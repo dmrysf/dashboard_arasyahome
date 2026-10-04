@@ -12,10 +12,10 @@
     "build": "vite build && node scripts/generate-dashboard-htaccess.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test tests/*.test.ts tests/*.test.tsx",
     "test:e2e:smoke": "playwright test -c playwright.smoke.config.ts",
     "test:e2e:real": "node e2e/prepare-real-api.mjs && VITE_DASHBOARD_API_BASE_URL=http://127.0.0.1:8788 vite build --mode e2e && playwright test -c playwright.real-api.config.ts",
-    "verify": "tsc --noEmit && eslint . && tsx --test tests/*.test.ts && pnpm build && node scripts/verify-build.mjs && /bin/bash tests/dashboard-deploy.sh"
+    "verify": "tsc --noEmit && eslint . && tsx --test tests/*.test.ts tests/*.test.tsx && pnpm build && node scripts/verify-build.mjs && /bin/bash tests/dashboard-deploy.sh"
   },
   "dependencies": {
     "react": "19.2.6",

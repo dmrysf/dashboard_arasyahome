@@ -21,11 +21,11 @@ export function RoleEditorPage({ id }: { id?: number }) {
   const [saved, setSaved] = useState(false);
   if ((catalog.error && !catalog.data) || (role.error && !role.data)) return <div className="page"><ErrorBanner message={catalog.error || role.error} onRetry={() => { catalog.reload(); role.reload(); }} /></div>;
   if (!catalog.data || (id !== undefined && !role.data)) return <div className="page"><Loading /></div>;
-  return <RoleEditor key={role.revision} id={id} role={role.data} catalog={catalog.data.items} saved={saved} onSaved={() => { setSaved(true); role.reload(); }} />;
+  return <RoleEditor key={role.revision} id={id} existing={role.data} catalog={catalog.data.items} saved={saved} onSaved={() => { setSaved(true); role.reload(); }} />;
 }
 
 /** Form state starts from the latest server copy of the role; each save remounts it from the server. */
-function RoleEditor({ id, role, catalog, saved, onSaved }: { id?: number; role: Role | null; catalog: Permission[]; saved: boolean; onSaved: () => void }) {
+export function RoleEditor({ id, existing: role, catalog, saved, onSaved }: { id?: number; existing: Role | null; catalog: Permission[]; saved: boolean; onSaved: () => void }) {
   const { api, can, me, navigate } = useDashboard();
   const ceiling = me.isRoot ? 999 : (me.authorityRank ?? 1) - 1;
   const [name, setName] = useState(role?.name ?? "");

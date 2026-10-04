@@ -15,6 +15,6 @@
     "jsx": "react-jsx",
     "types": ["vite/client", "node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "e2e/**/*.ts", "*.config.ts", "vite-env.d.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx", "e2e/**/*.ts", "*.config.ts", "vite-env.d.ts"],
   "exclude": ["node_modules", "dist", "dist-e2e"]
 }

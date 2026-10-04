@@ -6,7 +6,7 @@ import type { Department, EmployeeDetail, EmployeeSummary, Permission, Role, Wor
 import { Badge, Card, ConfirmDialog, ErrorBanner, Field, Loading, Notice, OneTimeSecret, PageHeader, RootBadge, StatusBadge } from "../components/ui";
 import { AuditList } from "./AuditList";
 
-type Pending = { title: string; body: ReactNode; confirmLabel: string; tone?: "primary" | "danger"; run: () => Promise<EmployeeDetail> };
+export type Pending = { title: string; body: ReactNode; confirmLabel: string; tone?: "primary" | "danger"; run: () => Promise<EmployeeDetail> };
 
 export function sameSet<T>(a: readonly T[], b: readonly T[]): boolean {
   return a.length === b.length && a.every((item) => b.includes(item));
@@ -76,7 +76,7 @@ export function EmployeeDetailPage({ id }: { id: string }) {
   );
 }
 
-type EditorProps = {
+export type EditorProps = {
   data: EmployeeDetail;
   departments: Department[];
   roles: Role[];
@@ -93,7 +93,7 @@ type EditorProps = {
 };
 
 /** Form state starts from the latest server copy; every accepted change remounts it from the server. */
-function EmployeeEditor({ data, departments, roles, catalog, applicationKeys, stages, managers, busy, message, error, secret, onPending, onSecret }: EditorProps) {
+export function EmployeeEditor({ data, departments, roles, catalog, applicationKeys, stages, managers, busy, message, error, secret, onPending, onSecret }: EditorProps) {
   const { api, can, me, navigate } = useDashboard();
   const id = data.id;
   const [profile, setProfile] = useState({ displayName: data.displayName, positionTitle: data.positionTitle ?? "", departmentId: String(data.department.id) });
