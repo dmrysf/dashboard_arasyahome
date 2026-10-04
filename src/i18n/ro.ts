@@ -687,7 +687,7 @@ export const ro = {
     applications: {
       staff: { name: "Staff", option: "Staff (producție)", description: "Aplicația de producție pentru angajați" },
       dashboard: { name: "Panou de control", option: "Panou de control (administrare)", description: "Panoul central de administrare" },
-      b2b: { name: "B2B", option: "B2B", description: "Aplicația pentru parteneri B2B" },
+      b2b: { name: "B2B", option: "B2B (vânzări en-gros)", description: "Aplicația internă pentru vânzări en-gros și clienți B2B" },
       finance: { name: "Financiar", option: "Financiar", description: "Aplicația financiară" },
     },
     categories: {
@@ -702,10 +702,16 @@ export const ro = {
       sources: "Surse",
       system: "Sistem",
       staff: "Staff (producție)",
+      b2b: "B2B (vânzări en-gros)",
     },
     permissions: {
       "staff.access": { label: "Acces Staff", description: "Acces la aplicația Staff." },
       "dashboard.access": { label: "Acces Panou de control", description: "Acces la panoul central de administrare." },
+      "b2b.access": { label: "Acces B2B", description: "Acces la aplicația internă pentru vânzări en-gros și clienți B2B." },
+      "b2b.companies.view": { label: "Vizualizare companii B2B", description: "Vede companiile en-gros, persoanele de contact, adresele, notele interne și activitatea lor." },
+      "b2b.companies.create": { label: "Creare companii B2B", description: "Înregistrează companii en-gros noi." },
+      "b2b.companies.update": { label: "Editare companii B2B", description: "Modifică datele companiilor, persoanele de contact, adresele și notele interne." },
+      "b2b.companies.manage_status": { label: "Activare/dezactivare companii B2B", description: "Dezactivează sau reactivează companii en-gros. Nu șterge nimic." },
       "dashboard.overview.view": { label: "Vizualizare panou de control", description: "Vede sumarul panoului de control." },
       "employees.view": { label: "Vizualizare angajați", description: "Vede identitățile angajaților." },
       "employees.create": { label: "Creare angajați", description: "Creează identități noi pentru angajați." },

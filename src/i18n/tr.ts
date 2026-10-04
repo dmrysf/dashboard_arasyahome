@@ -685,7 +685,7 @@ export const tr: Messages = {
     applications: {
       staff: { name: "Staff", option: "Staff (üretim)", description: "Çalışanlar için üretim uygulaması" },
       dashboard: { name: "Yönetim Paneli", option: "Yönetim Paneli (yönetim)", description: "Merkezi yönetim paneli" },
-      b2b: { name: "B2B", option: "B2B", description: "B2B iş ortakları uygulaması" },
+      b2b: { name: "B2B", option: "B2B (toptan satış)", description: "Toptan satış ve B2B müşteri yönetimi uygulaması" },
       finance: { name: "Finans", option: "Finans", description: "Finans uygulaması" },
     },
     categories: {
@@ -700,10 +700,16 @@ export const tr: Messages = {
       sources: "Kaynaklar",
       system: "Sistem",
       staff: "Staff (üretim)",
+      b2b: "B2B (toptan satış)",
     },
     permissions: {
       "staff.access": { label: "Staff Erişimi", description: "Staff uygulamasına erişim." },
       "dashboard.access": { label: "Yönetim Paneli Erişimi", description: "Merkezi yönetim paneline erişim." },
+      "b2b.access": { label: "B2B Erişimi", description: "Toptan satış ve B2B müşteri yönetimi uygulamasına erişim." },
+      "b2b.companies.view": { label: "B2B Şirketlerini Görüntüle", description: "Toptan müşteri şirketlerini, iletişim kişilerini, adreslerini, dahili notlarını ve etkinliklerini görür." },
+      "b2b.companies.create": { label: "B2B Şirketi Oluştur", description: "Yeni toptan müşteri şirketleri kaydeder." },
+      "b2b.companies.update": { label: "B2B Şirketlerini Düzenle", description: "Şirket bilgilerini, iletişim kişilerini, adresleri ve dahili notları değiştirir." },
+      "b2b.companies.manage_status": { label: "B2B Şirketlerini Aktif/Pasif Yap", description: "Toptan müşteri şirketlerini pasif veya yeniden aktif yapar. Hiçbir şeyi silmez." },
       "dashboard.overview.view": { label: "Yönetim Paneli Özetini Görüntüle", description: "Yönetim paneli özetini görür." },
       "employees.view": { label: "Çalışanları Görüntüle", description: "Çalışan kimliklerini görür." },
       "employees.create": { label: "Çalışan Oluştur", description: "Yeni çalışan kimlikleri oluşturur." },

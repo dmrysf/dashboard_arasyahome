@@ -131,6 +131,33 @@ test("8, 20: roles and permissions are translated while stable keys are shown an
   assert.match(list, /Ana Yönetici bir rol değildir/);
 });
 
+test("B2B application and its permissions are localized in both languages, never shown with the server's Romanian label", () => {
+  const b2b = [
+    ["b2b.access", "applications", "Acces B2B"],
+    ["b2b.companies.view", "b2b", "Vizualizare companii B2B"],
+    ["b2b.companies.create", "b2b", "Creare companii B2B"],
+    ["b2b.companies.update", "b2b", "Editare companii B2B"],
+    ["b2b.companies.manage_status", "b2b", "Activare/dezactivare companii B2B"],
+  ] as const;
+  const catalog = b2b.filter(([key]) => key !== "b2b.access").map(([key, category, label]) => permission({ key, category, label }));
+  const tr = text(render("tr", <RoleEditor id={9} existing={role({ id: 9, name: "Vânzări B2B", permissions: ["b2b.companies.view"] })} catalog={catalog} saved={false} onSaved={() => undefined} />));
+  for (const label of ["B2B (toptan satış)", "B2B Şirketlerini Görüntüle", "B2B Şirketi Oluştur", "B2B Şirketlerini Düzenle", "B2B Şirketlerini Aktif/Pasif Yap", "b2b.companies.manage_status"]) assert.ok(tr.includes(label), label);
+  assert.doesNotMatch(tr, /Vizualizare companii|Creare companii|Editare companii|Activare\/dezactivare/, "no Romanian server label inside the Turkish UI");
+  const ro = text(render("ro", <RoleEditor id={9} existing={role({ id: 9, name: "Vânzări B2B", permissions: [] })} catalog={catalog} saved={false} onSaved={() => undefined} />));
+  for (const label of ["B2B (vânzări en-gros)", "Vizualizare companii B2B", "Activare/dezactivare companii B2B"]) assert.ok(ro.includes(label), label);
+  for (const locale of ["ro", "tr"] as const) {
+    const t = createTranslator(locale);
+    for (const [key, , serverLabel] of b2b) {
+      assert.ok(Object.hasOwn(MESSAGES[locale].catalog.permissions, key), `${locale} ${key}`);
+      if (locale === "tr") assert.notEqual(t.permission(key, serverLabel), serverLabel, key);
+      assert.ok(t.permissionDescription(key, "server").length > 10);
+    }
+  }
+  assert.equal(createTranslator("ro").applicationDescription("b2b", "Management vânzări en-gros"), "Aplicația internă pentru vânzări en-gros și clienți B2B");
+  assert.equal(createTranslator("tr").applicationDescription("b2b", "Management vânzări en-gros"), "Toptan satış ve B2B müşteri yönetimi uygulaması");
+  assert.doesNotMatch(JSON.stringify(MESSAGES), /parteneri B2B|iş ortakları/, "B2B is internal wholesale sales, not a partner portal");
+});
+
 test("9-14: departments, applications, audit, system, login and password change are translated", () => {
   const pages: Array<[string, React.ReactNode, string[]]> = [
     ["departments", <DepartmentsPage key="d" />, ["Departmanlar", "Yeni Departman", "Departman adı", "Üst departman", "Ekle"]],

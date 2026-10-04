@@ -49,7 +49,7 @@ export function toProblem(caught: unknown): Problem {
 }
 
 /** Permission categories in a stable, readable order; the keys come from the server catalog. */
-export const CATEGORY_ORDER = ["dashboard", "employees", "roles", "departments", "applications", "orders", "production", "activity", "sources", "system", "staff"];
+export const CATEGORY_ORDER = ["dashboard", "employees", "roles", "departments", "applications", "orders", "production", "activity", "sources", "system", "staff", "b2b"];
 
 function pick<T>(map: Record<string, T>, key: string): T | undefined {
   return Object.hasOwn(map, key) ? map[key] : undefined;
