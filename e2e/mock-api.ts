@@ -21,10 +21,10 @@ function summary(overrides: Partial<Employee>): Employee {
   };
 }
 
-export type MockOptions = { mustChangePassword?: boolean; applications?: string[]; rejectApplicationsWith?: string };
+export type MockOptions = { mustChangePassword?: boolean; applications?: string[]; rejectApplicationsWith?: string; manageOwner?: boolean };
 
 /**
- * A stateful in-memory Operations API. It mirrors the 2.4.0 response shapes and records every mutation,
+ * A stateful in-memory Operations API. It mirrors the 2.6.0 response shapes and records every mutation,
  * so tests can prove that nothing is written before an explicit confirmation.
  */
 export async function mockApi(page: Page, options: MockOptions = {}) {
@@ -38,7 +38,10 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
     ordersFail: false,
     orderRequests: [] as string[],
     /** Mutable production state of the controlled order, so tests can simulate Staff progress. */
-    control: { stage: { id: "waiting", label: "În așteptare", ordinal: 1 }, owner: null as null | { id: string; displayName: string } },
+    control: { stage: { id: "waiting", label: "În așteptare", ordinal: 1 }, owner: null as null | { id: string; displayName: string }, extraVersions: 0, events: [] as unknown[] } as Control,
+    /** When set, the next owner intervention finds that Staff moved the order first (409 ORDER_CHANGED). */
+    ownerConflict: false,
+    ownerRequests: [] as Array<{ method: string; path: string; body: unknown; idempotencyKey: string | undefined; csrf: string | undefined }>,
     mutations: [] as Array<{ method: string; path: string; body: unknown; csrf: string | undefined }>,
     employees: [
       summary({ id: ROOT_ID, username: "arasya.root.owner", displayName: "Administrator principal", positionTitle: "Administrator principal", isRoot: true, applications: ["staff", "dashboard"], manageable: false, rolePermissions: ["*"], department: { id: 1, name: "Administrație" } }),
@@ -61,7 +64,7 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
     isRoot: false, authorityRank: 700,
     permissions: ["dashboard.access", "dashboard.overview.view", "employees.view", "employees.create", "employees.update", "employees.manage_applications", "employees.manage_roles", "roles.assign",
       "employees.manage_stages", "employees.activate", "employees.deactivate", "employees.reset_password", "roles.view", "departments.view", "applications.view", "iam.audit.view", "system.view",
-      "production.view", "orders.view_all", "activity.view_all", "sources.view"],
+      "production.view", "orders.view_all", "activity.view_all", "sources.view", ...(options.manageOwner === false ? [] : ["production.manage_owner"])],
     grantablePermissions: ["employees.view"], applications: ["staff", "dashboard"], authorizationVersion: 7,
   };
   const role = { id: 5, key: "employee", name: "Angajat", description: null, authorityRank: 100, isTemplate: true, status: "active", userCount: 1, permissionCount: 0, permissions: [], manageable: true };
@@ -100,11 +103,44 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
       if (state.ordersFail) return fail(route, "SERVER_ERROR", 503);
       return json(route, orderPage(url.searchParams, state.control));
     }
+    const owner = /^\/management\/orders\/([^/]+)\/(eligible-owners|owner|release-owner)$/.exec(path);
+    if (owner) {
+      if (decodeURIComponent(owner[1]) !== "trendhome:91001") return fail(route, "ORDER_NOT_FOUND", 404);
+      if (options.manageOwner === false) return fail(route, "UNAUTHORIZED_ACTION", 403);
+      const control = state.control;
+      if (owner[2] === "eligible-owners") {
+        return json(route, { stage: { id: control.stage.id, label: control.stage.label }, productionVersion: controlVersion(control), blockedReason: null,
+          items: ELIGIBLE.filter((item) => item.id !== control.owner?.id).map((item) => ({ ...item, stage: { id: control.stage.id, label: control.stage.label } })) });
+      }
+      state.ownerRequests.push({ method, path, body, idempotencyKey: request.headers()["idempotency-key"], csrf: request.headers()["x-csrf-token"] });
+      if (!request.headers()["idempotency-key"]) return fail(route, "INVALID_IDEMPOTENCY_KEY", 400);
+      if (state.ownerConflict) {
+        // Staff completed the stage in the meantime: the stale intervention must not overwrite it.
+        state.ownerConflict = false;
+        control.owner = null;
+        control.stage = { id: "material-preparation", label: "Pregătire material", ordinal: 2 };
+        control.extraVersions += 1;
+        return fail(route, "ORDER_CHANGED", 409);
+      }
+      if (body.expectedVersion !== controlVersion(control)) return fail(route, "ORDER_CHANGED", 409);
+      if (control.events.length === 0 && control.owner) control.events.push(claimedEvent(control.owner));
+      const previous = control.owner;
+      const next = owner[2] === "owner" ? ELIGIBLE.find((item) => item.id === body.employeeId) ?? null : null;
+      if (owner[2] === "owner" && (method !== "PUT" || !next)) return fail(route, "EMPLOYEE_NOT_ELIGIBLE_FOR_STAGE", 422);
+      if (owner[2] === "release-owner" && (method !== "POST" || !previous)) return fail(route, "ORDER_NOT_CLAIMED", 409);
+      const before = controlVersion(control);
+      control.owner = next ? { id: next.id, displayName: next.displayName } : null;
+      control.extraVersions += 1;
+      const action = next ? "owner_reassigned" : "owner_released";
+      control.events.push({ id: `pa-${control.events.length + 1}`, action, occurredAt: "2026-10-04T12:00:00.000Z", employee: { id: ADMIN_ID, displayName: "Maria Ionescu" },
+        fromStage: { id: control.stage.id, label: control.stage.label }, toStage: null, previousOwner: previous, newOwner: control.owner, productionVersion: before + 1 });
+      return json(route, { globalOrderId: "trendhome:91001", action, production: { version: before + 1, stage: { id: control.stage.id, label: control.stage.label }, owner: control.owner, previousOwner: previous } });
+    }
     if (path.startsWith("/management/orders/")) {
       state.orderRequests.push(path);
       if (state.ordersFail) return fail(route, "SERVER_ERROR", 503);
       const id = decodeURIComponent(path.slice("/management/orders/".length));
-      return id === "trendhome:91001" ? json(route, orderDetail(state.control)) : fail(route, "ORDER_NOT_FOUND", 404);
+      return id === "trendhome:91001" ? json(route, orderDetail(state.control, options.manageOwner !== false)) : fail(route, "ORDER_NOT_FOUND", 404);
     }
     if (path === "/management/production-overview") {
       state.overviewRequests.push(url.search);
@@ -181,7 +217,15 @@ function productionOverview(source: string | null) {
   };
 }
 
-type Control = { stage: { id: string; label: string; ordinal: number }; owner: null | { id: string; displayName: string } };
+type Control = { stage: { id: string; label: string; ordinal: number }; owner: null | { id: string; displayName: string }; extraVersions: number; events: unknown[] };
+
+const ELIGIBLE = [
+  { id: "e-mehmet", displayName: "Mehmet Atölye", department: "Atelier", positionTitle: "Croitor" },
+  { id: "e-cem", displayName: "Cem Kaya", department: "Pregătire Material", positionTitle: null },
+];
+/** Import is version 1, a Staff claim version 2; every intervention or simulated Staff step adds one. */
+const controlVersion = (control: Control) => (control.events.length > 0 || control.owner ? 2 : 1) + control.extraVersions;
+const claimedEvent = (owner: { id: string; displayName: string }) => ({ id: "pa-c1", action: "claimed", occurredAt: "2026-10-04T11:00:00.000Z", employee: owner, fromStage: { id: "waiting", label: "În așteptare" }, toStage: null, previousOwner: null, newOwner: null, productionVersion: 2 });
 
 function orderSummary(index: number, control: Control) {
   const controlled = index === 0;
@@ -193,6 +237,7 @@ function orderSummary(index: number, control: Control) {
     production: {
       state: "active", stage: controlled ? control.stage : { id: "labeling", label: "Etichetare", ordinal: 4 }, owner: controlled ? control.owner : null,
       claimedAt: controlled && control.owner ? "2026-10-04T11:00:00.000Z" : null, stageEnteredAt: "2026-10-04T09:00:00.000Z", completedAt: null,
+      attention: (controlled ? control.owner : null) ? null : "unassigned",
     },
     importedAt: `2026-10-04T0${Math.min(9, 8 - Math.floor(index / 10))}:00:00.000Z`,
     acceptedAt: "2026-10-04T07:00:00.000Z",
@@ -215,17 +260,18 @@ function orderPage(query: URLSearchParams, control: Control) {
       commerceStatuses: [{ code: "on-hold", label: "În așteptare plată" }, { code: "processing", label: "Se procesează" }],
       owners: control.owner ? [control.owner] : [],
     },
+    counts: { unassignedActive: control.owner ? 29 : 30, ownerAttention: 0 },
   };
 }
 
-function orderDetail(control: Control) {
+function orderDetail(control: Control, canManageOwner: boolean) {
   const base = orderSummary(0, control);
   return {
     ...base,
     commerce: { ...base.commerce, sourceChangedAt: "2026-10-04T07:01:00.000Z", lastSourceSeenAt: "2026-10-04T11:50:00.000Z" },
-    production: { ...base.production, changedAt: control.stage.id === "waiting" ? null : "2026-10-04T11:30:00.000Z", version: control.owner ? 2 : 1, notes: "Tiv dublu." },
+    production: { ...base.production, changedAt: control.stage.id === "waiting" ? null : "2026-10-04T11:30:00.000Z", version: controlVersion(control), notes: "Tiv dublu.", control: { canManageOwner, blockedReason: null } },
     items: [{ line: 1, name: "Draperie Velvet", sku: "DV-302", variant: "Inele", color: "Bej", width: 300, height: 260, unit: "cm", meters: 8.4, quantity: 2 }],
-    activity: control.owner ? [{ id: "pa-c1", action: "claimed", occurredAt: "2026-10-04T11:00:00.000Z", employee: control.owner, fromStage: { id: "waiting", label: "În așteptare" }, toStage: null, productionVersion: 2 }] : [],
+    activity: control.events.length > 0 ? control.events : control.owner ? [claimedEvent(control.owner)] : [],
     activityTruncated: false,
   };
 }

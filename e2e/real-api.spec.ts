@@ -8,7 +8,7 @@ type Fixture = {
   role: { id: number; name: string };
   stage: { id: string; label: string };
   department: { id: number; name: string };
-  control: { order: string; number: string; worker: { username: string; password: string; name: string } };
+  control: { order: string; number: string; worker: { username: string; password: string; name: string }; second: { username: string; password: string; name: string } };
   production: {
     summary: Record<"active" | "waiting" | "inWork" | "unassigned" | "completedToday", number>;
     stages: Record<string, number>;
@@ -129,18 +129,18 @@ const overflowing = () => [...document.querySelectorAll("body *")]
   .slice(0, 5).map((element) => `${element.tagName.toLowerCase()}.${String(element.className)}: ${(element.textContent ?? "").trim().slice(0, 40)}`);
 
 /** A signed Trendhome commerce event, exactly as the WooCommerce connector sends it (inbound only). */
-async function trendhomeEvent(eventId: string, status: { code: string; label: string }) {
+async function trendhomeEvent(eventId: string, status: { code: string; label: string }, orderId = "90001", stageId = "delivery") {
   const body = JSON.stringify({
     schemaVersion: 1, eventId, changedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
     order: {
-      id: "90001", number: "90001", status, availability: "active", notes: "Tiv dublu la bază.", acceptedAt: new Date(Date.now() - 3_600_000).toISOString().replace(/\.\d{3}Z$/, "Z"),
+      id: orderId, number: orderId, status, availability: "active", notes: "Tiv dublu la bază.", acceptedAt: new Date(Date.now() - 3_600_000).toISOString().replace(/\.\d{3}Z$/, "Z"),
       items: [
         { id: 900011, line: 1, name: "Draperie Blackout", sku: "BO-210", variant: "Rejansă cu inele", color: "Gri", width: 320, height: 270.5, unit: "cm", meters: 9.6, quantity: 2 },
         { id: 900012, line: 2, name: "Perdea In", sku: null, color: null, width: null, height: null, unit: null, meters: null, quantity: 1 },
       ],
     },
     // A stale source stage hint must not move production that Operations already owns.
-    production: { workflowKey: "curtain-production", workflowVersion: 1, stageId: "delivery" },
+    production: { workflowKey: "curtain-production", workflowVersion: 1, stageId },
   });
   const timestamp = String(Math.floor(Date.now() / 1000));
   const signature = "v1=" + createHmac("sha256", "trendhome-integration-secret-0123456789abcdef").update(`${timestamp}.${body}`).digest("hex");
@@ -241,6 +241,117 @@ test("production control: list, detail, Staff progress, independent commerce upd
   expect(external, "no request to any external host").toEqual([]);
   expect(rootWrites, "the order workspace is read-only").toEqual([]);
   await worker.context().close();
+});
+
+/** A Staff employee acting through the real API from its own browser context; returns the HTTP status. */
+async function staffOperation(page: Page, who: { username: string; password: string }, path: string, body: unknown) {
+  return page.evaluate(async ({ api, path, body, username, password }) => {
+    let session = await fetch(`${api}/auth/session`, { credentials: "include" });
+    if (session.status !== 200) session = await fetch(`${api}/auth/login`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
+    const { csrfToken } = await session.json();
+    const response = await fetch(`${api}${path}`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken, "Idempotency-Key": `e2e-${crypto.randomUUID()}` }, body: JSON.stringify(body) });
+    return response.status;
+  }, { api: API, path, body, username: who.username, password: who.password });
+}
+
+test("production control V2: supervisor reassigns and releases ownership; stage and store status stay; Staff follows at operation time", async ({ browser }) => {
+  const order = "trendhome:90002";
+  const orderPath = `/orders/${encodeURIComponent(order)}`;
+  const { worker: mehmet, second: ali } = fixture.control;
+  const external: string[] = [];
+  const watch = (request: import("@playwright/test").Request) => { if (new URL(request.url()).hostname !== "127.0.0.1") external.push(request.url()); };
+  root.on("request", watch);
+
+  // 1-2: a controlled Trendhome order (never a customer order) is claimed by Ali in Staff.
+  await trendhomeEvent("dashboard-e2e-90002-1", { code: "processing", label: "Se procesează" }, "90002", "waiting");
+  const aliPage = await newEmployeePage(browser);
+  const mehmetPage = await newEmployeePage(browser);
+  await aliPage.goto("/");
+  await mehmetPage.goto("/");
+  expect(await staffOperation(aliPage, ali, `${orderPath}/claim`, { expectedVersion: 1 })).toBe(200);
+
+  // 3: the Dashboard detail shows Ali and the owner controls.
+  await root.goto(`/comenzi/${encodeURIComponent(order)}`);
+  const control = root.locator('[data-section="control"]');
+  const stageChip = root.locator('[data-section="production"] [data-kind="production"]');
+  const storeChip = root.locator('[data-section="commerce"] [data-kind="commerce"]');
+  await expect(control.getByRole("heading", { name: "Control producție" })).toBeVisible();
+  await expect(control).toContainText(ali.name);
+  await expect(stageChip).toHaveText(/În așteptare/);
+  await expect(storeChip).toHaveText(/Se procesează/);
+
+  // 4: reassign Ali -> Mehmet; the eligible list comes from the server and excludes the current owner.
+  await control.getByRole("button", { name: "Schimbă responsabilul" }).click();
+  const dialog = root.getByRole("dialog", { name: "Schimbă responsabilul de producție" });
+  await expect(dialog.getByRole("radio", { name: mehmet.name })).toBeVisible();
+  await expect(dialog.getByRole("radio", { name: ali.name })).toHaveCount(0);
+  await expect(dialog.getByRole("radio", { name: "Ana Croitor" }), "Ana has no waiting stage").toHaveCount(0);
+  await dialog.getByRole("radio", { name: mehmet.name }).check();
+  await expect(dialog.locator("[data-summary-current]")).toHaveText(ali.name);
+  await expect(dialog.locator("[data-summary-new]")).toHaveText(mehmet.name);
+  await dialog.getByRole("button", { name: "Confirmă schimbarea" }).click();
+  await expect(control.getByRole("status")).toContainText(`Responsabil schimbat: ${mehmet.name}`);
+  await expect(control).toContainText(mehmet.name);
+  // 5-6: stage and store status unchanged.
+  await expect(stageChip).toHaveText(/În așteptare/);
+  await expect(storeChip).toHaveText(/Se procesează/);
+
+  // 7: Ali can no longer act as owner; 8: Mehmet completes the stage through the normal Staff flow.
+  expect(await staffOperation(aliPage, ali, `${orderPath}/transition`, { expectedVersion: 3 })).toBe(409);
+  expect(await staffOperation(mehmetPage, mehmet, `${orderPath}/transition`, { expectedVersion: 3 })).toBe(200);
+  // 9: the Dashboard follows.
+  await root.getByRole("button", { name: "Actualizează" }).click();
+  await expect(stageChip).toHaveText(/Pregătire material/);
+  await expect(control).toContainText("Fără responsabil");
+  expect(await staffOperation(mehmetPage, mehmet, `${orderPath}/claim`, { expectedVersion: 4 })).toBe(200);
+  await root.getByRole("button", { name: "Actualizează" }).click();
+  await expect(control).toContainText(mehmet.name);
+
+  // 10-12: release Mehmet; owner null, stage unchanged.
+  await control.getByRole("button", { name: "Eliberează responsabilul" }).click();
+  const release = root.getByRole("dialog", { name: "Eliberezi responsabilul curent?" });
+  await expect(release).toContainText("Comanda va rămâne în aceeași etapă de producție");
+  await release.getByRole("button", { name: "Eliberează responsabilul" }).click();
+  await expect(control.getByRole("status")).toContainText("Responsabil eliberat.");
+  await expect(control).toContainText("Fără responsabil");
+  await expect(stageChip).toHaveText(/Pregătire material/);
+  await expect(storeChip).toHaveText(/Se procesează/);
+
+  // 13: an eligible employee claims normally through Staff.
+  expect(await staffOperation(aliPage, ali, `${orderPath}/claim`, { expectedVersion: 6 })).toBe(200);
+  await root.getByRole("button", { name: "Actualizează" }).click();
+  await expect(control).toContainText(ali.name);
+
+  // 14: the immutable timeline shows every ownership event in order.
+  expect(await root.locator("[data-event]").evaluateAll((items) => items.map((item) => item.getAttribute("data-event")))).toEqual(["imported", "claimed", "owner_reassigned", "stage_completed", "claimed", "owner_released", "claimed"]);
+  await expect(root.locator('[data-event="owner_reassigned"]')).toContainText(`Responsabil: ${ali.name} → ${mehmet.name}`);
+  await expect(root.locator('[data-event="owner_released"]')).toContainText(`Responsabil eliberat: ${mehmet.name}`);
+
+  // 17-18: Turkish and phone, with the dialog usable on a phone.
+  await root.getByRole("button", { name: "TR — Türkçe" }).click();
+  await expect(control.getByRole("heading", { name: "Üretim Kontrolü" })).toBeVisible();
+  await root.setViewportSize({ width: 390, height: 844 });
+  await control.getByRole("button", { name: "Sorumluyu Değiştir" }).click();
+  const phoneDialog = root.getByRole("dialog", { name: "Üretim sorumlusunu değiştir" });
+  await expect(phoneDialog.getByRole("radio", { name: mehmet.name })).toBeVisible();
+  expect(await root.evaluate(overflowing), "no element wider than a phone").toEqual([]);
+  await phoneDialog.getByRole("button", { name: "İptal" }).click();
+  expect(await root.evaluate(overflowing), "no element wider than a phone").toEqual([]);
+  await root.setViewportSize({ width: 1280, height: 720 });
+  await root.getByRole("button", { name: "RO — Română" }).click();
+
+  // 15: the IAM audit holds both privileged interventions under stable keys.
+  await root.getByRole("navigation").getByRole("link", { name: "Audit" }).click();
+  await root.getByLabel("Tip țintă").selectOption("order");
+  await expect(root.getByText("Administrator principal a schimbat responsabilul de producție al comenzii 90002 · trendhome.")).toBeVisible();
+  await expect(root.getByText("Administrator principal a eliberat responsabilul de producție al comenzii 90002 · trendhome.")).toBeVisible();
+  await expect(root.getByText(`responsabil: ${ali.name} → ${mehmet.name}`)).toBeVisible();
+
+  // 16: no request left the controlled environment.
+  root.off("request", watch);
+  expect(external, "no request to any external host").toEqual([]);
+  await aliPage.context().close();
+  await mehmetPage.context().close();
 });
 
 test("old temporary root password stops working immediately", async ({ browser }) => {

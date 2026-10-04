@@ -97,6 +97,8 @@ if (($ingested['body']['outcome'] ?? null) !== 'applied') {
     throw new RuntimeException('Controlled order ingestion failed: ' . json_encode($ingested['body']));
 }
 $container->employeeAdmin()->create('Mehmet Atölye', 'mehmet.control.e2e', 'E2E-MEH', 'pregatire-material', 'employee', 'control e2e passphrase 2026', ['waiting', 'material-preparation'], 'e2e');
+// Production Control V2: a second Staff worker for the same stages, so ownership can move A -> B.
+$container->employeeAdmin()->create('Ali Demir', 'ali.control.e2e', 'E2E-ALI', 'pregatire-material', 'employee', 'control e2e passphrase 2026', ['waiting', 'material-preparation'], 'e2e');
 
 // OutletPerdele last spoke 30 minutes ago (stale); Trendhome just now (healthy); Trendyol has no credentials.
 $pdo->prepare("UPDATE order_sources SET last_contact_at = :at WHERE source_key = 'outletperdele'")->execute(['at' => gmdate('Y-m-d H:i:s', time() - 1800) . '.000000']);
@@ -106,7 +108,11 @@ echo json_encode([
     'role' => ['id' => (int) $role['role_id'], 'name' => (string) $role['name']],
     'stage' => ['id' => (string) $stage['stage_id'], 'label' => (string) $stage['label']],
     'department' => ['id' => (int) $department['department_id'], 'name' => (string) $department['name']],
-    'control' => ['order' => 'trendhome:90001', 'number' => '90001', 'worker' => ['username' => 'mehmet.control.e2e', 'password' => 'control e2e passphrase 2026', 'name' => 'Mehmet Atölye']],
+    'control' => [
+        'order' => 'trendhome:90001', 'number' => '90001',
+        'worker' => ['username' => 'mehmet.control.e2e', 'password' => 'control e2e passphrase 2026', 'name' => 'Mehmet Atölye'],
+        'second' => ['username' => 'ali.control.e2e', 'password' => 'control e2e passphrase 2026', 'name' => 'Ali Demir'],
+    ],
     'production' => [
         'summary' => ['active' => 5, 'waiting' => 3, 'inWork' => 2, 'unassigned' => 4, 'completedToday' => 1],
         'stages' => ['waiting' => 3, 'labeling' => 1, 'quality-control' => 1, 'ironing' => 0, 'delivery' => 0],

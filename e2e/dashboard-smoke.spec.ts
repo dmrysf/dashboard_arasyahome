@@ -329,3 +329,100 @@ test("orders: server filters and cursor pages, detail with separate store and pr
   await expect(page.getByRole("alert")).toContainText("Sipariş bulunamadı.");
   expect(api.mutations.map((mutation) => mutation.path)).toEqual(["/auth/login"]);
 });
+
+test("production control: a supervisor reassigns and releases the owner; stage and store status never change; conflicts and TR/phone work", async ({ page }) => {
+  const api = await mockApi(page);
+  api.control.owner = { id: "e-ali", displayName: "Ali Demir" };
+  await login(page);
+  await expect(page.getByRole("heading", { name: "Bună, Maria." })).toBeVisible();
+  await page.goto("/comenzi/trendhome%3A91001");
+  const control = page.locator('[data-section="control"]');
+  await expect(control.getByRole("heading", { name: "Control producție" })).toBeVisible();
+  await expect(control).toContainText("Ali Demir");
+  await expect(control).toContainText("Versiune producție 2");
+  const stageChip = page.locator('[data-section="production"] [data-kind="production"]');
+  const storeChip = page.locator('[data-section="commerce"] [data-kind="commerce"]');
+  await expect(stageChip).toHaveText(/În așteptare/);
+  await expect(storeChip).toHaveText(/Se procesează/);
+  await expect(page.locator("select")).toHaveCount(0);
+
+  // Reassign: only eligible employees, explicit summary and warning, nothing sent before confirmation.
+  await control.getByRole("button", { name: "Schimbă responsabilul" }).click();
+  const dialog = page.getByRole("dialog", { name: "Schimbă responsabilul de producție" });
+  await expect(dialog.locator("[data-candidate]")).toHaveCount(2);
+  await expect(dialog).toContainText("Atelier · Croitor");
+  await expect(dialog).toContainText("Etapă permisă: În așteptare");
+  await expect(dialog).toContainText("Această acțiune schimbă doar responsabilul de producție. Etapa de producție și statusul magazinului nu vor fi modificate.");
+  const confirmReassign = dialog.getByRole("button", { name: "Confirmă schimbarea" });
+  await expect(confirmReassign).toBeDisabled();
+  await dialog.getByRole("radio", { name: "Mehmet Atölye" }).check();
+  await expect(dialog.locator("[data-summary-current]")).toHaveText("Ali Demir");
+  await expect(dialog.locator("[data-summary-new]")).toHaveText("Mehmet Atölye");
+  await expect(dialog.locator("[data-summary-stage]")).toHaveText("În așteptare");
+  expect(api.ownerRequests).toEqual([]);
+  await confirmReassign.click();
+  await expect(control.getByRole("status")).toHaveText("Responsabil schimbat: Mehmet Atölye. Etapa de producție și statusul magazinului au rămas neschimbate.");
+  await expect(control).toContainText("Mehmet Atölye");
+  await expect(control).toContainText("Versiune producție 3");
+  await expect(stageChip).toHaveText(/În așteptare/);
+  await expect(storeChip).toHaveText(/Se procesează/);
+  await expect(page.locator('[data-event="owner_reassigned"]')).toContainText("Responsabil: Ali Demir → Mehmet Atölye");
+  expect(api.ownerRequests).toHaveLength(1);
+  expect(api.ownerRequests[0]).toMatchObject({ method: "PUT", path: "/management/orders/trendhome%3A91001/owner", body: { employeeId: "e-mehmet", expectedVersion: 2 }, csrf: "csrf-smoke" });
+  expect(api.ownerRequests[0].idempotencyKey).toMatch(/^dash-[A-Za-z0-9-]{16,}$/);
+
+  // Release: explicit confirmation with the specified text; the order stays in the same stage.
+  await control.getByRole("button", { name: "Eliberează responsabilul" }).click();
+  const release = page.getByRole("dialog", { name: "Eliberezi responsabilul curent?" });
+  await expect(release).toContainText("Comanda va rămâne în aceeași etapă de producție și va putea fi preluată de un alt angajat autorizat.");
+  await expect(release).toContainText("Mehmet Atölye");
+  await release.getByRole("button", { name: "Eliberează responsabilul" }).click();
+  await expect(control.getByRole("status")).toHaveText("Responsabil eliberat. Comanda a rămas în aceeași etapă și poate fi preluată din Staff.");
+  await expect(control).toContainText("Fără responsabil");
+  await expect(stageChip).toHaveText(/În așteptare/);
+  await expect(storeChip).toHaveText(/Se procesează/);
+  await expect(page.locator('[data-event="owner_released"]')).toContainText("Responsabil eliberat: Mehmet Atölye");
+  expect(api.ownerRequests[1]).toMatchObject({ method: "POST", path: "/management/orders/trendhome%3A91001/release-owner", body: { expectedVersion: 3 } });
+  expect(api.ownerRequests[1].idempotencyKey).not.toBe(api.ownerRequests[0].idempotencyKey);
+
+  // Concurrency: Staff completed the stage after the dialog opened; the stale request is refused and the page reloads.
+  api.ownerConflict = true;
+  await control.getByRole("button", { name: "Atribuie responsabil" }).click();
+  await page.getByRole("dialog").getByRole("radio", { name: "Cem Kaya" }).check();
+  await page.getByRole("dialog").getByRole("button", { name: "Confirmă schimbarea" }).click();
+  await expect(control.getByRole("status")).toHaveText("Comanda s-a schimbat între timp, de exemplu în Staff. Datele au fost reîncărcate. Verifică-le și încearcă din nou.");
+  await expect(stageChip).toHaveText(/Pregătire material/);
+  await expect(control).toContainText("Fără responsabil");
+
+  // Turkish and phone.
+  await page.getByRole("button", { name: "TR — Türkçe" }).click();
+  await expect(control.getByRole("heading", { name: "Üretim Kontrolü" })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await control.getByRole("button", { name: "Sorumlu Ata" }).click();
+  const phoneDialog = page.getByRole("dialog", { name: "Üretim sorumlusunu değiştir" });
+  await expect(phoneDialog).toContainText("Bu işlem yalnızca üretim sorumlusunu değiştirir. Üretim aşaması ve mağaza sipariş durumu değişmez.");
+  await phoneDialog.getByRole("radio", { name: "Mehmet Atölye" }).check();
+  await expect(phoneDialog.getByRole("button", { name: "Değişikliği onayla" })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await phoneDialog.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await phoneDialog.getByRole("button", { name: "İptal" }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(api.mutations.map((mutation) => mutation.path).filter((path) => !path.startsWith("/auth/"))).toEqual([
+    "/management/orders/trendhome%3A91001/owner", "/management/orders/trendhome%3A91001/release-owner", "/management/orders/trendhome%3A91001/owner",
+  ]);
+});
+
+test("production control: without production.manage_owner the controls are absent and the list keeps unassigned work visible", async ({ page }) => {
+  const api = await mockApi(page, { manageOwner: false });
+  await login(page);
+  await expect(page.getByRole("heading", { name: "Bună, Maria." })).toBeVisible();
+  await page.getByRole("navigation").getByRole("link", { name: "Comenzi", exact: true }).click();
+  await expect(page.locator('[data-count="unassigned"]')).toHaveText("30 active fără responsabil");
+  await page.locator('[data-count="unassigned"]').click();
+  await expect.poll(() => api.orderRequests.at(-1)).toBe("?assignment=unassigned&state=active&limit=50");
+  await page.goto("/comenzi/trendhome%3A91001");
+  const control = page.locator('[data-section="control"]');
+  await expect(control).toContainText("Nu ai permisiunea „Intervenție responsabil producție”.");
+  await expect(control.getByRole("button")).toHaveCount(0);
+  expect(api.ownerRequests).toEqual([]);
+});

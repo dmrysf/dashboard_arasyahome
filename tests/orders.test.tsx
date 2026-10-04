@@ -23,7 +23,7 @@ function summary(overrides: Omit<Partial<OrderSummary>, "production"> & { produc
     commerce: { status: { code: "processing", label: "Se procesează" }, availability: "active" },
     production: {
       state: "active", stage: { id: "quality-control", label: "Control calitate", ordinal: 12 }, owner: WORKER,
-      claimedAt: "2026-10-04T09:14:00.000Z", stageEnteredAt: "2026-10-04T09:00:00.000Z", completedAt: null, ...production,
+      claimedAt: "2026-10-04T09:14:00.000Z", stageEnteredAt: "2026-10-04T09:00:00.000Z", completedAt: null, attention: null, ...production,
     },
     importedAt: "2026-10-04T07:10:00.000Z",
     acceptedAt: "2026-10-04T07:05:00.000Z",
@@ -48,14 +48,14 @@ function detail(overrides: Partial<OrderDetail> = {}): OrderDetail {
   return {
     ...base,
     commerce: { ...base.commerce, sourceChangedAt: "2026-10-04T07:06:00.000Z", lastSourceSeenAt: "2026-10-04T11:00:00.000Z" },
-    production: { ...base.production, changedAt: "2026-10-04T09:00:00.000Z", version: 24, notes: "Tiv dublu.\nVerifică sensul materialului." },
+    production: { ...base.production, changedAt: "2026-10-04T09:00:00.000Z", version: 24, notes: "Tiv dublu.\nVerifică sensul materialului.", control: { canManageOwner: false, blockedReason: null } },
     items: [
       { line: 1, name: "Draperie Velvet", sku: "DV-302", variant: "Inele", color: "Bej", width: 300, height: 260.5, unit: "cm", meters: 8.4, quantity: 2 },
       { line: 2, name: "Perdea In", sku: null, variant: null, color: null, width: null, height: null, unit: null, meters: null, quantity: 1 },
     ],
     activity: [
-      { id: "a1", action: "claimed", occurredAt: "2026-10-04T07:14:00.000Z", employee: WORKER, fromStage: { id: "waiting", label: "În așteptare" }, toStage: null, productionVersion: 2 },
-      { id: "a2", action: "stage_completed", occurredAt: "2026-10-04T07:20:00.000Z", employee: WORKER, fromStage: { id: "waiting", label: "În așteptare" }, toStage: { id: "material-preparation", label: "Pregătire material" }, productionVersion: 3 },
+      { id: "a1", action: "claimed", occurredAt: "2026-10-04T07:14:00.000Z", employee: WORKER, fromStage: { id: "waiting", label: "În așteptare" }, toStage: null, previousOwner: null, newOwner: null, productionVersion: 2 },
+      { id: "a2", action: "stage_completed", occurredAt: "2026-10-04T07:20:00.000Z", employee: WORKER, fromStage: { id: "waiting", label: "În așteptare" }, toStage: { id: "material-preparation", label: "Pregătire material" }, previousOwner: null, newOwner: null, productionVersion: 3 },
     ],
     activityTruncated: false,
     ...overrides,
@@ -79,7 +79,7 @@ function wrap(locale: Locale, node: React.ReactNode, profile: ManagementMe = me(
 
 const noop = () => undefined;
 function list(locale: Locale, props: Partial<OrdersViewProps> = {}) {
-  return wrap(locale, <OrdersView data={{ items: rows, nextCursor: "next-1", facets }} error={null} updatedAt={Date.parse("2026-10-04T12:00:00Z")} refreshing={false} refresh={noop}
+  return wrap(locale, <OrdersView data={{ items: rows, nextCursor: "next-1", facets, counts: { unassignedActive: 1, ownerAttention: 0 } }} error={null} updatedAt={Date.parse("2026-10-04T12:00:00Z")} refreshing={false} refresh={noop}
     filters={DEFAULT_ORDER_FILTERS} facets={facets} page={1} onFilters={noop} onNext={noop} onPrevious={noop} onFirst={noop} {...props} />);
 }
 function view(locale: Locale, data: OrderDetail | null = detail(), extra: { error?: unknown } = {}) {
@@ -129,7 +129,7 @@ test("filters cover search, source, stage, store status, owner, assignment, stat
 test("cursor pagination offers next, previous and first only when they exist", () => {
   const first = text(list("ro"));
   assert.ok(first.includes("Pagina următoare") && !first.includes("Pagina anterioară") && first.includes("Pagina 1 · 3 comenzi"));
-  const third = text(list("ro", { page: 3, data: { items: rows, nextCursor: null, facets } }));
+  const third = text(list("ro", { page: 3, data: { items: rows, nextCursor: null, facets, counts: { unassignedActive: 1, ownerAttention: 0 } } }));
   assert.ok(!third.includes("Pagina următoare") && third.includes("Pagina anterioară") && third.includes("Prima pagină"));
 });
 
@@ -139,7 +139,7 @@ test("loading, failed load, stale data after a failed refresh and empty results 
   assert.ok(failed.includes("Siparişler yüklenemedi."));
   const stale = list("ro", { error: new ApiError("SERVER_ERROR", 500) });
   assert.ok(text(stale).includes("Datele nu au putut fi actualizate.") && stale.includes('data-order="trendhome:7001"'), "last good rows stay visible");
-  assert.ok(text(list("ro", { data: { items: [], nextCursor: null, facets } })).includes("Nicio comandă pentru aceste filtre."));
+  assert.ok(text(list("ro", { data: { items: [], nextCursor: null, facets, counts: { unassignedActive: 1, ownerAttention: 0 } } })).includes("Nicio comandă pentru aceste filtre."));
   assert.match(list("ro", { refreshing: true }), /disabled="">Se actualizează…</);
   assert.ok(text(list("tr")).includes("Yenile"));
 });
@@ -199,12 +199,12 @@ test("completed production is explicitly not a completed or shipped store order"
   assert.equal((view("ro", done).match(/class="is-done"/g) ?? []).length, 14);
 });
 
-test("the order detail is read-only: no stage selector, no claim or override, only back and refresh", () => {
+test("the order detail has no stage control: no stage selector, no claim or override; a viewer gets only back and refresh", () => {
   const html = view("ro");
   assert.ok(!/<select/.test(html), "no stage dropdown");
   const buttons = [...html.matchAll(/<button[^>]*>([^<]*)</g)].map((match) => match[1]);
   assert.deepEqual(buttons, ["← Comenzi", "Actualizează"]);
-  assert.ok(text(html).includes("Etapa se schimbă numai din Staff."));
+  assert.ok(text(html).includes("Etapa de producție se schimbă numai din Staff"));
   const failed = text(view("ro", null, { error: new ApiError("ORDER_NOT_FOUND", 404) }));
   assert.ok(failed.includes("Comanda nu a fost găsită."));
   assert.ok(text(view("tr", null, { error: new ApiError("ORDER_NOT_FOUND", 404) })).includes("Sipariş bulunamadı."));
@@ -234,7 +234,7 @@ test("the API client sends only GET requests with the chosen filters and encodes
   const calls: Array<{ url: string; method: string }> = [];
   const api = createApi(API, (async (url: string, init?: RequestInit) => {
     calls.push({ url, method: init?.method ?? "GET" });
-    return new Response(JSON.stringify({ items: [], nextCursor: null, facets }), { status: 200, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ items: [], nextCursor: null, facets, counts: { unassignedActive: 1, ownerAttention: 0 } }), { status: 200, headers: { "Content-Type": "application/json" } });
   }) as typeof fetch);
   await api.orders({ search: "#7001", source: "trendhome", stage: undefined, state: "active", limit: "25", cursor: "abc" });
   await api.order("trendhome:7001");
