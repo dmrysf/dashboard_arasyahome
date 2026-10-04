@@ -1,0 +1,4 @@
+---
+deployment:
+  tasks:
+    - DASHBOARD_DEPLOY_PATH="$HOME/public_html/dashboard.arasyahome.ro" DASHBOARD_RELEASE_STORAGE_PATH="$HOME/arasya-dashboard-releases" /bin/bash ./scripts/cpanel-deploy.sh

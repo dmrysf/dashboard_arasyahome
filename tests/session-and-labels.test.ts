@@ -76,11 +76,11 @@ test("audit rendering ignores undocumented metadata so secrets can never appear"
 });
 
 test("the API base URL must be an exact HTTPS origin; loopback HTTP only in the E2E build", () => {
-  assert.equal(resolveApiBaseUrl("https://api.arasyahome.ro", false), "https://api.arasyahome.ro");
+  assert.equal(resolveApiBaseUrl("https://api.arasyahome.ro", ""), "https://api.arasyahome.ro");
   for (const bad of ["", "http://api.arasyahome.ro", "https://api.arasyahome.ro/v1", "https://u:p@api.arasyahome.ro", "https://api.arasyahome.ro?x=1", "http://127.0.0.1:8788"]) {
-    assert.throws(() => resolveApiBaseUrl(bad, false), bad);
+    assert.throws(() => resolveApiBaseUrl(bad, ""), bad);
   }
-  assert.equal(resolveApiBaseUrl("http://127.0.0.1:8788", true), "http://127.0.0.1:8788");
+  assert.equal(resolveApiBaseUrl("http://127.0.0.1:8788", "127.0.0.1"), "http://127.0.0.1:8788");
 });
 
 test("the Dashboard source never uses browser storage for sessions, tokens or passwords", () => {
