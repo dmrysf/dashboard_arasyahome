@@ -13,3 +13,4 @@
 /e2e/.runtime/
 /e2e/.real-api-fixture.json
 /operations-api
+/.staff-api-source/

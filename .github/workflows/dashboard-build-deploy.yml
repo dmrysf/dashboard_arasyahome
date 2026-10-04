@@ -1,0 +1,204 @@
+name: Dashboard Build & Publish
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arasya-dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VITE_DASHBOARD_API_BASE_URL: ${{ vars.VITE_DASHBOARD_API_BASE_URL }}
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Enable pinned pnpm
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Unit tests
+        run: pnpm test
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Enable pinned pnpm
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build production artifact
+        run: pnpm build
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run Chromium smoke against the production build
+        run: pnpm test:e2e:smoke
+
+  real-api-e2e:
+    # The Operations API source is private; it is checked out read-only with a repository-scoped deploy key.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database:
+          - { name: mysql-8.4, image: "mysql:8.4", health: "mysqladmin ping -h 127.0.0.1 -proot-test-password" }
+          - { name: mariadb-10.11, image: "mariadb:10.11", health: "healthcheck.sh --connect --innodb_initialized" }
+    name: real-api-e2e (${{ matrix.database.name }})
+    services:
+      database:
+        image: ${{ matrix.database.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: root-test-password
+          MARIADB_ROOT_PASSWORD: root-test-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="${{ matrix.database.health }}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      ARASYA_E2E_DB_NAME: arasya_dashboard_e2e_test
+      ARASYA_TEST_DB_HOST: 127.0.0.1
+      ARASYA_TEST_DB_PORT: "3306"
+      ARASYA_TEST_DB_USER: root
+      ARASYA_TEST_DB_PASSWORD: root-test-password
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Read pinned Operations API source
+        id: api
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ref="$(tr -d '[:space:]' < e2e/operations-api.ref)"
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "e2e/operations-api.ref must be a full commit SHA" >&2; exit 1; }
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - name: Check out Operations API (read-only deploy key)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: dmrysf/staff_arasyahome
+          ref: ${{ steps.api.outputs.ref }}
+          ssh-key: ${{ secrets.STAFF_REPO_DEPLOY_KEY }}
+          path: .staff-api-source
+          persist-credentials: false
+      - name: Link Operations API source
+        run: ln -s .staff-api-source/operations-api operations-api
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.2"
+          extensions: mbstring, pdo_mysql
+          coverage: none
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Enable pinned pnpm
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run Dashboard against the real Operations API
+        run: pnpm test:e2e:real
+
+  verified-release:
+    needs: [quality, browser-smoke, real-api-e2e]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Enable pinned pnpm
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify source, production build and deploy tooling
+        run: pnpm verify
+      - name: Add release metadata and content checksums
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          printf '{\n  "commit": "%s",\n  "version": "%s",\n  "builtAt": "%s",\n  "preview": false\n}\n' \
+            "$GITHUB_SHA" "$(node -p "require('./package.json').version")" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist/release.json
+          /bin/bash scripts/generate-sha256s.sh dist
+          /bin/bash scripts/validate-dashboard-release.sh dist "$GITHUB_SHA"
+      - name: Prepare checksummed deploy branch contents
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          release_dir="$RUNNER_TEMP/dashboard-release-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$release_dir/scripts"
+          cp -R dist "$release_dir/dist"
+          cp .cpanel.yml "$release_dir/.cpanel.yml"
+          cp scripts/cpanel-deploy.sh scripts/cpanel-rollback-dashboard.sh scripts/dashboard-release-common.sh scripts/validate-dashboard-release.sh scripts/generate-sha256s.sh "$release_dir/scripts/"
+          chmod +x "$release_dir/scripts/"*.sh
+          /bin/bash "$release_dir/scripts/generate-sha256s.sh" "$release_dir"
+          (cd "$release_dir" && sha256sum -c --quiet SHA256SUMS)
+          HOME="$RUNNER_TEMP/fake-home" DRY_RUN=1 /bin/bash "$release_dir/scripts/cpanel-deploy.sh"
+      - name: Upload verified release artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dashboard-release-${{ github.sha }}
+          path: ${{ runner.temp }}/dashboard-release-${{ github.run_id }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish verified release to deploy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          release_dir="$RUNNER_TEMP/dashboard-release-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          publish_dir="$RUNNER_TEMP/dashboard-deploy-branch-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin deploy >/dev/null 2>&1; then
+            git fetch --depth=1 origin deploy
+            git worktree add --detach "$publish_dir" FETCH_HEAD
+          else
+            git worktree add --detach "$publish_dir" HEAD
+            git -C "$publish_dir" checkout --orphan deploy
+            git -C "$publish_dir" rm -rf --quiet .
+          fi
+          rsync --archive --checksum --delete --exclude='.git' "$release_dir/" "$publish_dir/"
+          cmp "$release_dir/SHA256SUMS" "$publish_dir/SHA256SUMS"
+          cmp "$release_dir/dist/release.json" "$publish_dir/dist/release.json"
+          (cd "$publish_dir" && sha256sum -c --quiet SHA256SUMS)
+          git -C "$publish_dir" add --all
+          if git -C "$publish_dir" diff --cached --quiet; then
+            echo "Deploy branch already matches this verified release."
+            exit 0
+          fi
+          git -C "$publish_dir" commit -m "build: publish Dashboard release from ${GITHUB_SHA:0:7}"
+          git -C "$publish_dir" push origin HEAD:deploy

@@ -16,6 +16,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "operations-api/**",
+    ".staff-api-source/**",
   ]),
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
