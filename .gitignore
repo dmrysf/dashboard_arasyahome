@@ -1,0 +1,15 @@
+/node_modules
+/.pnpm-store/
+/coverage
+/playwright-report/
+/test-results/
+*.tsbuildinfo
+.DS_Store
+*.pem
+.env*
+!.env.example
+/dist/
+/dist-e2e/
+/e2e/.runtime/
+/e2e/.real-api-fixture.json
+/operations-api/
