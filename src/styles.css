@@ -178,7 +178,7 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .permissions-detail summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
 .facts dt { color: var(--muted); }
-.facts dd { margin: 0; }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .form-grid .facts { grid-column: 1 / -1; }
 
 /* One-time secret */
@@ -338,4 +338,8 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
   .orders-table td:first-child { grid-column: 1 / -1; font-size: 15px; }
   .items-table td { white-space: normal; }
   .timeline li { grid-template-columns: 1fr; gap: 2px; }
+  .state-card .facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .state-card .facts dt { margin-top: 8px; font-size: 12px; }
+  .state-card .card-header { flex-wrap: wrap; }
+  .chip { white-space: normal; height: auto; min-height: 24px; overflow-wrap: anywhere; }
 }

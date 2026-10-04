@@ -123,6 +123,11 @@ test("production overview shows the real API aggregates, translates in place and
   expect(await root.evaluate(() => Object.keys(localStorage))).toEqual(["arasya.dashboard.locale"]);
 });
 
+/** Elements that stick out past the viewport (horizontal scrolling inside .table-scroll / .table-wrap is allowed). */
+const overflowing = () => [...document.querySelectorAll("body *")]
+  .filter((element) => !element.closest(".table-scroll, .table-wrap") && element.getBoundingClientRect().right > window.innerWidth + 1)
+  .slice(0, 5).map((element) => `${element.tagName.toLowerCase()}.${String(element.className)}: ${(element.textContent ?? "").trim().slice(0, 40)}`);
+
 /** A signed Trendhome commerce event, exactly as the WooCommerce connector sends it (inbound only). */
 async function trendhomeEvent(eventId: string, status: { code: string; label: string }) {
   const body = JSON.stringify({
@@ -224,10 +229,10 @@ test("production control: list, detail, Staff progress, independent commerce upd
   // 17: phone layout stacks the rows instead of scrolling a spreadsheet sideways.
   await root.setViewportSize({ width: 390, height: 844 });
   await expect(root.locator("tr[data-order]").first()).toBeVisible();
-  expect(await root.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await root.evaluate(overflowing), "no element wider than a phone").toEqual([]);
   await root.locator(`tr[data-order="${control.order}"] a`).click();
   await expect(root.locator('[data-section="production"]')).toBeVisible();
-  expect(await root.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await root.evaluate(overflowing), "no element wider than a phone").toEqual([]);
   await root.setViewportSize({ width: 1280, height: 720 });
   await root.getByRole("button", { name: "RO — Română" }).click();
 
