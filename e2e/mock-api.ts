@@ -24,7 +24,7 @@ function summary(overrides: Partial<Employee>): Employee {
 export type MockOptions = { mustChangePassword?: boolean; applications?: string[]; rejectApplicationsWith?: string };
 
 /**
- * A stateful in-memory Operations API. It mirrors the 2.3.0 response shapes and records every mutation,
+ * A stateful in-memory Operations API. It mirrors the 2.4.0 response shapes and records every mutation,
  * so tests can prove that nothing is written before an explicit confirmation.
  */
 export async function mockApi(page: Page, options: MockOptions = {}) {
@@ -33,6 +33,8 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
     mustChangePassword: options.mustChangePassword ?? false,
     applications: options.applications ?? ["staff", "dashboard"],
     requests: [] as string[],
+    overviewRequests: [] as string[],
+    overviewFails: false,
     mutations: [] as Array<{ method: string; path: string; body: unknown; csrf: string | undefined }>,
     employees: [
       summary({ id: ROOT_ID, username: "arasya.root.owner", displayName: "Administrator principal", positionTitle: "Administrator principal", isRoot: true, applications: ["staff", "dashboard"], manageable: false, rolePermissions: ["*"], department: { id: 1, name: "Administrație" } }),
@@ -54,7 +56,8 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
     employee: { id: ADMIN_ID, username: "maria.ionescu", displayName: "Maria Ionescu", positionTitle: "Director", department: "Administrație" },
     isRoot: false, authorityRank: 700,
     permissions: ["dashboard.access", "dashboard.overview.view", "employees.view", "employees.create", "employees.update", "employees.manage_applications", "employees.manage_roles", "roles.assign",
-      "employees.manage_stages", "employees.activate", "employees.deactivate", "employees.reset_password", "roles.view", "departments.view", "applications.view", "iam.audit.view", "system.view"],
+      "employees.manage_stages", "employees.activate", "employees.deactivate", "employees.reset_password", "roles.view", "departments.view", "applications.view", "iam.audit.view", "system.view",
+      "production.view", "orders.view_all", "activity.view_all", "sources.view"],
     grantablePermissions: ["employees.view"], applications: ["staff", "dashboard"], authorizationVersion: 7,
   };
   const role = { id: 5, key: "employee", name: "Angajat", description: null, authorityRank: 100, isTemplate: true, status: "active", userCount: 1, permissionCount: 0, permissions: [], manageable: true };
@@ -88,6 +91,11 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
     if (path.startsWith("/management") && !state.applications.includes("dashboard")) return fail(route, "APPLICATION_ACCESS_DENIED", 403);
 
     if (path === "/management/me") return json(route, me);
+    if (path === "/management/production-overview") {
+      state.overviewRequests.push(url.search);
+      if (state.overviewFails) return fail(route, "SERVER_ERROR", 503);
+      return json(route, productionOverview(url.searchParams.get("source")));
+    }
     if (path === "/management/dashboard") return json(route, { counts: { activeEmployees: 3, dashboardUsers: 2, staffUsers: 3, departments: 2, roles: 1 }, applications: [{ key: "staff", name: "Staff", status: "active" }, { key: "dashboard", name: "Dashboard", status: "active" }], recentAudit: [] });
     if (path === "/production/workflow") return json(route, { workflow: { id: "curtain-production", name: "Producție perdele", version: 1 }, stages });
     if (path === "/management/departments") return json(route, { items: [{ id: 1, key: "administratie", name: "Administrație", description: null, status: "active", parentId: null, employeeCount: 2, activeEmployeeCount: 2 }, { id: 2, key: "productie", name: "Producție", description: null, status: "active", parentId: null, employeeCount: 1, activeEmployeeCount: 1 }] });
@@ -132,3 +140,28 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
 }
 
 export const ids = { ROOT_ID, ADMIN_ID, ION_ID };
+
+export const PRODUCTION_STAGES = ["waiting", "material-preparation", "workshop-receiving", "labeling", "material-straightening", "bottom-hem", "side-hem", "ironing", "height", "header-tape", "sewing-finishing", "quality-control", "packing", "delivery"];
+
+/** A 2.4.0-shaped production overview with deliberately distinctive numbers; `source` filters it like the API. */
+function productionOverview(source: string | null) {
+  const all = source === null || source === "trendhome";
+  const counts: Record<string, number> = all ? { waiting: 13, labeling: 5, "quality-control": 2 } : {};
+  return {
+    generatedAt: "2026-10-04T12:00:00.000Z",
+    timezone: "Europe/Bucharest",
+    filters: { source },
+    summary: all ? { active: 20, waiting: 13, inWork: 7, unassigned: 17, completedToday: 3 } : { active: 0, waiting: 0, inWork: 0, unassigned: 0, completedToday: 0 },
+    stages: PRODUCTION_STAGES.map((id, index) => ({ id, label: id, ordinal: index + 1, active: counts[id] ?? 0, unassigned: counts[id] ?? 0, oldestEnteredAt: counts[id] ? "2026-10-04T07:00:00.000Z" : null })),
+    oldestOrders: all ? [
+      { globalOrderId: "trendhome:50011", orderNumber: "50011", source: { key: "trendhome", name: "Trendhome" }, stage: { id: "labeling", label: "Etichetare" }, stageEnteredAt: "2026-10-01T10:00:00.000Z", owner: null, claimedAt: null, commerceStatus: { code: "processing", label: "În procesare" } },
+      { globalOrderId: "trendhome:50012", orderNumber: "50012", source: { key: "trendhome", name: "Trendhome" }, stage: { id: "waiting", label: "În așteptare" }, stageEnteredAt: "2026-10-03T10:00:00.000Z", owner: { id: ION_ID, displayName: "Ion Popescu" }, claimedAt: "2026-10-04T08:00:00.000Z", commerceStatus: null },
+    ] : [],
+    activity: all ? [{ id: "pa-1", action: "claimed", occurredAt: "2026-10-04T11:00:00.000Z", employee: { id: ION_ID, displayName: "Ion Popescu" }, order: { globalOrderId: "trendhome:50012", orderNumber: "50012", source: "trendhome" }, fromStage: { id: "waiting", label: "În așteptare" }, toStage: null }] : [],
+    sources: [
+      { key: "outletperdele", name: "OutletPerdele", type: "woocommerce", health: "stale", lastContactAt: "2026-10-04T11:30:00.000Z", lastEventAt: null, activeOrders: 0 },
+      { key: "trendhome", name: "Trendhome", type: "woocommerce", health: "healthy", lastContactAt: "2026-10-04T11:59:00.000Z", lastEventAt: "2026-10-04T11:59:00.000Z", activeOrders: 20 },
+      { key: "trendyol", name: "Trendyol", type: "marketplace", health: "not_configured", lastContactAt: null, lastEventAt: null, activeOrders: 0 },
+    ],
+  };
+}

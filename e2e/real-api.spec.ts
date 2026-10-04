@@ -7,6 +7,12 @@ type Fixture = {
   role: { id: number; name: string };
   stage: { id: string; label: string };
   department: { id: number; name: string };
+  production: {
+    summary: Record<"active" | "waiting" | "inWork" | "unassigned" | "completedToday", number>;
+    stages: Record<string, number>;
+    oldest: string[];
+    sources: Record<string, string>;
+  };
 };
 
 const fixture = JSON.parse(readFileSync(path.join(import.meta.dirname, ".real-api-fixture.json"), "utf8")) as Fixture;
@@ -61,6 +67,58 @@ test("1-4 root logs in with the bootstrap password, is forced to change it, then
   await expect(root.getByRole("heading", { name: /^Bună, Administrator\./ })).toBeVisible();
   await expect(root.locator(".sidebar .root-badge")).toHaveText(/Administrator principal/);
   expect(await root.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+});
+
+test("production overview shows the real API aggregates, translates in place and never writes", async () => {
+  const writes: string[] = [];
+  const overviewRequests: string[] = [];
+  const track = (request: import("@playwright/test").Request) => {
+    if (!request.url().startsWith(API)) return;
+    if (request.method() !== "GET") writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    if (request.url().includes("/management/production-overview")) overviewRequests.push(request.url());
+  };
+  root.on("request", track);
+  await root.goto("/");
+  const production = root.locator("section.production");
+  await expect(production.getByRole("heading", { name: "Producție", exact: true })).toBeVisible();
+  const metric = (key: string) => production.locator(`[data-metric="${key}"] strong`);
+  for (const [key, value] of Object.entries(fixture.production.summary)) await expect(metric(key)).toHaveText(String(value));
+  await expect(production.locator("[data-stage]")).toHaveCount(14);
+  for (const [stage, count] of Object.entries(fixture.production.stages)) await expect(production.locator(`[data-stage="${stage}"] .pipeline-count`)).toHaveText(String(count));
+  await expect(production.locator("[data-order]")).toHaveCount(fixture.production.oldest.length);
+  expect(await production.locator("[data-order]").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-order")))).toEqual(fixture.production.oldest);
+  await expect(production.locator('[data-order="60003"]')).toContainText("Ana Croitor");
+  await expect(production.locator("[data-action]")).toHaveCount(3);
+  await expect(production.locator('[data-action="production_completed"]')).toContainText("A finalizat producția 60006");
+  for (const [source, health] of Object.entries(fixture.production.sources)) await expect(production.locator(`[data-source="${source}"]`)).toHaveAttribute("data-health", health);
+  await expect(production.locator('[data-source="trendyol"]')).toContainText("Neconfigurat");
+
+  const before = overviewRequests.length;
+  await production.getByRole("button", { name: "Actualizează" }).click();
+  await expect.poll(() => overviewRequests.length).toBe(before + 1);
+  await expect(production.getByText(/^Actualizat la \d{2}:\d{2}:\d{2}$/)).toBeVisible();
+
+  await root.getByRole("button", { name: "TR — Türkçe" }).click();
+  await expect(production.getByRole("heading", { name: "Üretim", exact: true })).toBeVisible();
+  await expect(production.locator('[data-metric="active"] span')).toHaveText("Aktif Siparişler");
+  await expect(metric("active")).toHaveText(String(fixture.production.summary.active));
+  await expect(production.locator('[data-source="trendhome"]')).toContainText("Çevrimiçi");
+  expect(overviewRequests.length, "a language switch re-renders, it does not refetch").toBe(before + 1);
+
+  await root.reload();
+  await expect(production.getByRole("heading", { name: "Üretim", exact: true })).toBeVisible();
+  await expect(metric("active")).toHaveText(String(fixture.production.summary.active));
+  await expect(root.getByRole("heading", { name: /^Merhaba, Administrator\./ })).toBeVisible();
+
+  await production.getByLabel("Kaynak").selectOption("outletperdele");
+  await expect(metric("active")).toHaveText("1");
+  expect(overviewRequests.at(-1)).toContain("source=outletperdele");
+  await production.getByLabel("Kaynak").selectOption("");
+  await root.getByRole("button", { name: "RO — Română" }).click();
+  await expect(metric("active")).toHaveText(String(fixture.production.summary.active));
+  root.off("request", track);
+  expect(writes, "the overview is read-only").toEqual([]);
+  expect(await root.evaluate(() => Object.keys(localStorage))).toEqual(["arasya.dashboard.locale"]);
 });
 
 test("old temporary root password stops working immediately", async ({ browser }) => {

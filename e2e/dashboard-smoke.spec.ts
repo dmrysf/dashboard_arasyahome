@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { ids, mockApi } from "./mock-api";
+import { ids, mockApi, PRODUCTION_STAGES } from "./mock-api";
 
 test.beforeEach(async ({ page }) => {
   page.on("pageerror", (error) => { throw error; });
@@ -198,4 +198,75 @@ test("the login screen offers the language choice and an invalid saved value fal
   await page.getByLabel("Şifre").fill("parola-corecta");
   await page.getByRole("button", { name: "Giriş yap" }).click();
   await expect(page.getByRole("heading", { name: "Merhaba, Maria." })).toBeVisible();
+});
+
+test("production overview: real response numbers, 14 stages, oldest orders, activity, sources, refresh and TR without writes", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-04T12:00:10Z") });
+  const api = await mockApi(page);
+  await login(page);
+  const production = page.locator("section.production");
+  const metric = (key: string) => production.locator(`[data-metric="${key}"] strong`);
+  await expect(metric("active")).toHaveText("20");
+  await expect(metric("waiting")).toHaveText("13");
+  await expect(metric("inWork")).toHaveText("7");
+  await expect(metric("unassigned")).toHaveText("17");
+  await expect(metric("completedToday")).toHaveText("3");
+  expect(await production.locator("[data-stage]").evaluateAll((items) => items.map((item) => item.getAttribute("data-stage")))).toEqual(PRODUCTION_STAGES);
+  await expect(production.locator('[data-stage="waiting"] .pipeline-count')).toHaveText("13");
+  await expect(production.locator('[data-stage="delivery"] .pipeline-count')).toHaveText("0");
+  await expect(production.locator('[data-stage="waiting"]')).toContainText("Cea mai încărcată etapă");
+  expect(await production.locator("[data-order]").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-order")))).toEqual(["50011", "50012"]);
+  await expect(production.locator('[data-order="50011"]')).toContainText("Nepreluată");
+  await expect(production.locator('[data-action="claimed"]')).toContainText("Ion Popescu");
+  await expect(production.locator('[data-source="trendyol"] .badge')).toHaveText("Neconfigurat");
+  await expect(production.locator('[data-source="outletperdele"] .badge')).toHaveText("Atenție");
+  await expect(production.getByText("Actualizat la 15:00:10")).toBeVisible();
+  expect(api.overviewRequests).toEqual([""]);
+
+  await production.getByRole("button", { name: "Actualizează" }).click();
+  await expect.poll(() => api.overviewRequests.length).toBe(2);
+  await expect(production.getByRole("button", { name: "Actualizează" })).toBeEnabled();
+  await page.clock.runFor(44_000);
+  expect(api.overviewRequests.length, "no request before the interval").toBe(2);
+  await page.clock.runFor(2_000);
+  await expect.poll(() => api.overviewRequests.length, { message: "automatic refresh after 45 s" }).toBe(3);
+
+  api.overviewFails = true;
+  await production.getByRole("button", { name: "Actualizează" }).click();
+  await expect(production.getByRole("status")).toHaveText("Datele nu au putut fi actualizate. Se afișează ultima versiune primită.");
+  await expect(metric("active")).toHaveText("20");
+  await expect(page.getByRole("heading", { name: "Bună, Maria." })).toBeVisible();
+  api.overviewFails = false;
+
+  await page.getByRole("button", { name: "TR — Türkçe" }).click();
+  await expect(production.locator('[data-metric="active"] span')).toHaveText("Aktif Siparişler");
+  await expect(production.getByRole("heading", { name: "Üretim Akışı" })).toBeVisible();
+  await expect(production.getByRole("heading", { name: "En Eski Aktif Siparişler" })).toBeVisible();
+  await expect(production.locator('[data-source="trendyol"] .badge')).toHaveText("Yapılandırılmamış");
+  await expect(production.getByRole("status")).toHaveText("Veriler güncellenemedi. Son alınan sürüm gösteriliyor.");
+  expect(api.overviewRequests.length).toBe(4);
+
+  await production.getByLabel("Kaynak").selectOption("outletperdele");
+  await expect(metric("active")).toHaveText("0");
+  await expect(production.getByText("Aktif sipariş bulunmuyor.").first()).toBeVisible();
+  expect(api.overviewRequests.at(-1)).toBe("?source=outletperdele");
+
+  await page.reload();
+  await expect(page.locator("section.production").getByRole("heading", { name: "Üretim", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Merhaba, Maria." })).toBeVisible();
+  expect(api.mutations.map((mutation) => mutation.path)).toEqual(["/auth/login"]);
+  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(["arasya.dashboard.locale"]);
+});
+
+test("production overview is hidden behind production.view and degrades without breaking the home page", async ({ page }) => {
+  const api = await mockApi(page);
+  api.overviewFails = true;
+  await login(page);
+  const production = page.locator("section.production");
+  await expect(production.getByText("Datele de producție nu au putut fi încărcate.")).toBeVisible();
+  await expect(production.getByRole("alert")).toBeVisible();
+  await expect(page.locator(".metric-grid").last().getByText("Angajați activi")).toBeVisible();
+  api.overviewFails = false;
+  await production.getByRole("button", { name: "Reîncearcă" }).click();
+  await expect(production.locator('[data-metric="active"] strong')).toHaveText("20");
 });

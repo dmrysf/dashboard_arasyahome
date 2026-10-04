@@ -38,6 +38,9 @@ export default defineConfig({
         ARASYA_ALLOWED_ORIGINS: `http://127.0.0.1:${webPort}`,
         ARASYA_LOGIN_USERNAME_LIMIT: "50",
         ARASYA_LOGIN_IP_LIMIT: "500",
+        // The fixture's test signing secrets, so source health reflects real signed contact.
+        ARASYA_SOURCE_SECRET_TRENDHOME: "trendhome-integration-secret-0123456789abcdef",
+        ARASYA_SOURCE_SECRET_OUTLETPERDELE: "outletperdele-integration-secret-0123456789ab",
       },
     },
     {

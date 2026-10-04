@@ -30,7 +30,7 @@ $server->exec("DROP DATABASE IF EXISTS `{$dbName}`");
 $server->exec("CREATE DATABASE `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
 $origin = (string) (getenv('ARASYA_E2E_ORIGIN') ?: 'http://127.0.0.1:4175');
-$config = T::config($dbName, [$origin]);
+$config = T::config($dbName, array_values(array_unique([$origin, T::ORIGIN])));
 $pdo = Connection::create($config);
 (new MigrationRunner($pdo))->migrate($api . '/database/migrations');
 $seeds = glob($api . '/database/seeds/*.sql') ?: [];
@@ -46,9 +46,50 @@ $role = $pdo->query("SELECT role_id, name FROM roles WHERE role_key = 'employee'
 $stage = $pdo->query("SELECT ps.stage_id, ps.display_name AS label FROM production_stages ps INNER JOIN production_workflows pw ON pw.workflow_id = ps.workflow_id WHERE ps.status = 'active' AND pw.status = 'active' ORDER BY ps.ordinal LIMIT 1")->fetch();
 $department = $pdo->query("SELECT department_id, name FROM departments WHERE status = 'active' ORDER BY department_id LIMIT 1")->fetch();
 
+// Real production data for the overview, written through the real signed ingestion and Staff operations.
+$kernel = $container->kernel();
+$changedAt = gmdate('Y-m-d\TH:i:s\Z', time() - 120);
+foreach ([
+    '60001' => ['trendhome', 'waiting', 'active'],
+    '60002' => ['trendhome', 'waiting', 'active'],
+    '60003' => ['outletperdele', 'labeling', 'active'],
+    '60004' => ['trendhome', 'quality-control', 'active'],
+    '60005' => ['outletperdele', 'ironing', 'cancelled'],
+    '60006' => ['trendhome', 'delivery', 'active'],
+] as $number => [$source, $stageId, $availability]) {
+    $ingested = T::ingest($kernel, $source, T::sourceOrder((string) $number, "dashboard-e2e-{$number}", $changedAt, T::stage($stageId), 'processing', $availability));
+    if (($ingested['body']['outcome'] ?? null) !== 'applied') {
+        throw new RuntimeException('Overview fixture ingestion failed: ' . json_encode($ingested['body']));
+    }
+}
+$container->employeeAdmin()->create('Ana Croitor', 'ana.overview.e2e', 'E2E-ANA', 'pregatire-material', 'employee', 'overview e2e passphrase 2026', ['labeling', 'delivery'], 'e2e');
+$worker = T::login($kernel, 'ana.overview.e2e', 'overview e2e passphrase 2026');
+$operate = static function (string $globalId, string $action, int $version) use ($kernel, $worker, $origin): void {
+    $response = T::call($kernel, 'POST', '/orders/' . rawurlencode($globalId) . '/' . $action, ['expectedVersion' => $version], ['origin' => $origin, 'x-csrf-token' => $worker['csrf'], 'idempotency-key' => "overview-{$action}-" . substr($globalId, strpos($globalId, ':') + 1)], $worker['cookie']);
+    if ($response['status'] !== 200) {
+        throw new RuntimeException("Overview fixture {$action} failed: " . json_encode($response['body']));
+    }
+};
+$operate('outletperdele:60003', 'claim', 1);
+$operate('trendhome:60006', 'claim', 1);
+$operate('trendhome:60006', 'transition', 2);
+// Deterministic stage-entry times: 60003 entered its stage first, then 60001, 60004, 60002.
+foreach (['60003' => 6, '60001' => 4, '60004' => 2, '60002' => 1] as $number => $hours) {
+    $pdo->prepare('UPDATE operational_orders SET production_changed_at = NULL, created_at = :at WHERE order_number = :number')
+        ->execute(['at' => gmdate('Y-m-d H:i:s', time() - $hours * 3600) . '.000000', 'number' => $number]);
+}
+// OutletPerdele last spoke 30 minutes ago (stale); Trendhome just now (healthy); Trendyol has no credentials.
+$pdo->prepare("UPDATE order_sources SET last_contact_at = :at WHERE source_key = 'outletperdele'")->execute(['at' => gmdate('Y-m-d H:i:s', time() - 1800) . '.000000']);
+
 echo json_encode([
     'root' => ['id' => $rootId, 'username' => RootBootstrapService::ROOT_USERNAME, 'password' => $rootPassword],
     'role' => ['id' => (int) $role['role_id'], 'name' => (string) $role['name']],
     'stage' => ['id' => (string) $stage['stage_id'], 'label' => (string) $stage['label']],
     'department' => ['id' => (int) $department['department_id'], 'name' => (string) $department['name']],
+    'production' => [
+        'summary' => ['active' => 4, 'waiting' => 2, 'inWork' => 2, 'unassigned' => 3, 'completedToday' => 1],
+        'stages' => ['waiting' => 2, 'labeling' => 1, 'quality-control' => 1, 'ironing' => 0, 'delivery' => 0],
+        'oldest' => ['60003', '60001', '60004', '60002'],
+        'sources' => ['outletperdele' => 'stale', 'trendhome' => 'healthy', 'trendyol' => 'not_configured'],
+    ],
 ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), "\n";
