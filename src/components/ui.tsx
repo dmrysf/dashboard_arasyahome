@@ -124,3 +124,15 @@ export function LocaleSwitcher() {
     </div>
   );
 }
+
+/** Last-updated time and manual refresh for polled operational data. */
+export function RefreshBar({ updatedAt, refreshing, hasData, onRefresh }: { updatedAt: number | null; refreshing: boolean; hasData: boolean; onRefresh: () => void }) {
+  const { t, clock } = useI18n();
+  const p = t.production;
+  return (
+    <>
+      <span className="updated-at muted small" title={p.autoRefresh} aria-live="polite">{updatedAt ? p.updatedAt(clock(updatedAt)) : ""}</span>
+      <button type="button" className="button button-secondary" onClick={onRefresh} disabled={refreshing}>{refreshing && hasData ? p.refreshing : p.refresh}</button>
+    </>
+  );
+}

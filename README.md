@@ -1,12 +1,22 @@
 # Arasya Dashboard
 
-Central management console (`https://dashboard.arasyahome.ro`) for the Arasya identity and access system. The Dashboard has no users table and no permission copy: `https://api.arasyahome.ro` (Operations API 2.4+) is the only identity provider, and every screen reflects the authorization the API returns.
+Central management console (`https://dashboard.arasyahome.ro`) for the Arasya identity and access system. The Dashboard has no users table and no permission copy: `https://api.arasyahome.ro` (Operations API 2.5+) is the only identity provider, and every screen reflects the authorization the API returns.
 
 - React 19 + Vite 8 + TypeScript. Interface in Romanian (default and fallback) and Turkish, chosen with the RO | TR switch.
 - Session: HttpOnly API cookie (`credentials: "include"`), CSRF token kept in memory only. The only browser-storage entry is the interface language (`arasya.dashboard.locale`); no session, token, password or permission is ever stored.
 - Gate: pending password change first, then `dashboard` application access (`Nu ai acces la Panoul de control.` otherwise).
-- Screens: Panou de control, Angajați, Roluri și permisiuni, Departamente, Aplicații, Audit, Sistem.
+- Screens: Panou de control, Comenzi, Angajați, Roluri și permisiuni, Departamente, Aplicații, Audit, Sistem.
 - Authorization changes are reviewed in a confirmation dialog before anything is written. The protected root identity (`arasya.root.owner`) is read-only in the UI; the API enforces this independently (`ROOT_PROTECTED`).
+
+## Production Control: Comenzi (0.4.0)
+
+`/comenzi` is a read-only order workspace on `GET /management/orders` and `GET /management/orders/{globalOrderId}` (Operations API 2.5.0, `orders.view_all`; the timeline also needs `activity.view_all`).
+
+- Two independent states, shown with different shapes and headings: **Status magazin / Mağaza Durumu** (the source's commerce status, received inbound only) and **Etapă producție / Üretim Aşaması** (the Arasya curtain-production@1 stage). The Dashboard never derives one from the other.
+- Server-side filters (search by order number or global id, source, stage, store status, owner, assigned/unassigned, active/completed/cancelled) and cursor pages of 25/50/100.
+- Detail at `/comenzi/<source>:<id>` (the global id, never the bare order number): store section, production section with owner, stage entry and time in stage (same definition as the overview, no SLA wording), normalized items and measurements, production notes and the immutable production timeline.
+- List and detail refresh every 45 seconds while visible (shared poller), with manual refresh; a failed refresh keeps the last data.
+- No production action exists here: no stage selector, no claim, no override. Staff remains where stages change. Arasya production transitions do not mutate WooCommerce order statuses (see `staff_arasyahome/docs/production-control.md`).
 
 ## Production overview (0.3.0)
 

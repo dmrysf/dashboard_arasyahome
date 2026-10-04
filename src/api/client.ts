@@ -1,5 +1,5 @@
 import type {
-  Application, AuditPage, Department, EmployeeDetail, EmployeePage, ManagementMe, Overview, Permission, ProductionOverview, Role, Session, SessionEmployee, SystemStatus, Workflow,
+  Application, AuditPage, Department, EmployeeDetail, EmployeePage, ManagementMe, OrderDetail, OrderPage, Overview, Permission, ProductionOverview, Role, Session, SessionEmployee, SystemStatus, Workflow,
 } from "./types";
 
 /** A typed API failure. `code` is the server error code; transport problems use NETWORK_UNAVAILABLE. */
@@ -120,6 +120,8 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     health: () => request<{ status: string; version: string }>("/health"),
     me: () => request<ManagementMe>("/management/me"),
     overview: () => request<Overview>("/management/dashboard"),
+    orders: (query: Record<string, string | undefined>, signal?: AbortSignal) => request<OrderPage>("/management/orders", { query, signal }),
+    order: (globalOrderId: string, signal?: AbortSignal) => request<OrderDetail>(`/management/orders/${encodeURIComponent(globalOrderId)}`, { signal }),
     productionOverview: (source: string | undefined, signal?: AbortSignal) => request<ProductionOverview>("/management/production-overview", { query: { source }, signal }),
     system: () => request<SystemStatus>("/management/system"),
     workflow: () => request<Workflow>("/production/workflow"),

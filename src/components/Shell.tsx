@@ -6,6 +6,7 @@ import { LocaleSwitcher, RootBadge } from "./ui";
 
 const NAVIGATION: Array<{ path: string; label: keyof Messages["nav"]; permission: string; match: (path: string) => boolean }> = [
   { path: "/", label: "overview", permission: "dashboard.overview.view", match: (path) => path === "/" },
+  { path: "/comenzi", label: "orders", permission: "orders.view_all", match: (path) => path.startsWith("/comenzi") },
   { path: "/angajati", label: "employees", permission: "employees.view", match: (path) => path.startsWith("/angajati") },
   { path: "/roluri", label: "roles", permission: "roles.view", match: (path) => path.startsWith("/roluri") },
   { path: "/departamente", label: "departments", permission: "departments.view", match: (path) => path.startsWith("/departamente") },

@@ -131,6 +131,51 @@ export type ProductionOverview = {
   sources: Array<{ key: string; name: string; type: string; health: SourceHealth; lastContactAt: string | null; lastEventAt: string | null; activeOrders: number }> | null;
 };
 
+/** GET /management/orders and /management/orders/{globalOrderId} (Operations API 2.5.0). */
+export type ProductionState = "active" | "completed" | "cancelled";
+export type OrderSummary = {
+  globalOrderId: string;
+  orderNumber: string;
+  source: { key: string; name: string };
+  /** Commerce: the source's own state, received inbound only. */
+  commerce: { status: { code: string; label: string | null } | null; availability: "active" | "cancelled" };
+  /** Production: the Arasya curtain-production@1 state. Independent of commerce. */
+  production: {
+    state: ProductionState;
+    stage: { id: string; label: string; ordinal: number };
+    owner: { id: string; displayName: string } | null;
+    claimedAt: string | null;
+    stageEnteredAt: string;
+    completedAt: string | null;
+  };
+  importedAt: string;
+  acceptedAt: string | null;
+};
+export type OrderFacets = {
+  sources: Array<{ key: string; name: string }>;
+  stages: Array<{ id: string; label: string; ordinal: number }>;
+  commerceStatuses: Array<{ code: string; label: string | null }>;
+  owners: Array<{ id: string; displayName: string }>;
+};
+export type OrderPage = { items: OrderSummary[]; nextCursor: string | null; facets: OrderFacets };
+export type OrderItem = { line: number; name: string; sku: string | null; variant: string | null; color: string | null; width: number | null; height: number | null; unit: string | null; meters: number | null; quantity: number };
+export type OrderActivity = {
+  id: string;
+  action: string;
+  occurredAt: string;
+  employee: { id: string; displayName: string };
+  fromStage: { id: string; label: string };
+  toStage: { id: string; label: string } | null;
+  productionVersion: number;
+};
+export type OrderDetail = Omit<OrderSummary, "commerce" | "production"> & {
+  commerce: OrderSummary["commerce"] & { sourceChangedAt: string; lastSourceSeenAt: string };
+  production: OrderSummary["production"] & { changedAt: string | null; version: number; notes: string | null };
+  items: OrderItem[];
+  activity: OrderActivity[] | null;
+  activityTruncated: boolean;
+};
+
 export type SystemStatus = {
   apiVersion: string;
   database: string;

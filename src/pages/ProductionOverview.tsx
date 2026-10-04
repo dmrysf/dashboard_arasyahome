@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
 import type { ProductionOverview as Overview, SourceHealth } from "../api/types";
 import { useDashboard } from "../app/context";
+import { orderPath } from "../app/router";
 import { usePolling } from "../app/usePolling";
-import { Badge, ErrorBanner, Loading } from "../components/ui";
+import { Badge, ErrorBanner, Loading, RefreshBar } from "../components/ui";
 import { useI18n } from "../i18n/context";
 
 const HEALTH_TONE: Record<SourceHealth, "success" | "warning" | "neutral"> = {
@@ -38,7 +39,7 @@ export type ProductionPanelProps = {
 
 /** Presentation of one polling state: first load, data, a failed first load, or stale data after a failed refresh. */
 export function ProductionPanel({ data, error, updatedAt, refreshing, refresh, source, sourceOptions, onSource }: ProductionPanelProps) {
-  const { t, clock } = useI18n();
+  const { t } = useI18n();
   const p = t.production;
   return (
     <section className="production stack" aria-labelledby="production-title">
@@ -57,8 +58,7 @@ export function ProductionPanel({ data, error, updatedAt, refreshing, refresh, s
               </select>
             </label>
           )}
-          <span className="updated-at muted small" title={p.autoRefresh} aria-live="polite">{updatedAt ? p.updatedAt(clock(updatedAt)) : ""}</span>
-          <button type="button" className="button button-secondary" onClick={refresh} disabled={refreshing}>{refreshing && data ? p.refreshing : p.refresh}</button>
+          <RefreshBar updatedAt={updatedAt} refreshing={refreshing} hasData={data !== null} onRefresh={refresh} />
         </div>
       </div>
       {error !== null && data && <div className="notice notice-warning" role="status">{p.refreshFailed}</div>}
@@ -125,12 +125,14 @@ function Pipeline({ data }: { data: Overview }) {
 }
 
 function OldestOrders({ data }: { data: Overview }) {
+  const { navigate } = useDashboard();
   const { t, dateTime, duration, stage: stageName } = useI18n();
   const p = t.production;
   const generatedAt = Date.parse(data.generatedAt);
   return (
     <section className="card">
-      <div className="card-header"><div><h2>{p.oldest}</h2><p>{p.oldestHint}</p></div></div>
+      <div className="card-header"><div><h2>{p.oldest}</h2><p>{p.oldestHint}</p></div>
+        {data.oldestOrders !== null && <a className="button button-ghost" href="/comenzi" onClick={(event) => { event.preventDefault(); navigate("/comenzi"); }}>{t.orders.seeAll}</a>}</div>
       {data.oldestOrders === null ? <p className="muted">{p.oldestNeedsPermission}</p>
         : data.oldestOrders.length === 0 ? <p className="muted">{p.noActive}</p>
           : (
@@ -140,7 +142,7 @@ function OldestOrders({ data }: { data: Overview }) {
                 <tbody>
                   {data.oldestOrders.map((order) => (
                     <tr key={order.globalOrderId} data-order={order.orderNumber}>
-                      <td data-label={p.order}><strong className="mono">{order.orderNumber}</strong><small className="cell-sub">{order.source.name}</small></td>
+                      <td data-label={p.order}><a className="mono order-link" href={orderPath(order.globalOrderId)} onClick={(event) => { event.preventDefault(); navigate(orderPath(order.globalOrderId)); }}>{order.orderNumber}</a><small className="cell-sub">{order.source.name}</small></td>
                       <td data-label={p.stage}>{stageName(order.stage.id, order.stage.label)}</td>
                       <td data-label={p.timeInStage}><span>{duration(generatedAt - Date.parse(order.stageEnteredAt))}</span><small className="cell-sub" title={p.enteredAt}>{dateTime(order.stageEnteredAt)}</small></td>
                       <td data-label={p.owner}>{order.owner ? order.owner.displayName : <span className="muted">{p.noOwner}</span>}</td>

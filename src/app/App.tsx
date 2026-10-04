@@ -9,6 +9,8 @@ import { AuditPage } from "../pages/AuditPage";
 import { DepartmentsPage } from "../pages/DepartmentsPage";
 import { EmployeeCreatePage } from "../pages/EmployeeCreatePage";
 import { EmployeeDetailPage } from "../pages/EmployeeDetailPage";
+import { OrderDetailPage } from "../pages/OrderDetailPage";
+import { OrdersPage } from "../pages/OrdersPage";
 import { EmployeesPage } from "../pages/EmployeesPage";
 import { OverviewPage } from "../pages/OverviewPage";
 import { RoleEditorPage } from "../pages/RoleEditorPage";
@@ -90,6 +92,8 @@ function NotFound() {
 function renderRoute(route: Route) {
   switch (route.name) {
     case "overview": return <OverviewPage />;
+    case "orders": return <OrdersPage />;
+    case "order": return <OrderDetailPage key={route.id} id={route.id} />;
     case "employees": return <EmployeesPage />;
     case "employee-new": return <EmployeeCreatePage />;
     case "employee": return <EmployeeDetailPage key={route.id} id={route.id} />;

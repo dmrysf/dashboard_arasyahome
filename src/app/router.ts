@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 
 export type Route =
   | { name: "overview" }
+  | { name: "orders" }
+  | { name: "order"; id: string }
   | { name: "employees" }
   | { name: "employee-new" }
   | { name: "employee"; id: string }
@@ -17,6 +19,11 @@ export type Route =
 export function parseRoute(pathname: string): Route {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/") return { name: "overview" };
+  if (path === "/comenzi") return { name: "orders" };
+  const order = /^\/comenzi\/([^/]{1,600})$/.exec(path);
+  if (order) {
+    try { return { name: "order", id: decodeURIComponent(order[1]) }; } catch { return { name: "not-found" }; }
+  }
   if (path === "/angajati") return { name: "employees" };
   if (path === "/angajati/nou") return { name: "employee-new" };
   const employee = /^\/angajati\/([0-9a-f-]{36})$/.exec(path);
@@ -46,3 +53,6 @@ export function useRouter() {
   }, []);
   return { route: parseRoute(pathname), pathname, navigate };
 }
+
+/** Dashboard path of one order; the source-aware global id is the identity, never the bare order number. */
+export const orderPath = (globalOrderId: string) => `/comenzi/${encodeURIComponent(globalOrderId)}`;
