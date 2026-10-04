@@ -74,11 +74,11 @@ test("authorization changes need an explicit confirmation before anything is wri
   await login(page);
   await page.goto(`/angajati/${ids.ION_ID}`);
   await expect(page.getByRole("heading", { name: "Ion Popescu" })).toBeVisible();
-  await page.getByRole("checkbox", { name: "Dashboard" }).check();
+  await page.getByRole("checkbox", { name: "Panou de control" }).check();
   await page.getByRole("checkbox", { name: /Confecționare/ }).check();
   expect(api.mutations.filter((mutation) => mutation.path.startsWith("/management"))).toEqual([]);
   await page.getByRole("button", { name: "Revizuiește accesul" }).click();
-  await expect(page.getByRole("dialog")).toContainText("După: Staff, Dashboard");
+  await expect(page.getByRole("dialog")).toContainText("După: Staff, Panou de control");
   await page.getByRole("button", { name: "Anulează" }).click();
   expect(api.mutations.filter((mutation) => mutation.path.startsWith("/management"))).toEqual([]);
   await page.getByRole("button", { name: "Revizuiește accesul" }).click();
@@ -92,11 +92,11 @@ test("a server authorization refusal is explained in Romanian and the form retur
   await mockApi(page, { rejectApplicationsWith: "AUTHORITY_EXCEEDED" });
   await login(page);
   await page.goto(`/angajati/${ids.ION_ID}`);
-  await page.getByRole("checkbox", { name: "Dashboard" }).check();
+  await page.getByRole("checkbox", { name: "Panou de control" }).check();
   await page.getByRole("button", { name: "Revizuiește accesul" }).click();
   await page.getByRole("button", { name: "Aplică accesul" }).click();
   await expect(page.getByRole("alert")).toHaveText("Modificarea depășește nivelul tău de autoritate.");
-  await expect(page.getByRole("checkbox", { name: "Dashboard" })).not.toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Panou de control" })).not.toBeChecked();
 });
 
 test("the protected root identity shows its badge and no modification controls", async ({ page }) => {
@@ -120,4 +120,82 @@ test("mobile layout keeps navigation reachable without horizontal scrolling", as
   await page.getByRole("navigation").getByRole("link", { name: "Angajați" }).click();
   await expect(page.getByRole("heading", { name: "Angajați" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+
+test("the interface switches between Romanian and Turkish, remembers the choice and never touches the session or data", async ({ page }) => {
+  const api = await mockApi(page);
+  await login(page);
+  await expect(page.getByRole("heading", { name: "Bună, Maria." })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ro");
+  const before = api.mutations.length;
+  const sessionReads = () => api.requests.filter((request) => request === "GET /auth/session").length;
+  const reads = sessionReads();
+
+  await page.getByRole("button", { name: "TR — Türkçe" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "tr");
+  await expect(page.getByRole("button", { name: "TR — Türkçe" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("heading", { name: "Merhaba, Maria." })).toBeVisible();
+  const nav = page.getByRole("navigation");
+  for (const item of ["Yönetim Paneli", "Çalışanlar", "Roller ve Yetkiler", "Departmanlar", "Uygulamalar", "Denetim Kayıtları", "Sistem"]) {
+    await expect(nav.getByRole("link", { name: item, exact: true })).toBeVisible();
+  }
+  for (const romanian of ["Angajați", "Roluri și permisiuni", "Departamente", "Aplicații"]) await expect(nav.getByRole("link", { name: romanian, exact: true })).toHaveCount(0);
+
+  await nav.getByRole("link", { name: "Çalışanlar" }).click();
+  await expect(page.getByRole("columnheader", { name: "Ad Soyad" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Producție" }).first()).toBeVisible(); // business data stays as stored
+  await page.getByRole("link", { name: "Ion Popescu" }).click();
+  await expect(page.getByRole("heading", { name: "Uygulama Erişimleri" })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /Malzeme Hazırlığı/ })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /Confecționare/ })).toBeVisible(); // unknown stage IDs keep the server label
+
+  await nav.getByRole("link", { name: "Roller ve Yetkiler" }).click();
+  await expect(page.getByRole("heading", { name: "Roller ve Yetkiler" })).toBeVisible();
+  await page.getByRole("link", { name: "Angajat" }).click(); // a role name is business data and is not translated
+  await expect(page.getByText("Staff Aşamalarını Yönet")).toBeVisible();
+  await expect(page.getByText("employees.manage_stages")).toBeVisible();
+
+  await nav.getByRole("link", { name: "Departmanlar" }).click();
+  await expect(page.getByRole("columnheader", { name: "Üst departman" })).toBeVisible();
+  await nav.getByRole("link", { name: "Uygulamalar" }).click();
+  await expect(page.getByText("Erişim yetkisi").first()).toBeVisible();
+  await nav.getByRole("link", { name: "Denetim Kayıtları" }).click();
+  await expect(page.getByText("Ana Yönetici, Ion Popescu adlı kullanıcıyı devre dışı bıraktı.")).toBeVisible();
+  await expect(page.getByText("4 Eki 2026", { exact: false })).toBeVisible();
+  await nav.getByRole("link", { name: "Sistem" }).click();
+  await expect(page.getByText("Sürümler ve erişilebilirlik")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("[object Object]");
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("lang", "tr");
+  await expect(page.getByText("Sürümler ve erişilebilirlik")).toBeVisible();
+  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(["arasya.dashboard.locale"]);
+  expect(await page.evaluate(() => localStorage.getItem("arasya.dashboard.locale"))).toBe("tr");
+  expect(await page.evaluate(() => sessionStorage.length)).toBe(0);
+
+  await page.getByRole("button", { name: "RO — Română" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ro");
+  await expect(page.getByText("Versiuni și disponibilitate")).toBeVisible();
+  await expect(page.getByRole("navigation").getByRole("link", { name: "Angajați", exact: true })).toBeVisible();
+
+  // Switching language wrote nothing to the API and needed no new login; only the reload re-read the session once.
+  expect(api.mutations.length).toBe(before);
+  expect(sessionReads()).toBe(reads + 1);
+  await expect(page.getByRole("heading", { name: "Autentificare" })).toHaveCount(0);
+});
+
+test("the login screen offers the language choice and an invalid saved value falls back to Romanian", async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("arasya.dashboard.locale", "de"); } });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Autentificare" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ro");
+  await page.getByRole("button", { name: "TR — Türkçe" }).click();
+  await expect(page.getByRole("heading", { name: "Giriş" })).toBeVisible();
+  await page.getByRole("button", { name: "Giriş yap" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Kullanıcı adını ve şifreyi girin.");
+  await page.getByLabel("Kullanıcı adı").fill("maria.ionescu");
+  await page.getByLabel("Şifre").fill("parola-corecta");
+  await page.getByRole("button", { name: "Giriş yap" }).click();
+  await expect(page.getByRole("heading", { name: "Merhaba, Maria." })).toBeVisible();
 });

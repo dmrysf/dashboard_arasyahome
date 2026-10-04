@@ -4,12 +4,15 @@ import path from "node:path";
 import { test } from "node:test";
 import { describeAuditEvent, personName } from "../src/api/audit";
 import { ApiError, createApi } from "../src/api/client";
-import { errorMessage } from "../src/api/labels";
 import type { AuditEvent } from "../src/api/types";
 import { classifySession, resolveSession, restoreSession } from "../src/app/session";
 import { resolveApiBaseUrl } from "../src/config";
+import { createTranslator } from "../src/i18n";
+import { LOCALE_STORAGE_KEY } from "../src/i18n/storage";
 import { API, apiError, fakeFetch, me, sessionEmployee, sessionPayload } from "./support";
 
+const ro = createTranslator("ro");
+const errorMessage = (error: unknown) => ro.problem(error);
 const session = (overrides = {}) => ({ employee: sessionEmployee(overrides), expiresAt: "2026-10-04T20:00:00+00:00" });
 
 test("the session gate follows the API: password change first, then Dashboard application access", () => {
@@ -34,7 +37,8 @@ test("a valid Dashboard session restores into the ready state with the managemen
 
 test("an inactive account returns to login and an unreachable API offers a retry", async () => {
   const inactive = await restoreSession(createApi(API, fakeFetch(() => apiError("ACCOUNT_INACTIVE", 401)).fetchImpl));
-  assert.deepEqual(inactive, { kind: "anonymous", notice: "Contul nu este activ." });
+  assert.equal(inactive.kind, "anonymous");
+  assert.equal(inactive.kind === "anonymous" && ro.problem(inactive.notice), "Contul nu este activ.");
   const offline = await restoreSession(createApi(API, (() => Promise.reject(new TypeError("x"))) as typeof fetch));
   assert.equal(offline.kind, "unavailable");
 });
@@ -60,16 +64,16 @@ const event = (overrides: Partial<AuditEvent>): AuditEvent => ({
 
 test("IAM audit events read as Romanian sentences", () => {
   assert.equal(personName("Ion Popescu (ion.popescu)"), "Ion Popescu");
-  assert.deepEqual(describeAuditEvent(event({ action: "employee.applications_changed", metadata: { before: ["staff"], after: ["dashboard", "staff"] } })).sentences, ["Ion Popescu a primit acces la Dashboard."]);
-  assert.deepEqual(describeAuditEvent(event({ action: "employee.applications_changed", metadata: { before: ["dashboard", "staff"], after: ["staff"] } })).sentences, ["Ion Popescu nu mai are acces la Dashboard."]);
-  assert.deepEqual(describeAuditEvent(event({ action: "employee.roles_changed", metadata: { before: [], after: ["supervisor"] } })).sentences, ["Maria Ionescu a modificat rolurile utilizatorului Ion Popescu."]);
-  assert.deepEqual(describeAuditEvent(event({ action: "employee.deactivated", actorType: "root", actorLabel: "Administrator principal (arasya.root.owner)" })).sentences, ["Administrator principal a dezactivat utilizatorul Ion Popescu."]);
-  const stages = describeAuditEvent(event({ action: "employee.stages_changed", metadata: { before: [], after: ["sewing"] } }), (id) => id === "sewing" ? "Confecționare" : id);
+  assert.deepEqual(describeAuditEvent(event({ action: "employee.applications_changed", metadata: { before: ["staff"], after: ["dashboard", "staff"] } }), ro).sentences, ["Ion Popescu a primit acces la Panou de control."]);
+  assert.deepEqual(describeAuditEvent(event({ action: "employee.applications_changed", metadata: { before: ["dashboard", "staff"], after: ["staff"] } }), ro).sentences, ["Ion Popescu nu mai are acces la Panou de control."]);
+  assert.deepEqual(describeAuditEvent(event({ action: "employee.roles_changed", metadata: { before: [], after: ["supervisor"] } }), ro).sentences, ["Maria Ionescu a modificat rolurile utilizatorului Ion Popescu."]);
+  assert.deepEqual(describeAuditEvent(event({ action: "employee.deactivated", actorType: "root", actorLabel: "Administrator principal (arasya.root.owner)" }), ro).sentences, ["Administrator principal a dezactivat utilizatorul Ion Popescu."]);
+  const stages = describeAuditEvent(event({ action: "employee.stages_changed", metadata: { before: [], after: ["sewing"] } }), ro, (id) => id === "sewing" ? "Confecționare" : undefined);
   assert.deepEqual(stages.details, ["— → Confecționare"]);
 });
 
 test("audit rendering ignores undocumented metadata so secrets can never appear", () => {
-  const rendered = describeAuditEvent(event({ action: "employee.updated", metadata: { displayName: { before: "Ion", after: "Ion Popescu" }, sessionToken: { before: "s3cret", after: "x" }, revokedSessions: 2 } }));
+  const rendered = describeAuditEvent(event({ action: "employee.updated", metadata: { displayName: { before: "Ion", after: "Ion Popescu" }, sessionToken: { before: "s3cret", after: "x" }, revokedSessions: 2 } }), ro);
   const text = [...rendered.sentences, ...rendered.details].join(" ");
   assert.match(text, /nume: Ion → Ion Popescu/);
   assert.doesNotMatch(text, /s3cret|sessionToken|revokedSessions/);
@@ -83,7 +87,7 @@ test("the API base URL must be an exact HTTPS origin; loopback HTTP only in the 
   assert.equal(resolveApiBaseUrl("http://127.0.0.1:8788", "127.0.0.1"), "http://127.0.0.1:8788");
 });
 
-test("the Dashboard source never uses browser storage for sessions, tokens or passwords", () => {
+test("the Dashboard source never uses browser storage for sessions, tokens or passwords; only the language choice is kept", () => {
   const files: string[] = [];
   const walk = (directory: string) => {
     for (const name of readdirSync(directory)) {
@@ -93,8 +97,16 @@ test("the Dashboard source never uses browser storage for sessions, tokens or pa
     }
   };
   walk(path.resolve(import.meta.dirname, "../src"));
+  const storageModule = path.resolve(import.meta.dirname, "../src/i18n/storage.ts");
   for (const file of files) {
     const source = readFileSync(file, "utf8");
+    if (file === storageModule) {
+      // The single allowed use: the interface language under one namespaced key.
+      assert.deepEqual([...source.matchAll(/\b(localStorage|sessionStorage|indexedDB)\b/g)].map((match) => match[1]), ["localStorage"]);
+      assert.deepEqual([...source.matchAll(/(getItem|setItem)\(([^,)]+)/g)].map((match) => match[2]), ["LOCALE_STORAGE_KEY", "LOCALE_STORAGE_KEY"]);
+      assert.equal(LOCALE_STORAGE_KEY, "arasya.dashboard.locale");
+      continue;
+    }
     assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB|document\.cookie/, file);
     assert.doesNotMatch(source, /isAdmin/, file);
   }

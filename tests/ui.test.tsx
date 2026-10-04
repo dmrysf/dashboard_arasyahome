@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createApi } from "../src/api/client";
 import type { EmployeeDetail, ManagementMe } from "../src/api/types";
 import { DashboardContext } from "../src/app/context";
+import { I18nProvider } from "../src/i18n/context";
 import { OneTimeSecret } from "../src/components/ui";
 import { NoAccessPage } from "../src/pages/AuthPages";
 import { EmployeeEditor, sameSet, toggle } from "../src/pages/EmployeeDetailPage";
@@ -12,9 +13,11 @@ import { API, employee, me, permission, role, root } from "./support";
 
 const stages = [{ id: "material-preparation", ordinal: 1, label: "Pregătire material" }, { id: "sewing", ordinal: 2, label: "Confecționare" }];
 
+const ro = (node: React.ReactNode) => renderToStaticMarkup(<I18nProvider locale="ro">{node}</I18nProvider>);
+
 function render(node: React.ReactNode, profile: ManagementMe = me()) {
   const permissions = new Set(profile.permissions);
-  return renderToStaticMarkup(
+  return ro(
     <DashboardContext.Provider value={{
       api: createApi(API, (() => Promise.reject(new Error("no network in render tests"))) as typeof fetch),
       session: { employee: { employeeUuid: profile.employee.id, displayName: profile.employee.displayName, username: profile.employee.username, department: profile.employee.department, positionTitle: null, permissions: profile.permissions, applications: profile.applications, allowedStageIds: [], isRoot: profile.isRoot, mustChangePassword: false, authorizationVersion: profile.authorizationVersion }, expiresAt: "2026-10-04T20:00:00Z" },
@@ -28,7 +31,7 @@ function render(node: React.ReactNode, profile: ManagementMe = me()) {
 function editor(data: EmployeeDetail, profile?: ManagementMe) {
   return render(<EmployeeEditor data={data} departments={[{ id: 2, key: "productie", name: "Producție", description: null, status: "active", parentId: null, employeeCount: 3, activeEmployeeCount: 3 }]}
     roles={[role(), role({ id: 6, key: "ceo", name: "CEO / Proprietar", authorityRank: 900, manageable: false })]} catalog={[permission()]} applicationKeys={["staff", "dashboard"]}
-    stages={stages} managers={[]} busy={false} message="" error="" secret="" onPending={() => undefined} onSecret={() => undefined} />, profile);
+    stages={stages} managers={[]} busy={false} message={null} error={null} secret="" onPending={() => undefined} onSecret={() => undefined} />, profile);
 }
 
 const buttons = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((match) => match[1].replace(/<[^>]+>/g, ""));
@@ -67,14 +70,14 @@ test("an identity at or above the actor's authority, or the actor itself, is rea
 });
 
 test("a temporary password is presented once with an intentional copy action and the required notice", () => {
-  const html = renderToStaticMarkup(<OneTimeSecret label="Parolă temporară" value="Tmp-0123456789abcdef" />);
+  const html = ro(<OneTimeSecret label="Parolă temporară" value="Tmp-0123456789abcdef" />);
   assert.match(html, /Tmp-0123456789abcdef/);
   assert.match(html, /Parola temporară este afișată o singură dată\.<br\/>Utilizatorul va trebui să o schimbe la prima autentificare\./);
   assert.ok(buttons(html).includes("Copiază parola"));
 });
 
 test("an authenticated identity without Dashboard access sees the exact refusal and a logout", () => {
-  const html = renderToStaticMarkup(<NoAccessPage displayName="Ion Popescu" onLogout={() => undefined} />);
+  const html = ro(<NoAccessPage displayName="Ion Popescu" onLogout={() => undefined} />);
   assert.match(html, /Nu ai acces la Panoul de control\./);
   assert.ok(buttons(html).includes("Ieși din cont"));
 });
@@ -89,7 +92,7 @@ test("the role editor only offers server catalog permissions the actor can grant
   const html = render(<RoleEditor existing={role({ id: 7, permissions: [] })} id={7} catalog={catalog} saved={false} onSaved={() => undefined} />, me({ permissions: [...me().permissions, "roles.update"] }));
   assert.match(html, /<input type="checkbox"[^>]*>Vizualizare angajați/);
   assert.doesNotMatch(html, /<input type="checkbox"(?![^>]*disabled)[^>]*>Vizualizare sistem/, "a permission the actor does not hold cannot be ticked");
-  assert.doesNotMatch(html, /Acces Dashboard/);
+  assert.doesNotMatch(html, /Acces (Dashboard|Panou de control)/);
   assert.doesNotMatch(html, /<input[^>]*type="text"[^>]*permission/i, "there is no free-text permission entry");
 });
 

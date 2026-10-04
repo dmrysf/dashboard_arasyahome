@@ -54,7 +54,7 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
     employee: { id: ADMIN_ID, username: "maria.ionescu", displayName: "Maria Ionescu", positionTitle: "Director", department: "Administrație" },
     isRoot: false, authorityRank: 700,
     permissions: ["dashboard.access", "dashboard.overview.view", "employees.view", "employees.create", "employees.update", "employees.manage_applications", "employees.manage_roles", "roles.assign",
-      "employees.manage_stages", "employees.activate", "employees.deactivate", "employees.reset_password", "roles.view", "departments.view", "applications.view", "iam.audit.view"],
+      "employees.manage_stages", "employees.activate", "employees.deactivate", "employees.reset_password", "roles.view", "departments.view", "applications.view", "iam.audit.view", "system.view"],
     grantablePermissions: ["employees.view"], applications: ["staff", "dashboard"], authorizationVersion: 7,
   };
   const role = { id: 5, key: "employee", name: "Angajat", description: null, authorityRank: 100, isTemplate: true, status: "active", userCount: 1, permissionCount: 0, permissions: [], manageable: true };
@@ -92,9 +92,15 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
     if (path === "/production/workflow") return json(route, { workflow: { id: "curtain-production", name: "Producție perdele", version: 1 }, stages });
     if (path === "/management/departments") return json(route, { items: [{ id: 1, key: "administratie", name: "Administrație", description: null, status: "active", parentId: null, employeeCount: 2, activeEmployeeCount: 2 }, { id: 2, key: "productie", name: "Producție", description: null, status: "active", parentId: null, employeeCount: 1, activeEmployeeCount: 1 }] });
     if (path === "/management/roles") return json(route, { items: [role] });
-    if (path === "/management/permissions") return json(route, { items: [] });
+    if (path === `/management/roles/${role.id}`) return json(route, { ...role, permissions: ["employees.manage_stages"], permissionCount: 1 });
+    if (path === "/management/permissions") return json(route, { items: [{ key: "employees.manage_stages", category: "employees", label: "Gestionare etape Staff", description: "Assign Staff production stages", roleGrantable: true, grantableByMe: true }] });
+    if (path === "/management/system") return json(route, { apiVersion: "2.3.0", database: "ok", migrations: { applied: 5, latest: "005_central_iam.sql" }, applications: 2, rootConfigured: true });
+    if (path === "/health") return json(route, { status: "ok", version: "2.3.0" });
     if (path === "/management/applications") return json(route, { items: [{ key: "staff", name: "Staff", description: null, status: "active", accessPermission: "staff.access", userCount: 3 }, { key: "dashboard", name: "Dashboard", description: null, status: "active", accessPermission: "dashboard.access", userCount: 2 }] });
-    if (path === "/management/audit") return json(route, { items: [], nextCursor: null });
+    if (path === "/management/audit") {
+      return json(route, { items: [{ id: "a1", actorId: null, actorLabel: "Administrator principal (arasya.root.owner)", actorType: "root", action: "employee.deactivated", targetType: "employee", targetId: ION_ID,
+        targetLabel: "Ion Popescu (ion.popescu)", metadata: null, createdAt: "2026-10-04T10:00:00.000Z" }], nextCursor: null });
+    }
     if (path === "/management/employees" && method === "GET") {
       const search = (url.searchParams.get("search") ?? "").toLowerCase();
       const application = url.searchParams.get("application");

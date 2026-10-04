@@ -99,7 +99,7 @@ test("7-10 root grants Staff access, assigns a role and one Staff stage, and the
   await review(root, "Revizuiește etapele", "Aplică etapele");
   await root.reload();
   await expect(root.getByRole("checkbox", { name: "Staff", exact: true })).toBeChecked();
-  await expect(root.getByRole("checkbox", { name: "Dashboard", exact: true })).not.toBeChecked();
+  await expect(root.getByRole("checkbox", { name: "Panou de control", exact: true })).not.toBeChecked();
   await expect(root.getByRole("checkbox", { name: new RegExp(`^${escape(fixture.role.name)} nivel`) })).toBeChecked();
   await expect(root.getByRole("checkbox", { name: new RegExp(`${escape(fixture.stage.label)}$`) })).toBeChecked();
 });
@@ -124,7 +124,7 @@ test("12 a Staff-only identity changes its temporary password and still cannot o
 
 test("13-14 granting Dashboard access applies on the next authorization request without a new login", async () => {
   await root.goto(`/angajati/${employeeId}`);
-  await root.getByRole("checkbox", { name: "Dashboard", exact: true }).check();
+  await root.getByRole("checkbox", { name: "Panou de control", exact: true }).check();
   await review(root, "Revizuiește accesul", "Aplică accesul");
   await employee.reload();
   await expect(employee.getByRole("heading", { name: /^Bună, Test\./ })).toBeVisible();
@@ -132,7 +132,7 @@ test("13-14 granting Dashboard access applies on the next authorization request 
 });
 
 test("15-16 removing Dashboard access denies the next protected request again", async () => {
-  await root.getByRole("checkbox", { name: "Dashboard", exact: true }).uncheck();
+  await root.getByRole("checkbox", { name: "Panou de control", exact: true }).uncheck();
   await review(root, "Revizuiește accesul", "Aplică accesul");
   // Any protected management request now fails; the app re-reads the session and shows the refusal.
   await employee.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
