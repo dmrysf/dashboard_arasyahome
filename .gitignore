@@ -12,4 +12,4 @@
 /dist-e2e/
 /e2e/.runtime/
 /e2e/.real-api-fixture.json
-/operations-api/
+/operations-api
