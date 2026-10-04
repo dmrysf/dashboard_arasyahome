@@ -270,3 +270,62 @@ test("production overview is hidden behind production.view and degrades without 
   await production.getByRole("button", { name: "Reîncearcă" }).click();
   await expect(production.locator('[data-metric="active"] strong')).toHaveText("20");
 });
+
+test("orders: server filters and cursor pages, detail with separate store and production, Staff progress by polling, TR and phone cards, no writes", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-04T12:00:00Z") });
+  const api = await mockApi(page);
+  await login(page);
+  await page.getByRole("navigation").getByRole("link", { name: "Comenzi", exact: true }).click();
+  await expect(page.locator("tr[data-order]")).toHaveCount(30);
+  expect(api.orderRequests.at(-1)).toBe("?state=active&limit=50");
+  await page.getByLabel("Pe pagină").selectOption("25");
+  await expect(page.locator("tr[data-order]")).toHaveCount(25);
+  await page.getByRole("button", { name: "Pagina următoare" }).click();
+  await expect(page.locator("tr[data-order]")).toHaveCount(5);
+  expect(api.orderRequests.at(-1)).toBe("?cursor=page-2&state=active&limit=25");
+  await page.getByRole("button", { name: "Pagina anterioară" }).click();
+  await page.getByLabel("Sursă").selectOption("trendhome");
+  await expect(page.locator("tr[data-order]")).toHaveCount(1);
+  expect(api.orderRequests.at(-1)).toBe("?source=trendhome&state=active&limit=25");
+  const row = page.locator('tr[data-order="trendhome:91001"]');
+  await expect(row.locator('[data-kind="commerce"]')).toHaveText(/Se procesează/);
+  await expect(row.locator('[data-kind="production"]')).toHaveText(/În așteptare/);
+  await expect(row).toContainText("Fără responsabil");
+
+  await row.getByRole("link", { name: "91001" }).click();
+  await expect(page).toHaveURL(/\/comenzi\/trendhome%3A91001$/);
+  await expect(page.locator('[data-section="commerce"]')).toContainText("Se procesează");
+  await expect(page.locator('[data-section="production"]')).toContainText("Fără responsabil");
+  await expect(page.locator('[data-item="1"]')).toContainText("300 cm");
+
+  // A Staff employee claims and completes the stage; the open detail follows within one polling interval.
+  api.control.owner = { id: "e-mehmet", displayName: "Mehmet Atölye" };
+  api.control.stage = { id: "material-preparation", label: "Pregătire material", ordinal: 2 };
+  await expect(page.getByRole("button", { name: "Actualizează" })).toBeEnabled();
+  await page.clock.runFor(46_000);
+  await expect(page.locator('[data-section="production"] [data-kind="production"]')).toHaveText(/Pregătire material/);
+  await expect(page.locator('[data-section="production"]')).toContainText("Mehmet Atölye");
+  await expect(page.locator('[data-event="claimed"]')).toContainText("Mehmet Atölye");
+  await expect(page.locator('[data-section="commerce"]')).toContainText("Se procesează");
+
+  api.ordersFail = true;
+  await page.getByRole("button", { name: "Actualizează" }).click();
+  await expect(page.getByRole("status")).toHaveText("Datele nu au putut fi actualizate. Se afișează ultima versiune primită.");
+  await expect(page.locator('[data-section="production"]')).toContainText("Mehmet Atölye");
+  api.ordersFail = false;
+
+  await page.getByRole("button", { name: "TR — Türkçe" }).click();
+  await expect(page.getByRole("heading", { name: "Arasya Üretimi" })).toBeVisible();
+  await expect(page.locator('[data-section="production"] [data-kind="production"]')).toHaveText(/Malzeme Hazırlığı/);
+  await page.getByRole("button", { name: "← Siparişler" }).click();
+  await expect(page.getByRole("columnheader", { name: "Üretim Aşaması" })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator("tr[data-order]").first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.locator("table.orders-table thead").isVisible()).toBe(false);
+
+  await page.goto("/comenzi/trendhome%3A99999");
+  await expect(page.getByRole("alert")).toContainText("Sipariş bulunamadı.");
+  expect(api.mutations.map((mutation) => mutation.path)).toEqual(["/auth/login"]);
+});

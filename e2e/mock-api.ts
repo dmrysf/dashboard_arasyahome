@@ -35,6 +35,10 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
     requests: [] as string[],
     overviewRequests: [] as string[],
     overviewFails: false,
+    ordersFail: false,
+    orderRequests: [] as string[],
+    /** Mutable production state of the controlled order, so tests can simulate Staff progress. */
+    control: { stage: { id: "waiting", label: "În așteptare", ordinal: 1 }, owner: null as null | { id: string; displayName: string } },
     mutations: [] as Array<{ method: string; path: string; body: unknown; csrf: string | undefined }>,
     employees: [
       summary({ id: ROOT_ID, username: "arasya.root.owner", displayName: "Administrator principal", positionTitle: "Administrator principal", isRoot: true, applications: ["staff", "dashboard"], manageable: false, rolePermissions: ["*"], department: { id: 1, name: "Administrație" } }),
@@ -91,6 +95,17 @@ export async function mockApi(page: Page, options: MockOptions = {}) {
     if (path.startsWith("/management") && !state.applications.includes("dashboard")) return fail(route, "APPLICATION_ACCESS_DENIED", 403);
 
     if (path === "/management/me") return json(route, me);
+    if (path === "/management/orders") {
+      state.orderRequests.push(url.search);
+      if (state.ordersFail) return fail(route, "SERVER_ERROR", 503);
+      return json(route, orderPage(url.searchParams, state.control));
+    }
+    if (path.startsWith("/management/orders/")) {
+      state.orderRequests.push(path);
+      if (state.ordersFail) return fail(route, "SERVER_ERROR", 503);
+      const id = decodeURIComponent(path.slice("/management/orders/".length));
+      return id === "trendhome:91001" ? json(route, orderDetail(state.control)) : fail(route, "ORDER_NOT_FOUND", 404);
+    }
     if (path === "/management/production-overview") {
       state.overviewRequests.push(url.search);
       if (state.overviewFails) return fail(route, "SERVER_ERROR", 503);
@@ -163,5 +178,54 @@ function productionOverview(source: string | null) {
       { key: "trendhome", name: "Trendhome", type: "woocommerce", health: "healthy", lastContactAt: "2026-10-04T11:59:00.000Z", lastEventAt: "2026-10-04T11:59:00.000Z", activeOrders: 20 },
       { key: "trendyol", name: "Trendyol", type: "marketplace", health: "not_configured", lastContactAt: null, lastEventAt: null, activeOrders: 0 },
     ],
+  };
+}
+
+type Control = { stage: { id: string; label: string; ordinal: number }; owner: null | { id: string; displayName: string } };
+
+function orderSummary(index: number, control: Control) {
+  const controlled = index === 0;
+  return {
+    globalOrderId: controlled ? "trendhome:91001" : `outletperdele:${92000 + index}`,
+    orderNumber: controlled ? "91001" : String(92000 + index),
+    source: controlled ? { key: "trendhome", name: "Trendhome" } : { key: "outletperdele", name: "OutletPerdele" },
+    commerce: { status: controlled ? { code: "processing", label: "Se procesează" } : { code: "on-hold", label: "În așteptare plată" }, availability: "active" },
+    production: {
+      state: "active", stage: controlled ? control.stage : { id: "labeling", label: "Etichetare", ordinal: 4 }, owner: controlled ? control.owner : null,
+      claimedAt: controlled && control.owner ? "2026-10-04T11:00:00.000Z" : null, stageEnteredAt: "2026-10-04T09:00:00.000Z", completedAt: null,
+    },
+    importedAt: `2026-10-04T0${Math.min(9, 8 - Math.floor(index / 10))}:00:00.000Z`,
+    acceptedAt: "2026-10-04T07:00:00.000Z",
+  };
+}
+
+/** 30 active orders; 25 per page by cursor. Filters are echoed by narrowing, like the API. */
+function orderPage(query: URLSearchParams, control: Control) {
+  let items = Array.from({ length: 30 }, (_, index) => orderSummary(index, control));
+  if (query.get("source")) items = items.filter((item) => item.source.key === query.get("source"));
+  if (query.get("search")) items = items.filter((item) => item.orderNumber.startsWith(String(query.get("search")).replace("#", "")));
+  const limit = Number(query.get("limit") ?? 50);
+  const start = query.get("cursor") === "page-2" ? limit : 0;
+  return {
+    items: items.slice(start, start + limit),
+    nextCursor: start + limit < items.length ? "page-2" : null,
+    facets: {
+      sources: [{ key: "outletperdele", name: "OutletPerdele" }, { key: "trendhome", name: "Trendhome" }, { key: "trendyol", name: "Trendyol" }],
+      stages: PRODUCTION_STAGES.map((id, index) => ({ id, label: id, ordinal: index + 1 })),
+      commerceStatuses: [{ code: "on-hold", label: "În așteptare plată" }, { code: "processing", label: "Se procesează" }],
+      owners: control.owner ? [control.owner] : [],
+    },
+  };
+}
+
+function orderDetail(control: Control) {
+  const base = orderSummary(0, control);
+  return {
+    ...base,
+    commerce: { ...base.commerce, sourceChangedAt: "2026-10-04T07:01:00.000Z", lastSourceSeenAt: "2026-10-04T11:50:00.000Z" },
+    production: { ...base.production, changedAt: control.stage.id === "waiting" ? null : "2026-10-04T11:30:00.000Z", version: control.owner ? 2 : 1, notes: "Tiv dublu." },
+    items: [{ line: 1, name: "Draperie Velvet", sku: "DV-302", variant: "Inele", color: "Bej", width: 300, height: 260, unit: "cm", meters: 8.4, quantity: 2 }],
+    activity: control.owner ? [{ id: "pa-c1", action: "claimed", occurredAt: "2026-10-04T11:00:00.000Z", employee: control.owner, fromStage: { id: "waiting", label: "În așteptare" }, toStage: null, productionVersion: 2 }] : [],
+    activityTruncated: false,
   };
 }

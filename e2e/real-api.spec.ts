@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -7,6 +8,7 @@ type Fixture = {
   role: { id: number; name: string };
   stage: { id: string; label: string };
   department: { id: number; name: string };
+  control: { order: string; number: string; worker: { username: string; password: string; name: string } };
   production: {
     summary: Record<"active" | "waiting" | "inWork" | "unassigned" | "completedToday", number>;
     stages: Record<string, number>;
@@ -119,6 +121,121 @@ test("production overview shows the real API aggregates, translates in place and
   root.off("request", track);
   expect(writes, "the overview is read-only").toEqual([]);
   expect(await root.evaluate(() => Object.keys(localStorage))).toEqual(["arasya.dashboard.locale"]);
+});
+
+/** A signed Trendhome commerce event, exactly as the WooCommerce connector sends it (inbound only). */
+async function trendhomeEvent(eventId: string, status: { code: string; label: string }) {
+  const body = JSON.stringify({
+    schemaVersion: 1, eventId, changedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+    order: {
+      id: "90001", number: "90001", status, availability: "active", notes: "Tiv dublu la bază.", acceptedAt: new Date(Date.now() - 3_600_000).toISOString().replace(/\.\d{3}Z$/, "Z"),
+      items: [
+        { id: 900011, line: 1, name: "Draperie Blackout", sku: "BO-210", variant: "Rejansă cu inele", color: "Gri", width: 320, height: 270.5, unit: "cm", meters: 9.6, quantity: 2 },
+        { id: 900012, line: 2, name: "Perdea In", sku: null, color: null, width: null, height: null, unit: null, meters: null, quantity: 1 },
+      ],
+    },
+    // A stale source stage hint must not move production that Operations already owns.
+    production: { workflowKey: "curtain-production", workflowVersion: 1, stageId: "delivery" },
+  });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = "v1=" + createHmac("sha256", "trendhome-integration-secret-0123456789abcdef").update(`${timestamp}.${body}`).digest("hex");
+  const response = await fetch(`${API}/integrations/sources/trendhome/orders`, { method: "POST", headers: { "Content-Type": "application/json", "X-Arasya-Timestamp": timestamp, "X-Arasya-Signature": signature }, body });
+  expect(response.status).toBe(200);
+  expect((await response.json()).outcome).toBe("applied");
+}
+
+test("production control: list, detail, Staff progress, independent commerce updates, RO/TR and mobile", async ({ browser }) => {
+  const control = fixture.control;
+  const external: string[] = [];
+  const rootWrites: string[] = [];
+  const watch = (request: import("@playwright/test").Request) => {
+    const url = new URL(request.url());
+    if (url.hostname !== "127.0.0.1") external.push(request.url());
+    if (request.url().startsWith(API) && request.method() !== "GET") rootWrites.push(`${request.method()} ${url.pathname}`);
+  };
+  root.on("request", watch);
+
+  // 1-5: the controlled Trendhome order appears with its store status and an independent production start.
+  await root.getByRole("navigation").getByRole("link", { name: "Comenzi", exact: true }).click();
+  await expect(root.getByRole("heading", { name: "Comenzi", exact: true })).toBeVisible();
+  const row = root.locator(`tr[data-order="${control.order}"]`);
+  await expect(row.locator('[data-kind="commerce"]')).toHaveText(/Se procesează/);
+  await expect(row.locator('[data-kind="production"]')).toHaveText(/În așteptare/);
+  await expect(row).toContainText("Fără responsabil");
+  await root.getByLabel("Sursă").selectOption("trendhome");
+  await expect(root.locator("tr[data-order]"), "default filter shows active production only").toHaveCount(4);
+  await root.getByLabel("Caută").fill("90001");
+  await root.getByRole("button", { name: "Caută", exact: true }).click();
+  await expect(root.locator("tr[data-order]")).toHaveCount(1);
+  await row.getByRole("link", { name: control.number }).click();
+  await expect(root).toHaveURL(/\/comenzi\/trendhome%3A90001$/);
+  const commerce = root.locator('[data-section="commerce"]');
+  const production = root.locator('[data-section="production"]');
+  await expect(commerce).toContainText("Se procesează");
+  await expect(production).toContainText("În așteptare");
+  await expect(production).toContainText("Fără responsabil");
+  await expect(root.locator('[data-item="1"]')).toContainText("Draperie Blackout");
+  await expect(root.locator('[data-item="1"]')).toContainText("320 cm");
+  await expect(root.locator('[data-item="1"]')).toContainText("270,5 cm");
+  await expect(root.locator('[data-item="1"]')).toContainText("9,6 m");
+  await expect(root.locator('[data-item="2"]')).toContainText("Perdea In");
+  await expect(root.getByText("Tiv dublu la bază.")).toBeVisible();
+  await expect(root.locator("[data-event]")).toHaveCount(1);
+
+  // 6-9: a Staff employee claims and completes the waiting stage through the real API.
+  const worker = await newEmployeePage(browser);
+  await worker.goto("/");
+  const staffAction = (path: string, body: unknown) => worker.evaluate(async ({ api, path, body, username, password }) => {
+    let session = await fetch(`${api}/auth/session`, { credentials: "include" });
+    if (session.status !== 200) session = await fetch(`${api}/auth/login`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
+    const { csrfToken } = await session.json();
+    const response = await fetch(`${api}${path}`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken, "Idempotency-Key": `e2e-${crypto.randomUUID()}` }, body: JSON.stringify(body) });
+    return response.status;
+  }, { api: API, path, body, username: control.worker.username, password: control.worker.password });
+  const orderApiPath = `/orders/${encodeURIComponent(control.order)}`;
+  expect(await staffAction(`${orderApiPath}/claim`, { expectedVersion: 1 })).toBe(200);
+  await root.getByRole("button", { name: "Actualizează" }).click();
+  await expect(production).toContainText(control.worker.name);
+  await expect(root.locator('[data-event="claimed"]')).toContainText(control.worker.name);
+  expect(await staffAction(`${orderApiPath}/transition`, { expectedVersion: 2 })).toBe(200);
+  await root.getByRole("button", { name: "Actualizează" }).click();
+  await expect(production.locator('[data-kind="production"]')).toHaveText(/Pregătire material/);
+  await expect(production).toContainText("Fără responsabil");
+  await expect(root.locator('[data-event="stage_completed"]')).toContainText("Din: În așteptare → Către: Pregătire material");
+  // 10: the store status stored in Operations is untouched by production.
+  await expect(commerce).toContainText("Se procesează");
+
+  // 11-14: a new Trendhome commerce event updates the store status and nothing else.
+  await trendhomeEvent("dashboard-e2e-90001-2", { code: "shipped", label: "Expediat" });
+  await root.getByRole("button", { name: "Actualizează" }).click();
+  await expect(commerce).toContainText("Expediat");
+  await expect(production.locator('[data-kind="production"]')).toHaveText(/Pregătire material/);
+  expect(await root.locator("[data-event]").evaluateAll((items) => items.map((item) => item.getAttribute("data-event")))).toEqual(["imported", "claimed", "stage_completed"]);
+
+  // 16: Turkish, in place.
+  await root.getByRole("button", { name: "TR — Türkçe" }).click();
+  await expect(root.getByRole("heading", { name: "Mağaza (kaynak)" })).toBeVisible();
+  await expect(production.locator('[data-kind="production"]')).toHaveText(/Malzeme Hazırlığı/);
+  await expect(root.locator('[data-event="stage_completed"]')).toContainText("Aşamayı tamamladı");
+  await root.getByRole("button", { name: "← Siparişler" }).click();
+  await expect(root.getByRole("columnheader", { name: "Mağaza Durumu" })).toBeVisible();
+  await expect(root.getByRole("columnheader", { name: "Üretim Aşaması" })).toBeVisible();
+
+  // 17: phone layout stacks the rows instead of scrolling a spreadsheet sideways.
+  await root.setViewportSize({ width: 390, height: 844 });
+  await expect(root.locator("tr[data-order]").first()).toBeVisible();
+  expect(await root.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await root.locator(`tr[data-order="${control.order}"] a`).click();
+  await expect(root.locator('[data-section="production"]')).toBeVisible();
+  expect(await root.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await root.setViewportSize({ width: 1280, height: 720 });
+  await root.getByRole("button", { name: "RO — Română" }).click();
+
+  // 15: nothing left the controlled environment and the Dashboard itself wrote nothing.
+  root.off("request", watch);
+  expect(external, "no request to any external host").toEqual([]);
+  expect(rootWrites, "the order workspace is read-only").toEqual([]);
+  await worker.context().close();
 });
 
 test("old temporary root password stops working immediately", async ({ browser }) => {

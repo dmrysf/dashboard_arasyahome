@@ -139,7 +139,8 @@ test("oldest orders keep the API order and show stage age, owner, source and com
   assert.ok(body.includes("Nepreluată") && body.includes("Ana Popescu"));
   assert.ok(body.includes("OutletPerdele") && body.includes("Processing"));
   assert.ok(text(panel("tr")).includes("2 g 3 sa"));
-  assert.ok(!html.includes("Vezi tot"), "no dead-end 'see all' link without an order destination");
+  assert.match(html, /href="\/comenzi">Vezi toate comenzile</, "'see all' leads to the order workspace");
+  assert.match(html, /href="\/comenzi\/trendhome%3A91004"[^>]*>91004</, "each order opens its Production Control detail");
 });
 
 test("production activity is labelled by action key and kept apart from the IAM audit", () => {
