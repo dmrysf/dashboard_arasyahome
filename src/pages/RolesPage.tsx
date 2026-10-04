@@ -4,7 +4,7 @@ import { Badge, EmptyState, ErrorBanner, Loading, Notice, PageHeader, StatusBadg
 
 export function RolesPage() {
   const { api, can, navigate } = useDashboard();
-  const roles = useLoader(() => api.roles(), [api]);
+  const roles = useLoader(() => api.roles());
   return (
     <div className="page">
       <PageHeader title="Roluri și permisiuni" description="Rolurile combină permisiuni din catalogul fix al serverului. Nivelul de autoritate limitează cine poate atribui sau modifica un rol."

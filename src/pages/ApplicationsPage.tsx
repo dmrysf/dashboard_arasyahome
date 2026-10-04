@@ -4,7 +4,7 @@ import { ErrorBanner, Loading, Notice, PageHeader, StatusBadge } from "../compon
 
 export function ApplicationsPage() {
   const { api } = useDashboard();
-  const applications = useLoader(() => api.applications(), [api]);
+  const applications = useLoader(() => api.applications());
   return (
     <div className="page">
       <PageHeader title="Aplicații" description="Aplicațiile înregistrate în identitatea centrală Arasya. Accesul se acordă per angajat." />

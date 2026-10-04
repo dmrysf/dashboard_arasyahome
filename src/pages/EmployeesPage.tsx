@@ -9,9 +9,9 @@ export function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState<Record<string, string | undefined>>({ status: "active" });
   const [cursor, setCursor] = useState<string | undefined>();
-  const departments = useLoader(() => can("departments.view") ? api.departments() : Promise.resolve({ items: [] }), [api]);
-  const roles = useLoader(() => can("roles.view") ? api.roles() : Promise.resolve({ items: [] }), [api]);
-  const page = useLoader(() => api.employees({ ...query, cursor }), [api, query, cursor]);
+  const departments = useLoader(() => can("departments.view") ? api.departments() : Promise.resolve({ items: [] }));
+  const roles = useLoader(() => can("roles.view") ? api.roles() : Promise.resolve({ items: [] }));
+  const page = useLoader(() => api.employees({ ...query, cursor }), JSON.stringify({ ...query, cursor }));
   const update = (key: string, value: string) => { setCursor(undefined); setQuery((current) => ({ ...current, [key]: value || undefined })); };
 
   return (

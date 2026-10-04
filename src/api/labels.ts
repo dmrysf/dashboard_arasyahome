@@ -18,7 +18,11 @@ export const CATEGORY_ORDER = ["dashboard", "employees", "roles", "departments",
 
 export const STATUS_LABELS: Record<string, string> = { active: "Activ", inactive: "Inactiv", suspended: "Suspendat" };
 
-export const APPLICATION_LABELS: Record<string, string> = { staff: "Staff", dashboard: "Dashboard" };
+export const APPLICATION_LABELS: Record<string, string> = { staff: "Staff", dashboard: "Dashboard", b2b: "B2B", finance: "Financiar" };
+
+export function applicationLabel(key: string): string {
+  return APPLICATION_LABELS[key] ?? key;
+}
 
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "employee.created": "Angajat creat",

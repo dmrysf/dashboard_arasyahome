@@ -7,10 +7,10 @@ import { Card, ErrorBanner, Field, Loading, OneTimeSecret, PageHeader } from "..
 
 export function EmployeeCreatePage() {
   const { api, can, navigate, me } = useDashboard();
-  const departments = useLoader(() => api.departments(), [api]);
-  const roles = useLoader(() => can("roles.view") ? api.roles() : Promise.resolve({ items: [] }), [api]);
-  const workflow = useLoader(() => api.workflow(), [api]);
-  const managers = useLoader(() => can("employees.manage_hierarchy") ? api.employees({ status: "active", limit: "100" }) : Promise.resolve({ items: [], nextCursor: null, total: 0 }), [api]);
+  const departments = useLoader(() => api.departments());
+  const roles = useLoader(() => can("roles.view") ? api.roles() : Promise.resolve({ items: [] }));
+  const workflow = useLoader(() => api.workflow());
+  const managers = useLoader(() => can("employees.manage_hierarchy") ? api.employees({ status: "active", limit: "100" }) : Promise.resolve({ items: [], nextCursor: null, total: 0 }));
   const [form, setForm] = useState({ displayName: "", username: "", departmentId: "", positionTitle: "", managerId: "", status: "active" as "active" | "inactive" });
   const [applications, setApplications] = useState<string[]>(["staff"]);
   const [roleIds, setRoleIds] = useState<number[]>([]);

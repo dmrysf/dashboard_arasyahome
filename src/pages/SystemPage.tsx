@@ -5,7 +5,7 @@ import { Badge, Card, ErrorBanner, Loading, PageHeader } from "../components/ui"
 
 export function SystemPage() {
   const { api, session, me } = useDashboard();
-  const system = useLoader(() => api.system(), [api]);
+  const system = useLoader(() => api.system());
   return (
     <div className="page">
       <PageHeader title="Sistem" description="Stare generală, fără secrete sau detalii de infrastructură." />

@@ -5,7 +5,7 @@ import { AuditList } from "./AuditList";
 
 export function OverviewPage() {
   const { api, me, can, navigate } = useDashboard();
-  const { data, error, reload } = useLoader(() => api.overview(), [api]);
+  const { data, error, reload } = useLoader(() => api.overview());
   if (!can("dashboard.overview.view")) return <PageHeader title="Panou de control" description="Nu ai permisiunea de a vedea sumarul." />;
   return (
     <div className="page">

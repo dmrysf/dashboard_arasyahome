@@ -12,7 +12,7 @@ export function AuditPage() {
   const [search, setSearch] = useState("");
   const [extra, setExtra] = useState<AuditEvent[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
-  const page = useLoader(() => api.audit(filters).then((result) => { setExtra([]); setCursor(result.nextCursor); return result; }), [api, filters]);
+  const page = useLoader(() => api.audit(filters).then((result) => { setExtra([]); setCursor(result.nextCursor); return result; }), JSON.stringify(filters));
   const set = (key: string, value: string) => setFilters((current) => ({ ...current, [key]: value || undefined }));
 
   async function more() {

@@ -8,7 +8,6 @@ export type DashboardContextValue = {
   me: ManagementMe;
   navigate: (path: string) => void;
   can: (permission: string) => boolean;
-  refreshMe: () => Promise<void>;
 };
 
 export const DashboardContext = createContext<DashboardContextValue | null>(null);

@@ -7,7 +7,7 @@ import { Card, ConfirmDialog, EmptyState, ErrorBanner, Field, Loading, Notice, P
 
 export function DepartmentsPage() {
   const { api, can } = useDashboard();
-  const departments = useLoader(() => api.departments(), [api]);
+  const departments = useLoader(() => api.departments());
   const [draft, setDraft] = useState({ name: "", description: "", parentId: "" });
   const [editing, setEditing] = useState<Department | null>(null);
   const [rename, setRename] = useState("");
