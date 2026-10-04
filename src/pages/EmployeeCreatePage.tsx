@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { useDashboard } from "../app/context";
 import { useLoader } from "../app/useLoader";
-import { errorMessage } from "../api/labels";
+import { applicationLabel, errorMessage } from "../api/labels";
+import { toggle } from "./EmployeeDetailPage";
+
+const APPLICATION_DESCRIPTIONS: Record<string, string> = { staff: "Staff (producție)", dashboard: "Dashboard (administrare)" };
 import type { EmployeeDetail } from "../api/types";
 import { Card, ErrorBanner, Field, Loading, OneTimeSecret, PageHeader } from "../components/ui";
 
@@ -10,6 +13,7 @@ export function EmployeeCreatePage() {
   const departments = useLoader(() => api.departments());
   const roles = useLoader(() => can("roles.view") ? api.roles() : Promise.resolve({ items: [] }));
   const workflow = useLoader(() => api.workflow());
+  const applicationList = useLoader(() => can("applications.view") ? api.applications() : Promise.resolve({ items: [] }));
   const managers = useLoader(() => can("employees.manage_hierarchy") ? api.employees({ status: "active", limit: "100" }) : Promise.resolve({ items: [], nextCursor: null, total: 0 }));
   const [form, setForm] = useState({ displayName: "", username: "", departmentId: "", positionTitle: "", managerId: "", status: "active" as "active" | "inactive" });
   const [applications, setApplications] = useState<string[]>(["staff"]);
@@ -18,7 +22,6 @@ export function EmployeeCreatePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<{ employee: EmployeeDetail; temporaryPassword: string } | null>(null);
-  const toggle = <T,>(list: T[], value: T) => list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -29,13 +32,16 @@ export function EmployeeCreatePage() {
       setCreated(await api.createEmployee({
         displayName: form.displayName.trim(), username: form.username.trim(), departmentId: Number(form.departmentId),
         positionTitle: form.positionTitle.trim() || null, managerId: form.managerId || null,
-        applications: can("employees.manage_applications") ? applications : [], roleIds: can("employees.manage_roles") ? roleIds : [],
+        applications: can("employees.manage_applications") ? applications : [], roleIds: canAssignRoles ? roleIds : [],
         stageIds: can("employees.manage_stages") && applications.includes("staff") ? stageIds : [], status: form.status,
       }));
     } catch (caught) { setError(errorMessage(caught)); }
     finally { setBusy(false); }
   }
 
+  const canAssignRoles = can("employees.manage_roles") && can("roles.assign");
+  const grantableApplications = (applicationList.data?.items.length ? applicationList.data.items.filter((item) => item.status === "active").map((item) => item.key) : ["staff", "dashboard"])
+    .filter((key) => me.isRoot || me.applications.includes(key));
   if (!can("employees.create")) return <PageHeader title="Angajat nou" description="Nu ai permisiunea de a crea angajați." />;
   if (created) {
     return (
@@ -67,12 +73,12 @@ export function EmployeeCreatePage() {
           </Card>
           {can("employees.manage_applications") && <Card title="Aplicații" description="Accesul la Dashboard oferă acces la panoul de administrare; permisiunile vin din roluri.">
             <div className="check-list">
-              {["staff", "dashboard"].filter((key) => me.isRoot || me.applications.includes(key)).map((key) => (
-                <label key={key} className="check"><input type="checkbox" checked={applications.includes(key)} onChange={() => setApplications(toggle(applications, key))} /> {key === "staff" ? "Staff (producție)" : "Dashboard (administrare)"}</label>
+              {grantableApplications.map((key) => (
+                <label key={key} className="check"><input type="checkbox" checked={applications.includes(key)} onChange={() => setApplications(toggle(applications, key))} /> {APPLICATION_DESCRIPTIONS[key] ?? applicationLabel(key)}</label>
               ))}
             </div>
           </Card>}
-          {can("employees.manage_roles") && <Card title="Roluri" description="Poți atribui doar roluri aflate sub nivelul tău de autoritate.">
+          {canAssignRoles && <Card title="Roluri" description="Poți atribui doar roluri aflate sub nivelul tău de autoritate.">
             <div className="check-list">
               {roles.data?.items.filter((role) => role.status === "active").map((role) => (
                 <label key={role.id} className={`check ${role.manageable ? "" : "disabled"}`}><input type="checkbox" disabled={!role.manageable} checked={roleIds.includes(role.id)} onChange={() => setRoleIds(toggle(roleIds, role.id))} /> {role.name} <small>nivel {role.authorityRank}</small></label>

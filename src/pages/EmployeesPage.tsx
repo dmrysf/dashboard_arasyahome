@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useDashboard } from "../app/context";
 import { useLoader } from "../app/useLoader";
-import { APPLICATION_LABELS } from "../api/labels";
+import { applicationLabel } from "../api/labels";
 import { Badge, EmptyState, ErrorBanner, Loading, PageHeader, RootBadge, StatusBadge } from "../components/ui";
 
 export function EmployeesPage() {
@@ -11,6 +11,7 @@ export function EmployeesPage() {
   const [cursor, setCursor] = useState<string | undefined>();
   const departments = useLoader(() => can("departments.view") ? api.departments() : Promise.resolve({ items: [] }));
   const roles = useLoader(() => can("roles.view") ? api.roles() : Promise.resolve({ items: [] }));
+  const applications = useLoader(() => can("applications.view") ? api.applications() : Promise.resolve({ items: [] }));
   const page = useLoader(() => api.employees({ ...query, cursor }), JSON.stringify({ ...query, cursor }));
   const update = (key: string, value: string) => { setCursor(undefined); setQuery((current) => ({ ...current, [key]: value || undefined })); };
 
@@ -28,7 +29,8 @@ export function EmployeesPage() {
           {departments.data?.items.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
         </select>
         <select aria-label="Aplicație" value={query.application ?? ""} onChange={(event) => update("application", event.target.value)}>
-          <option value="">Toate aplicațiile</option><option value="staff">Staff</option><option value="dashboard">Dashboard</option>
+          <option value="">Toate aplicațiile</option>
+          {(applications.data?.items.length ? applications.data.items.map((item) => item.key) : ["staff", "dashboard"]).map((key) => <option key={key} value={key}>{applicationLabel(key)}</option>)}
         </select>
         <select aria-label="Rol" value={query.roleId ?? ""} onChange={(event) => update("roleId", event.target.value)}>
           <option value="">Toate rolurile</option>
@@ -41,7 +43,7 @@ export function EmployeesPage() {
       {page.data && (page.data.items.length === 0 ? <EmptyState title="Niciun angajat găsit.">Modifică filtrele sau creează un angajat nou.</EmptyState> : <>
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>Nume</th><th>Utilizator</th><th>Departament</th><th>Funcție</th><th>Manager</th><th>Aplicații</th><th>Rol</th><th>Status</th></tr></thead>
+            <thead><tr><th>Nume</th><th>Utilizator</th><th>Departament</th><th>Funcție</th><th>Manager</th><th>Aplicații</th><th>Roluri</th><th>Status</th></tr></thead>
             <tbody>
               {page.data.items.map((employee) => (
                 <tr key={employee.id} className={employee.isRoot ? "row-root" : ""} onClick={() => navigate(`/angajati/${employee.id}`)}>
@@ -50,8 +52,8 @@ export function EmployeesPage() {
                   <td data-label="Departament">{employee.department.name}</td>
                   <td data-label="Funcție">{employee.positionTitle ?? "—"}</td>
                   <td data-label="Manager">{employee.manager?.displayName ?? "—"}</td>
-                  <td data-label="Aplicații">{employee.applications.length ? employee.applications.map((key) => <Badge key={key} tone="accent">{APPLICATION_LABELS[key] ?? key}</Badge>) : "—"}</td>
-                  <td data-label="Rol">{employee.isRoot ? "Toate drepturile" : employee.roles.map((role) => role.name).join(", ") || "—"}</td>
+                  <td data-label="Aplicații">{employee.applications.length ? employee.applications.map((key) => <Badge key={key} tone="accent">{applicationLabel(key)}</Badge>) : "—"}</td>
+                  <td data-label="Roluri">{employee.isRoot ? "Toate drepturile" : employee.roles.map((role) => role.name).join(", ") || "—"}</td>
                   <td data-label="Status"><StatusBadge status={employee.status} /></td>
                 </tr>
               ))}

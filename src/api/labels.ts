@@ -47,6 +47,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
 export const TARGET_LABELS: Record<string, string> = { employee: "Angajat", role: "Rol", department: "Departament" };
 
 const ERROR_MESSAGES: Record<string, string> = {
+  AUTHENTICATION_REQUIRED: "Autentifică-te pentru a continua.",
+  NO_SESSION: "Autentifică-te pentru a continua.",
   INVALID_CREDENTIALS: "Utilizatorul sau parola nu sunt corecte.",
   ACCOUNT_INACTIVE: "Contul nu este activ.",
   RATE_LIMITED: "Prea multe încercări. Încearcă din nou puțin mai târziu.",
@@ -55,11 +57,12 @@ const ERROR_MESSAGES: Record<string, string> = {
   CSRF_INVALID: "Sesiunea de securitate s-a reînnoit. Reîncarcă pagina și încearcă din nou.",
   ORIGIN_DENIED: "Cererea nu provine dintr-o origine permisă.",
   UNAUTHORIZED_ACTION: "Nu ai permisiunea pentru această acțiune.",
-  APPLICATION_ACCESS_DENIED: "Contul nu are acces la Panoul de control.",
+  APPLICATION_ACCESS_DENIED: "Nu ai acces la Panoul de control.",
+  CORS_HEADER_DENIED: "Cererea a fost respinsă de politica de securitate a serverului.",
   PASSWORD_CHANGE_REQUIRED: "Trebuie să schimbi parola temporară.",
   CURRENT_PASSWORD_INVALID: "Parola actuală nu este corectă.",
   PASSWORD_POLICY: "Parola nouă trebuie să aibă cel puțin 12 caractere, să fie diferită de cea actuală și să nu conțină numele de utilizator.",
-  ROOT_PROTECTED: "Administratorul principal este un cont de sistem protejat.",
+  ROOT_PROTECTED: "Administratorul principal este un cont de sistem protejat și nu poate fi modificat.",
   AUTHORITY_EXCEEDED: "Modificarea depășește nivelul tău de autoritate.",
   SELF_MODIFICATION_DENIED: "Nu îți poți modifica propriile drepturi.",
   PERMISSION_NOT_GRANTABLE: "Una dintre permisiuni nu poate fi acordată de tine.",
@@ -81,10 +84,22 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_REQUEST: "Datele trimise nu sunt valide.",
   CONFLICT: "Modificarea intră în conflict cu datele existente.",
   SERVICE_UNAVAILABLE: "Serviciul nu este disponibil momentan.",
+  WORKFLOW_UNAVAILABLE: "Fluxul de producție nu este disponibil momentan.",
+  SERVER_ERROR: "Serverul nu a putut finaliza operațiunea. Nicio informație tehnică nu este afișată aici.",
+  INTERNAL_ERROR: "Serverul nu a putut finaliza operațiunea. Nicio informație tehnică nu este afișată aici.",
+  INVALID_RESPONSE: "Serverul a trimis un răspuns neașteptat. Reîncearcă.",
+  NOT_FOUND: "Resursa cerută nu există.",
+  METHOD_NOT_ALLOWED: "Operațiunea nu este permisă.",
+  MALFORMED_JSON: "Datele trimise nu sunt valide.",
+  REQUEST_TOO_LARGE: "Datele trimise sunt prea mari.",
+  UNSUPPORTED_MEDIA_TYPE: "Datele trimise nu sunt valide.",
+  INVALID_CURSOR: "Pagina cerută nu mai este validă. Reîncarcă lista.",
+  INVALID_LIMIT: "Datele trimise nu sunt valide.",
 };
 
+/** Maps an API failure to a Romanian message. Server messages and stack traces are never shown. */
 export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return ERROR_MESSAGES[error.code] ?? "Operațiunea nu a putut fi finalizată.";
+  if (error instanceof ApiError) return ERROR_MESSAGES[error.code] ?? (error.status === 403 ? ERROR_MESSAGES.UNAUTHORIZED_ACTION : "Operațiunea nu a putut fi finalizată.");
   return "Operațiunea nu a putut fi finalizată.";
 }
 

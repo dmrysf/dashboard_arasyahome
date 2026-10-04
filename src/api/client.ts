@@ -11,7 +11,7 @@ export class ApiError extends Error {
 }
 
 /** Codes after which the app must re-read the central session instead of continuing. */
-export const SESSION_CODES = new Set(["SESSION_EXPIRED", "NO_SESSION", "ACCOUNT_INACTIVE"]);
+export const SESSION_CODES = new Set(["SESSION_EXPIRED", "NO_SESSION", "AUTHENTICATION_REQUIRED", "ACCOUNT_INACTIVE"]);
 export const ACCESS_CHANGED_CODES = new Set(["APPLICATION_ACCESS_DENIED", "PASSWORD_CHANGE_REQUIRED"]);
 
 type Fetch = typeof fetch;
@@ -79,6 +79,8 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
       const error = payload && typeof payload === "object" ? (payload as { error?: { code?: unknown } }).error : undefined;
       const code = typeof error?.code === "string" ? error.code : response.status >= 500 ? "SERVER_ERROR" : "REQUEST_FAILED";
       const failure = new ApiError(code, response.status);
+      // A rotated session invalidates the in-memory CSRF token; fetch the current one so a deliberate retry works.
+      if (code === "CSRF_INVALID" && path !== "/auth/session") void refreshCsrf();
       if (path !== "/auth/login" && path !== "/auth/session" && (SESSION_CODES.has(code) || (ACCESS_CHANGED_CODES.has(code) && path !== "/auth/password"))) {
         if (SESSION_CODES.has(code)) csrfToken = "";
         listeners.forEach((listener) => listener(failure));
@@ -87,6 +89,10 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     }
     if (payload === null) throw new ApiError("INVALID_RESPONSE", response.status);
     return payload as T;
+  }
+
+  async function refreshCsrf() {
+    try { await withSession(request("/auth/session")); } catch { /* the next request reports the real state */ }
   }
 
   const withSession = async (promise: Promise<unknown>): Promise<Session> => {
@@ -110,6 +116,7 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
       try { await request("/auth/logout", { method: "POST" }); }
       finally { csrfToken = ""; }
     },
+    health: () => request<{ status: string; version: string }>("/health"),
     me: () => request<ManagementMe>("/management/me"),
     overview: () => request<Overview>("/management/dashboard"),
     system: () => request<SystemStatus>("/management/system"),

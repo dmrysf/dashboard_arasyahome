@@ -70,7 +70,7 @@ export function EmployeeDetailPage({ id }: { id: string }) {
         onPending={setPending}
         onSecret={setSecret}
       />
-      {can("iam.audit.view") && <Card title="Activitate administrativă" className="section-gap">{audit.error ? <ErrorBanner message={audit.error} onRetry={audit.reload} /> : audit.data ? <AuditList items={audit.data.items} /> : <Loading />}</Card>}
+      {can("iam.audit.view") && <Card title="Activitate administrativă" className="section-gap">{audit.error ? <ErrorBanner message={audit.error} onRetry={audit.reload} /> : audit.data ? <AuditList items={audit.data.items} stageLabel={(stage) => workflow.data?.stages.find((item) => item.id === stage)?.label ?? stage} /> : <Loading />}</Card>}
       {pending && <ConfirmDialog title={pending.title} confirmLabel={pending.confirmLabel} tone={pending.tone} busy={busy} onConfirm={() => { void confirm(); }} onCancel={() => setPending(null)}>{pending.body}</ConfirmDialog>}
     </>
   );

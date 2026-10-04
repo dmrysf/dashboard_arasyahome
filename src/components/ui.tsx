@@ -85,8 +85,8 @@ export function OneTimeSecret({ label, value }: { label: string; value: string }
     <div className="one-time-secret">
       <span>{label}</span>
       <code data-testid="one-time-secret">{value}</code>
-      <button type="button" className="button button-secondary" onClick={() => { void navigator.clipboard?.writeText(value).then(() => setCopied(true), () => setCopied(false)); }}>{copied ? "Copiat" : "Copiază"}</button>
-      <small>Parola este afișată o singură dată și nu poate fi recuperată ulterior. Angajatul va fi obligat să o schimbe la prima autentificare.</small>
+      <button type="button" className="button button-secondary" onClick={() => { void navigator.clipboard?.writeText(value).then(() => setCopied(true), () => setCopied(false)); }}>{copied ? "Copiată" : "Copiază parola"}</button>
+      <p className="one-time-warning" role="note">Parola temporară este afișată o singură dată.<br />Utilizatorul va trebui să o schimbe la prima autentificare.</p>
     </div>
   );
 }
