@@ -99,6 +99,38 @@ export type Overview = {
   recentAudit: AuditEvent[] | null;
 };
 
+/** GET /management/production-overview. Definitions live with the API (docs/production-overview.md). */
+export type SourceHealth = "healthy" | "stale" | "offline" | "no_contact" | "not_configured" | "disabled";
+export type ProductionActivityAction = "claimed" | "stage_completed" | "production_completed";
+
+export type ProductionOverview = {
+  generatedAt: string;
+  timezone: string;
+  filters: { source: string | null };
+  summary: { active: number; waiting: number; inWork: number; unassigned: number; completedToday: number };
+  stages: Array<{ id: string; label: string; ordinal: number; active: number; unassigned: number; oldestEnteredAt: string | null }>;
+  oldestOrders: Array<{
+    globalOrderId: string;
+    orderNumber: string;
+    source: { key: string; name: string };
+    stage: { id: string; label: string };
+    stageEnteredAt: string;
+    owner: { id: string; displayName: string } | null;
+    claimedAt: string | null;
+    commerceStatus: { code: string; label: string | null } | null;
+  }> | null;
+  activity: Array<{
+    id: string;
+    action: string;
+    occurredAt: string;
+    employee: { id: string; displayName: string };
+    order: { globalOrderId: string; orderNumber: string; source: string };
+    fromStage: { id: string; label: string };
+    toStage: { id: string; label: string } | null;
+  }> | null;
+  sources: Array<{ key: string; name: string; type: string; health: SourceHealth; lastContactAt: string | null; lastEventAt: string | null; activeOrders: number }> | null;
+};
+
 export type SystemStatus = {
   apiVersion: string;
   database: string;

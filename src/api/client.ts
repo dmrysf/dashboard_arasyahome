@@ -1,5 +1,5 @@
 import type {
-  Application, AuditPage, Department, EmployeeDetail, EmployeePage, ManagementMe, Overview, Permission, Role, Session, SessionEmployee, SystemStatus, Workflow,
+  Application, AuditPage, Department, EmployeeDetail, EmployeePage, ManagementMe, Overview, Permission, ProductionOverview, Role, Session, SessionEmployee, SystemStatus, Workflow,
 } from "./types";
 
 /** A typed API failure. `code` is the server error code; transport problems use NETWORK_UNAVAILABLE. */
@@ -60,7 +60,7 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
   let csrfToken = "";
   const listeners = new Set<Listener>();
 
-  async function request<T>(path: string, init: { method?: string; body?: unknown; query?: Record<string, string | undefined> } = {}): Promise<T> {
+  async function request<T>(path: string, init: { method?: string; body?: unknown; query?: Record<string, string | undefined>; signal?: AbortSignal } = {}): Promise<T> {
     const method = init.method ?? "GET";
     const url = new URL(path, baseUrl);
     for (const [key, value] of Object.entries(init.query ?? {})) if (value) url.searchParams.set(key, value);
@@ -69,8 +69,9 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     if (method !== "GET" && csrfToken) headers["X-CSRF-Token"] = csrfToken;
     let response: Response;
     try {
-      response = await fetchImpl(url.toString(), { method, headers, credentials: "include", cache: "no-store", body: init.body === undefined ? undefined : JSON.stringify(init.body) });
-    } catch {
+      response = await fetchImpl(url.toString(), { method, headers, credentials: "include", cache: "no-store", signal: init.signal, body: init.body === undefined ? undefined : JSON.stringify(init.body) });
+    } catch (caught) {
+      if (init.signal?.aborted) throw caught;
       throw new ApiError("NETWORK_UNAVAILABLE", 0);
     }
     let payload: unknown = null;
@@ -119,6 +120,7 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     health: () => request<{ status: string; version: string }>("/health"),
     me: () => request<ManagementMe>("/management/me"),
     overview: () => request<Overview>("/management/dashboard"),
+    productionOverview: (source: string | undefined, signal?: AbortSignal) => request<ProductionOverview>("/management/production-overview", { query: { source }, signal }),
     system: () => request<SystemStatus>("/management/system"),
     workflow: () => request<Workflow>("/production/workflow"),
     employees: (query: Record<string, string | undefined>) => request<EmployeePage>("/management/employees", { query }),

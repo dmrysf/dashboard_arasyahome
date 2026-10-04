@@ -1,12 +1,22 @@
 # Arasya Dashboard
 
-Central management console (`https://dashboard.arasyahome.ro`) for the Arasya identity and access system. The Dashboard has no users table and no permission copy: `https://api.arasyahome.ro` (Operations API 2.3+) is the only identity provider, and every screen reflects the authorization the API returns.
+Central management console (`https://dashboard.arasyahome.ro`) for the Arasya identity and access system. The Dashboard has no users table and no permission copy: `https://api.arasyahome.ro` (Operations API 2.4+) is the only identity provider, and every screen reflects the authorization the API returns.
 
 - React 19 + Vite 8 + TypeScript. Interface in Romanian (default and fallback) and Turkish, chosen with the RO | TR switch.
 - Session: HttpOnly API cookie (`credentials: "include"`), CSRF token kept in memory only. The only browser-storage entry is the interface language (`arasya.dashboard.locale`); no session, token, password or permission is ever stored.
 - Gate: pending password change first, then `dashboard` application access (`Nu ai acces la Panoul de control.` otherwise).
 - Screens: Panou de control, Angajați, Roluri și permisiuni, Departamente, Aplicații, Audit, Sistem.
 - Authorization changes are reviewed in a confirmation dialog before anything is written. The protected root identity (`arasya.root.owner`) is read-only in the UI; the API enforces this independently (`ROOT_PROTECTED`).
+
+## Production overview (0.3.0)
+
+The home page (`/`) opens with a read-only production snapshot from `GET /management/production-overview` (Operations API 2.4.0). All numbers are aggregated by the API; the Dashboard holds no production constants and never aggregates order history in the browser.
+
+- Summary: active orders, waiting, in work, unassigned and completed today (Europe/Bucharest day). Definitions are documented with the API in `staff_arasyahome/docs/production-overview.md`.
+- The 14 `curtain-production@1` stages in order with counts, unassigned counts and the age of the oldest order; the busiest stage is marked, without alarm colours.
+- Oldest active orders sorted by time in the current stage (no SLA exists, so nothing is labelled late), recent production activity (separate from the IAM audit) and source health (`healthy`, `stale`, `offline`, `no_contact`, `not_configured`, `disabled`).
+- Requires `production.view`; order rows, activity and sources additionally need `orders.view_all`, `activity.view_all` and `sources.view` and show a permission note otherwise.
+- Refreshes every 45 seconds while the tab is visible, never overlaps requests, aborts stale ones, keeps the last good data if a refresh fails, and offers a manual **Actualizează / Yenile**. An optional source filter is the only filter. There are no production actions on this page.
 
 ## Localization
 

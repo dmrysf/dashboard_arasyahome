@@ -3,6 +3,7 @@ import { useLoader } from "../app/useLoader";
 import { Card, ErrorBanner, Loading, PageHeader, StatusBadge } from "../components/ui";
 import { useI18n } from "../i18n/context";
 import { AuditList } from "./AuditList";
+import { ProductionOverview } from "./ProductionOverview";
 
 export function OverviewPage() {
   const { api, me, can, navigate } = useDashboard();
@@ -12,6 +13,8 @@ export function OverviewPage() {
   return (
     <div className="page">
       <PageHeader title={t.overview.greeting(me.employee.displayName.split(" ")[0])} description={t.overview.description} />
+      {can("production.view") ? <ProductionOverview /> : <p className="notice">{t.production.noPermission}</p>}
+      <h2 className="section-title">{t.administration}</h2>
       {error && <ErrorBanner error={error} onRetry={reload} />}
       {!data && !error && <Loading />}
       {data && <>

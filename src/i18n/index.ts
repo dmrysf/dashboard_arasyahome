@@ -72,6 +72,13 @@ export type Translator = {
   stage: (id: string, fallback?: string) => string;
   status: (value: string) => string;
   auditAction: (action: string) => string;
+  /** Wall-clock time (HH:MM:SS) in Europe/Bucharest, e.g. for "last updated". */
+  clock: (value: number | string | null) => string;
+  /** Compact elapsed time such as "3 h 20 min" / "3 sa 20 dk"; never negative. */
+  duration: (milliseconds: number) => string;
+  productionAction: (action: string) => string;
+  sourceHealth: (health: string) => string;
+  sourceHealthHint: (health: string) => string;
 };
 
 export function createTranslator(locale: Locale): Translator {
@@ -79,6 +86,7 @@ export function createTranslator(locale: Locale): Translator {
   const errors: Record<string, string> = t.errors;
   const dateTime = new Intl.DateTimeFormat(INTL_LOCALE[locale], { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Bucharest" });
   const number = new Intl.NumberFormat(INTL_LOCALE[locale]);
+  const clock = new Intl.DateTimeFormat(INTL_LOCALE[locale], { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Europe/Bucharest" });
   const app = (key: string) => pick(t.catalog.applications, key);
   const permission = (key: string) => pick(t.catalog.permissions, key);
   return {
@@ -104,5 +112,22 @@ export function createTranslator(locale: Locale): Translator {
     stage: (id, fallback) => pick(t.catalog.stages, id) ?? fallback ?? id,
     status: (value) => pick<string>(t.status, value) ?? value,
     auditAction: (action) => pick(t.auditActions, action) ?? t.audit.fallbackAction,
+    clock: (value) => {
+      if (value === null) return "—";
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? "—" : clock.format(parsed);
+    },
+    duration: (milliseconds) => {
+      const d = t.production.duration;
+      const minutes = Math.floor(Math.max(0, milliseconds) / 60_000);
+      if (minutes < 1) return d.lessThanMinute;
+      if (minutes < 60) return d.minutes(minutes);
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return d.hours(hours, minutes % 60);
+      return d.days(Math.floor(hours / 24), hours % 24);
+    },
+    productionAction: (action) => pick(t.production.actions, action) ?? t.production.unknownAction,
+    sourceHealth: (health) => pick(t.production.health, health) ?? health,
+    sourceHealthHint: (health) => pick(t.production.healthHint, health) ?? "",
   };
 }
