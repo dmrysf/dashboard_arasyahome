@@ -1,38 +1,40 @@
 import { useDashboard } from "../app/context";
 import { useLoader } from "../app/useLoader";
 import { Card, ErrorBanner, Loading, PageHeader, StatusBadge } from "../components/ui";
+import { useI18n } from "../i18n/context";
 import { AuditList } from "./AuditList";
 
 export function OverviewPage() {
   const { api, me, can, navigate } = useDashboard();
+  const { t, number, application } = useI18n();
   const { data, error, reload } = useLoader(() => api.overview());
-  if (!can("dashboard.overview.view")) return <PageHeader title="Panou de control" description="Nu ai permisiunea de a vedea sumarul." />;
+  if (!can("dashboard.overview.view")) return <PageHeader title={t.overview.title} description={t.overview.noPermission} />;
   return (
     <div className="page">
-      <PageHeader title={`Bună, ${me.employee.displayName.split(" ")[0]}.`} description="Situația identităților și a accesului în ecosistemul Arasya." />
-      {error && <ErrorBanner message={error} onRetry={reload} />}
+      <PageHeader title={t.overview.greeting(me.employee.displayName.split(" ")[0])} description={t.overview.description} />
+      {error && <ErrorBanner error={error} onRetry={reload} />}
       {!data && !error && <Loading />}
       {data && <>
         <div className="metric-grid">
-          {[
-            ["Angajați activi", data.counts.activeEmployees, "/angajati"],
-            ["Utilizatori Dashboard", data.counts.dashboardUsers, "/angajati"],
-            ["Utilizatori Staff", data.counts.staffUsers, "/angajati"],
-            ["Departamente", data.counts.departments, "/departamente"],
-            ["Roluri", data.counts.roles, "/roluri"],
-          ].map(([label, value, path]) => (
-            <button type="button" className="metric" key={String(label)} onClick={() => navigate(String(path))}><span>{label}</span><strong>{value}</strong></button>
+          {([
+            ["activeEmployees", t.overview.activeEmployees, data.counts.activeEmployees, "/angajati"],
+            ["dashboardUsers", t.overview.dashboardUsers, data.counts.dashboardUsers, "/angajati"],
+            ["staffUsers", t.overview.staffUsers, data.counts.staffUsers, "/angajati"],
+            ["departments", t.overview.departments, data.counts.departments, "/departamente"],
+            ["roles", t.overview.roles, data.counts.roles, "/roluri"],
+          ] as const).map(([key, label, value, path]) => (
+            <button type="button" className="metric" key={key} onClick={() => navigate(path)}><span>{label}</span><strong>{number(value)}</strong></button>
           ))}
         </div>
         <div className="grid-2">
-          <Card title="Activitate administrativă recentă" actions={can("iam.audit.view") ? <button type="button" className="button button-ghost" onClick={() => navigate("/audit")}>Vezi tot</button> : undefined}>
-            {data.recentAudit ? <AuditList items={data.recentAudit} compact /> : <p className="muted">Auditul IAM necesită permisiunea „Vizualizare audit IAM”.</p>}
+          <Card title={t.overview.recentActivity} actions={can("iam.audit.view") ? <button type="button" className="button button-ghost" onClick={() => navigate("/audit")}>{t.overview.seeAll}</button> : undefined}>
+            {data.recentAudit ? <AuditList items={data.recentAudit} compact /> : <p className="muted">{t.overview.auditNeedsPermission}</p>}
           </Card>
-          <Card title="Aplicații">
+          <Card title={t.overview.applications}>
             <ul className="app-health">
-              {data.applications.map((application) => <li key={application.key}><strong>{application.name}</strong><StatusBadge status={application.status} /></li>)}
+              {data.applications.map((item) => <li key={item.key}><strong>{application(item.key, item.name)}</strong><StatusBadge status={item.status} /></li>)}
             </ul>
-            <p className="muted small">Operațiunile de producție detaliate vor apărea într-o versiune viitoare a panoului.</p>
+            <p className="muted small">{t.overview.futureNote}</p>
           </Card>
         </div>
       </>}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { errorMessage } from "../api/labels";
+import { toProblem, type Problem } from "../i18n";
 
-type LoaderState<T> = { key: string; request: string; data: T | null; error: string; revision: number };
+type LoaderState<T> = { key: string; request: string; data: T | null; error: Problem | null; revision: number };
 
 /**
  * Loads server data for a page; the server stays the only source of truth.
@@ -14,26 +14,26 @@ export function useLoader<T>(load: () => Promise<T>, key = "") {
   const loadRef = useRef(load);
   useEffect(() => { loadRef.current = load; });
   const [version, setVersion] = useState(0);
-  const [state, setState] = useState<LoaderState<T>>({ key: "", request: "", data: null, error: "", revision: 0 });
+  const [state, setState] = useState<LoaderState<T>>({ key: "", request: "", data: null, error: null, revision: 0 });
   const request = `${key}\u0000${version}`;
 
   useEffect(() => {
     let active = true;
     loadRef.current().then(
-      (data) => { if (active) setState((current) => ({ key, request, data, error: "", revision: current.revision + 1 })); },
+      (data) => { if (active) setState((current) => ({ key, request, data, error: null, revision: current.revision + 1 })); },
       (caught: unknown) => {
-        if (active) setState((current) => ({ key, request, data: current.key === key ? current.data : null, error: errorMessage(caught), revision: current.revision }));
+        if (active) setState((current) => ({ key, request, data: current.key === key ? current.data : null, error: toProblem(caught), revision: current.revision }));
       },
     );
     return () => { active = false; };
   }, [key, request]);
 
   const reload = useCallback(() => setVersion((value) => value + 1), []);
-  const setData = useCallback((data: T) => setState((current) => ({ ...current, data, error: "", revision: current.revision + 1 })), []);
+  const setData = useCallback((data: T) => setState((current) => ({ ...current, data, error: null, revision: current.revision + 1 })), []);
   const current = state.key === key;
   return {
     data: current ? state.data : null,
-    error: state.request === request ? state.error : "",
+    error: state.request === request ? state.error : null,
     revision: state.revision,
     reload,
     setData,

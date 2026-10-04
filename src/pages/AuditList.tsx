@@ -1,14 +1,17 @@
 import { actorName, describeAuditEvent } from "../api/audit";
-import { AUDIT_ACTION_LABELS, formatDateTime } from "../api/labels";
 import type { AuditEvent } from "../api/types";
 import { Badge, EmptyState } from "../components/ui";
+import { useI18n } from "../i18n/context";
 
-export function AuditList({ items, compact = false, stageLabel }: { items: AuditEvent[]; compact?: boolean; stageLabel?: (id: string) => string }) {
-  if (items.length === 0) return <EmptyState title="Nicio activitate administrativă.">Modificările IAM apar aici imediat ce sunt salvate.</EmptyState>;
+/** `stageLabel` supplies the API's own stage names as a fallback for stage IDs the interface does not know. */
+export function AuditList({ items, compact = false, stageLabel }: { items: AuditEvent[]; compact?: boolean; stageLabel?: (id: string) => string | undefined }) {
+  const i18n = useI18n();
+  const { t } = i18n;
+  if (items.length === 0) return <EmptyState title={t.audit.empty}>{t.audit.emptyHint}</EmptyState>;
   return (
     <ol className={`audit-list ${compact ? "audit-compact" : ""}`}>
       {items.map((event) => {
-        const description = describeAuditEvent(event, stageLabel);
+        const description = describeAuditEvent(event, i18n, stageLabel);
         return (
           <li key={event.id}>
             <div className="audit-main">
@@ -16,9 +19,9 @@ export function AuditList({ items, compact = false, stageLabel }: { items: Audit
               {!compact && description.details.map((detail) => <span key={detail} className="audit-change">{detail}</span>)}
             </div>
             <div className="audit-meta">
-              <Badge>{AUDIT_ACTION_LABELS[event.action] ?? "Modificare"}</Badge>
-              <span>{actorName(event)}{event.actorType === "root" && <> <Badge tone="root">protejat</Badge></>}</span>
-              <time dateTime={event.createdAt}>{formatDateTime(event.createdAt)}</time>
+              <Badge>{i18n.auditAction(event.action)}</Badge>
+              <span>{actorName(event, i18n)}{event.actorType === "root" && <> <Badge tone="root">{t.audit.protectedBadge}</Badge></>}</span>
+              <time dateTime={event.createdAt}>{i18n.dateTime(event.createdAt)}</time>
             </div>
           </li>
         );

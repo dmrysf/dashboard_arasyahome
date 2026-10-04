@@ -1,12 +1,17 @@
 import { useState, type ReactNode } from "react";
 import { useDashboard } from "../app/context";
 import { useLoader } from "../app/useLoader";
-import { applicationLabel, errorMessage, formatDateTime } from "../api/labels";
 import type { Department, EmployeeDetail, EmployeeSummary, Permission, Role, WorkflowStage } from "../api/types";
 import { Badge, Card, ConfirmDialog, ErrorBanner, Field, Loading, Notice, OneTimeSecret, PageHeader, RootBadge, StatusBadge } from "../components/ui";
+import { toProblem, type Messages, type NoticeKey, type Problem, type Translator } from "../i18n";
+import { useI18n } from "../i18n/context";
 import { AuditList } from "./AuditList";
 
-export type Pending = { title: string; body: ReactNode; confirmLabel: string; tone?: "primary" | "danger"; run: () => Promise<EmployeeDetail> };
+/** A reviewed change. Its dialog text is rendered from the active language, so it follows a language switch. */
+export type Pending = {
+  view: (i18n: Translator) => { title: string; body: ReactNode; confirmLabel: string; tone?: "primary" | "danger" };
+  run: () => Promise<EmployeeDetail>;
+};
 
 export function sameSet<T>(a: readonly T[], b: readonly T[]): boolean {
   return a.length === b.length && a.every((item) => b.includes(item));
@@ -20,6 +25,7 @@ const NO_ITEMS = { items: [] };
 
 export function EmployeeDetailPage({ id }: { id: string }) {
   const { api, can } = useDashboard();
+  const { t } = useI18n();
   const employee = useLoader(() => api.employee(id), id);
   const departments = useLoader(() => can("departments.view") ? api.departments() : Promise.resolve(NO_ITEMS));
   const roles = useLoader(() => can("roles.view") ? api.roles() : Promise.resolve(NO_ITEMS));
@@ -31,22 +37,22 @@ export function EmployeeDetailPage({ id }: { id: string }) {
 
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useState<NoticeKey | null>(null);
+  const [error, setError] = useState<Problem | null>(null);
   const [secret, setSecret] = useState("");
 
-  if (employee.error && !employee.data) return <div className="page"><ErrorBanner message={employee.error} onRetry={employee.reload} /></div>;
-  if (!employee.data || !workflow.data) return <div className="page">{workflow.error ? <ErrorBanner message={workflow.error} onRetry={workflow.reload} /> : <Loading />}</div>;
+  if (employee.error && !employee.data) return <div className="page"><ErrorBanner error={employee.error} onRetry={employee.reload} /></div>;
+  if (!employee.data || !workflow.data) return <div className="page">{workflow.error ? <ErrorBanner error={workflow.error} onRetry={workflow.reload} /> : <Loading />}</div>;
 
   async function confirm() {
     if (!pending) return;
-    setBusy(true); setError(""); setMessage("");
+    setBusy(true); setError(null); setMessage(null);
     try {
       employee.setData(await pending.run());
-      setMessage("Modificarea a fost salvată și se aplică imediat, la următoarea cerere a angajatului.");
+      setMessage("employeeSaved");
       audit.reload();
     } catch (caught) {
-      setError(errorMessage(caught));
+      setError(toProblem(caught));
       // The server may have changed in the meantime; show its current state again.
       employee.reload();
     } finally { setBusy(false); setPending(null); }
@@ -70,10 +76,16 @@ export function EmployeeDetailPage({ id }: { id: string }) {
         onPending={setPending}
         onSecret={setSecret}
       />
-      {can("iam.audit.view") && <Card title="Activitate administrativă" className="section-gap">{audit.error ? <ErrorBanner message={audit.error} onRetry={audit.reload} /> : audit.data ? <AuditList items={audit.data.items} stageLabel={(stage) => workflow.data?.stages.find((item) => item.id === stage)?.label ?? stage} /> : <Loading />}</Card>}
-      {pending && <ConfirmDialog title={pending.title} confirmLabel={pending.confirmLabel} tone={pending.tone} busy={busy} onConfirm={() => { void confirm(); }} onCancel={() => setPending(null)}>{pending.body}</ConfirmDialog>}
+      {can("iam.audit.view") && <Card title={t.employee.activity} className="section-gap">{audit.error ? <ErrorBanner error={audit.error} onRetry={audit.reload} /> : audit.data ? <AuditList items={audit.data.items} stageLabel={(stage) => workflow.data?.stages.find((item) => item.id === stage)?.label} /> : <Loading />}</Card>}
+      {pending && <PendingDialog pending={pending} busy={busy} onConfirm={() => { void confirm(); }} onCancel={() => setPending(null)} />}
     </>
   );
+}
+
+function PendingDialog({ pending, busy, onConfirm, onCancel }: { pending: Pending; busy: boolean; onConfirm: () => void; onCancel: () => void }) {
+  const i18n = useI18n();
+  const view = pending.view(i18n);
+  return <ConfirmDialog title={view.title} confirmLabel={view.confirmLabel} tone={view.tone} busy={busy} onConfirm={onConfirm} onCancel={onCancel}>{view.body}</ConfirmDialog>;
 }
 
 export type EditorProps = {
@@ -85,8 +97,8 @@ export type EditorProps = {
   stages: WorkflowStage[];
   managers: EmployeeSummary[];
   busy: boolean;
-  message: string;
-  error: string;
+  message: NoticeKey | null;
+  error: Problem | null;
   secret: string;
   onPending: (pending: Pending) => void;
   onSecret: (secret: string) => void;
@@ -95,6 +107,8 @@ export type EditorProps = {
 /** Form state starts from the latest server copy; every accepted change remounts it from the server. */
 export function EmployeeEditor({ data, departments, roles, catalog, applicationKeys, stages, managers, busy, message, error, secret, onPending, onSecret }: EditorProps) {
   const { api, can, me, navigate } = useDashboard();
+  const { t, dateTime, application, stage: stageName, permission } = useI18n();
+  const m = t.employee;
   const id = data.id;
   const [profile, setProfile] = useState({ displayName: data.displayName, positionTitle: data.positionTitle ?? "", departmentId: String(data.department.id) });
   const [applications, setApplications] = useState<string[]>(data.applications);
@@ -107,48 +121,52 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
   const allowed = (permission: string) => editable && can(permission);
   const knownApplications = [...new Set([...(applicationKeys.length ? applicationKeys : ["staff", "dashboard"]), ...data.applications])];
   const canGrantApplication = (key: string) => me.isRoot || me.applications.includes(key);
-  const stageLabel = (stage: string) => stages.find((item) => item.id === stage)?.label ?? stage;
+  const stageLabel = (stage: string) => stageName(stage, stages.find((item) => item.id === stage)?.label);
+  const applicationLabel = (key: string) => application(key);
   const roleName = (roleId: number) => roles.find((role) => role.id === roleId)?.name ?? data.roles.find((role) => role.id === roleId)?.name ?? `#${roleId}`;
-  const permissionLabel = (key: string) => catalog.find((item) => item.key === key)?.label ?? key;
-  const list = (items: string[]) => items.length ? items.join(", ") : "nimic";
+  const permissionLabel = (key: string) => permission(key, catalog.find((item) => item.key === key)?.label);
+  const list = (tr: Messages, items: string[]) => items.length ? items.join(", ") : tr.common.nothing;
+  const change = (tr: Messages, before: string[], after: string[], applies: string) => (
+    <p>{tr.common.before}: <strong>{list(tr, before)}</strong><br />{tr.common.after}: <strong>{list(tr, after)}</strong><br />{applies}</p>
+  );
   const profileChanged = profile.displayName.trim() !== data.displayName || profile.positionTitle.trim() !== (data.positionTitle ?? "") || profile.departmentId !== String(data.department.id);
   const departmentOptions = (departments.length ? departments : [{ id: data.department.id, name: data.department.name, status: "active" as const }])
     .filter((department) => department.status === "active" || department.id === data.department.id);
 
   return (
     <div className="page">
-      <button type="button" className="back-link" onClick={() => navigate("/angajati")}>← Angajați</button>
-      <PageHeader title={data.displayName} description={`${data.username} · ${data.positionTitle ?? "fără funcție"} · ${data.department.name}`}
-        actions={<div className="header-badges">{data.isRoot && <RootBadge />}<StatusBadge status={data.status} />{data.mustChangePassword && <Badge tone="warning">Parolă temporară</Badge>}</div>} />
-      {data.isRoot && <Notice tone="warning"><strong>Cont de sistem protejat.</strong> Administratorul principal are acces la toate aplicațiile și toate drepturile. Nu poate fi dezactivat, șters sau modificat din Panoul de control; își poate schimba doar propria parolă.</Notice>}
-      {!data.isRoot && !data.manageable && <Notice>{data.id === me.employee.id ? "Acesta este propriul tău cont. Nu îți poți modifica singur drepturile." : "Acest cont este la nivelul tău de autoritate sau peste el. Poți doar vizualiza informațiile."}</Notice>}
-      {message && <Notice tone="success">{message}</Notice>}
-      {error && <ErrorBanner message={error} />}
+      <button type="button" className="back-link" onClick={() => navigate("/angajati")}>{m.back}</button>
+      <PageHeader title={data.displayName} description={`${data.username} · ${data.positionTitle ?? m.noPosition} · ${data.department.name}`}
+        actions={<div className="header-badges">{data.isRoot && <RootBadge />}<StatusBadge status={data.status} />{data.mustChangePassword && <Badge tone="warning">{t.common.temporaryPassword}</Badge>}</div>} />
+      {data.isRoot && <Notice tone="warning"><strong>{t.root.noticeTitle}</strong> {t.root.noticeBody}</Notice>}
+      {!data.isRoot && !data.manageable && <Notice>{data.id === me.employee.id ? m.ownAccount : m.aboveAuthority}</Notice>}
+      {message && <Notice tone="success">{t.notices[message]}</Notice>}
+      {error && <ErrorBanner error={error} />}
 
       <div className="grid-2">
-        <Card title="Profil" actions={allowed("employees.update") ? <button type="button" className="button button-secondary" disabled={busy || !profileChanged || profile.displayName.trim().length < 2}
-          onClick={() => onPending({ title: "Salvezi profilul?", confirmLabel: "Salvează", body: <p>Numele, funcția și departamentul vor fi actualizate. Departamentul nu acordă drepturi.</p>,
-            run: () => api.updateEmployee(id, { displayName: profile.displayName.trim(), positionTitle: profile.positionTitle.trim() || null, departmentId: Number(profile.departmentId) }) })}>Salvează profilul</button> : undefined}>
+        <Card title={m.profile} actions={allowed("employees.update") ? <button type="button" className="button button-secondary" disabled={busy || !profileChanged || profile.displayName.trim().length < 2}
+          onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.saveProfileTitle, confirmLabel: tr.common.save, body: <p>{tr.employee.saveProfileBody}</p> }),
+            run: () => api.updateEmployee(id, { displayName: profile.displayName.trim(), positionTitle: profile.positionTitle.trim() || null, departmentId: Number(profile.departmentId) }) })}>{m.saveProfile}</button> : undefined}>
           <div className="form-grid">
-            <Field label="Nume complet">{(fid) => <input id={fid} disabled={!allowed("employees.update")} value={profile.displayName} onChange={(event) => setProfile({ ...profile, displayName: event.target.value })} />}</Field>
-            <Field label="Funcție">{(fid) => <input id={fid} disabled={!allowed("employees.update")} value={profile.positionTitle} onChange={(event) => setProfile({ ...profile, positionTitle: event.target.value })} />}</Field>
-            <Field label="Departament">{(fid) => <select id={fid} disabled={!allowed("employees.update")} value={profile.departmentId} onChange={(event) => setProfile({ ...profile, departmentId: event.target.value })}>
+            <Field label={m.fullName}>{(fid) => <input id={fid} disabled={!allowed("employees.update")} value={profile.displayName} onChange={(event) => setProfile({ ...profile, displayName: event.target.value })} />}</Field>
+            <Field label={m.position}>{(fid) => <input id={fid} disabled={!allowed("employees.update")} value={profile.positionTitle} onChange={(event) => setProfile({ ...profile, positionTitle: event.target.value })} />}</Field>
+            <Field label={m.department}>{(fid) => <select id={fid} disabled={!allowed("employees.update")} value={profile.departmentId} onChange={(event) => setProfile({ ...profile, departmentId: event.target.value })}>
               {departmentOptions.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
             </select>}</Field>
           </div>
           <dl className="facts">
-            <dt>Utilizator</dt><dd className="mono">{data.username}</dd>
-            <dt>Creat</dt><dd>{formatDateTime(data.createdAt)}</dd>
-            <dt>Ultima autentificare</dt><dd>{formatDateTime(data.lastLoginAt)}</dd>
-            <dt>Versiune autorizare</dt><dd>{data.authorizationVersion}</dd>
+            <dt>{m.username}</dt><dd className="mono">{data.username}</dd>
+            <dt>{m.created}</dt><dd>{dateTime(data.createdAt)}</dd>
+            <dt>{m.lastLogin}</dt><dd>{dateTime(data.lastLoginAt)}</dd>
+            <dt>{m.authorizationVersion}</dt><dd>{data.authorizationVersion}</dd>
           </dl>
         </Card>
 
-        <Card title="Acces aplicații" description="Accesul este verificat de server la fiecare cerere."
+        <Card title={m.access} description={m.accessHint}
           actions={allowed("employees.manage_applications") ? <button type="button" className="button button-secondary" disabled={busy || sameSet(applications, data.applications)}
-            onClick={() => onPending({ title: "Confirmi accesul la aplicații?", confirmLabel: "Aplică accesul",
-              body: <p>Înainte: <strong>{list(data.applications.map(applicationLabel))}</strong><br />După: <strong>{list(applications.map(applicationLabel))}</strong><br />Schimbarea se aplică la următoarea cerere a angajatului, fără re-autentificare.</p>,
-              run: () => api.setApplications(id, applications) })}>Revizuiește accesul</button> : undefined}>
+            onClick={() => onPending({ view: ({ t: tr, application: name }) => ({ title: tr.employee.accessTitle, confirmLabel: tr.employee.applyAccess,
+              body: change(tr, data.applications.map((key) => name(key)), applications.map((key) => name(key)), tr.employee.accessApplies) }),
+              run: () => api.setApplications(id, applications) })}>{m.reviewAccess}</button> : undefined}>
           <div className="check-list">
             {knownApplications.map((key) => {
               const enabled = allowed("employees.manage_applications") && canGrantApplication(key);
@@ -162,12 +180,12 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
           </div>
         </Card>
 
-        <Card title="Roluri și permisiuni" description={data.isRoot ? undefined : "Poți atribui doar roluri aflate sub nivelul tău de autoritate."}
+        <Card title={m.roles} description={data.isRoot ? undefined : m.rolesHint}
           actions={allowed("employees.manage_roles") && can("roles.assign") ? <button type="button" className="button button-secondary" disabled={busy || sameSet(roleIds, data.roles.map((role) => role.id))}
-            onClick={() => onPending({ title: "Confirmi rolurile?", confirmLabel: "Aplică rolurile",
-              body: <p>Înainte: <strong>{list(data.roles.map((role) => role.name))}</strong><br />După: <strong>{list(roleIds.map(roleName))}</strong><br />Permisiunile noi se aplică la următoarea cerere.</p>,
-              run: () => api.setRoles(id, roleIds) })}>Revizuiește rolurile</button> : undefined}>
-          {data.isRoot ? <p className="muted">Toate permisiunile (cont de sistem, nu un rol).</p> : <>
+            onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.rolesTitle, confirmLabel: tr.employee.applyRoles,
+              body: change(tr, data.roles.map((role) => role.name), roleIds.map(roleName), tr.employee.rolesApply) }),
+              run: () => api.setRoles(id, roleIds) })}>{m.reviewRoles}</button> : undefined}>
+          {data.isRoot ? <p className="muted">{t.root.allPermissions}</p> : <>
             {roles.length > 0 ? (
               <div className="check-list">
                 {roles.filter((role) => role.status === "active" || roleIds.includes(role.id)).map((role) => {
@@ -175,61 +193,63 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
                   return (
                     <label key={role.id} className={`check ${enabled ? "" : "disabled"}`}>
                       <input type="checkbox" disabled={!enabled} checked={roleIds.includes(role.id)} onChange={() => setRoleIds(toggle(roleIds, role.id))} />
-                      {role.name} <small>nivel {role.authorityRank}</small>
+                      {role.name} <small>{t.common.level(role.authorityRank)}</small>
                     </label>
                   );
                 })}
               </div>
-            ) : <p>{list(data.roles.map((role) => role.name))}</p>}
+            ) : <p>{list(t, data.roles.map((role) => role.name))}</p>}
             <details className="permissions-detail">
-              <summary>Permisiuni din roluri ({data.rolePermissions.length})</summary>
+              <summary>{m.rolePermissions(data.rolePermissions.length)}</summary>
               <ul className="permission-list">{data.rolePermissions.map((key) => <li key={key}>{permissionLabel(key)} <small className="mono">{key}</small></li>)}</ul>
             </details>
           </>}
         </Card>
 
-        <Card title="Etape Staff" description="Etapele canonice ale fluxului de producție, citite din API."
+        <Card title={m.stages} description={m.stagesHint}
           actions={allowed("employees.manage_stages") ? <button type="button" className="button button-secondary" disabled={busy || sameSet(stageIds, data.stageIds)}
-            onClick={() => onPending({ title: "Confirmi etapele Staff?", confirmLabel: "Aplică etapele",
-              body: <p>Înainte: <strong>{list(data.stageIds.map(stageLabel))}</strong><br />După: <strong>{list(stageIds.map(stageLabel))}</strong><br />Staff folosește noile etape de la următoarea cerere.</p>,
-              run: () => api.setStages(id, stageIds) })}>Revizuiește etapele</button> : undefined}>
-          {!data.applications.includes("staff") && !data.isRoot && <p className="muted small">Etapele se aplică doar când angajatul are acces la Staff.</p>}
+            onClick={() => onPending({ view: ({ t: tr, stage: name }) => {
+              const label = (stage: string) => name(stage, stages.find((item) => item.id === stage)?.label);
+              return { title: tr.employee.stagesTitle, confirmLabel: tr.employee.applyStages, body: change(tr, data.stageIds.map(label), stageIds.map(label), tr.employee.stagesApply) };
+            },
+              run: () => api.setStages(id, stageIds) })}>{m.reviewStages}</button> : undefined}>
+          {!data.applications.includes("staff") && !data.isRoot && <p className="muted small">{m.stagesNeedStaff}</p>}
           <div className="stage-grid">
             {stages.map((stage) => (
               <label key={stage.id} className={`check ${allowed("employees.manage_stages") ? "" : "disabled"}`}>
                 <input type="checkbox" disabled={!allowed("employees.manage_stages")} checked={stageIds.includes(stage.id)} onChange={() => setStageIds(toggle(stageIds, stage.id))} />
-                <span className="ordinal">{stage.ordinal}</span> {stage.label}
+                <span className="ordinal">{stage.ordinal}</span> {stageLabel(stage.id)}
               </label>
             ))}
           </div>
         </Card>
 
-        <Card title="Ierarhie" description="Ierarhia descrie organizarea; nu acordă drepturi."
+        <Card title={m.hierarchy} description={m.hierarchyHint}
           actions={allowed("employees.manage_hierarchy") ? <button type="button" className="button button-secondary" disabled={busy || managerId === (data.manager?.id ?? "")}
-            onClick={() => onPending({ title: "Schimbi managerul direct?", confirmLabel: "Salvează", body: <p>Managerul direct nu primește drepturi suplimentare asupra angajatului.</p>,
-              run: () => api.setManager(id, managerId || null) })}>Salvează managerul</button> : undefined}>
+            onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.managerTitle, confirmLabel: tr.common.save, body: <p>{tr.employee.managerBody}</p> }),
+              run: () => api.setManager(id, managerId || null) })}>{m.saveManager}</button> : undefined}>
           {allowed("employees.manage_hierarchy") ? (
-            <Field label="Manager direct">{(fid) => <select id={fid} value={managerId} onChange={(event) => setManagerId(event.target.value)}>
-              <option value="">Fără manager</option>
+            <Field label={m.manager}>{(fid) => <select id={fid} value={managerId} onChange={(event) => setManagerId(event.target.value)}>
+              <option value="">{m.noManager}</option>
               {data.manager && !managers.some((manager) => manager.id === data.manager?.id) && <option value={data.manager.id}>{data.manager.displayName}</option>}
               {managers.filter((manager) => manager.id !== data.id).map((manager) => <option key={manager.id} value={manager.id}>{manager.displayName}</option>)}
             </select>}</Field>
-          ) : <dl className="facts"><dt>Manager direct</dt><dd>{data.manager?.displayName ?? "—"}</dd></dl>}
+          ) : <dl className="facts"><dt>{m.manager}</dt><dd>{data.manager?.displayName ?? "—"}</dd></dl>}
         </Card>
 
-        <Card title="Securitate">
-          {secret && <OneTimeSecret label="Parolă temporară nouă:" value={secret} />}
-          {data.isRoot ? <p className="muted">Parola administratorului principal se schimbă doar de titular, la autentificare, sau prin procedura de recuperare de pe server.</p> : (
+        <Card title={m.security}>
+          {secret && <OneTimeSecret label={m.newTemporaryPassword} value={secret} />}
+          {data.isRoot ? <p className="muted">{t.root.passwordNote}</p> : (
             <div className="button-row">
               {data.status === "active"
                 ? allowed("employees.deactivate") && <button type="button" className="button button-danger" disabled={busy}
-                    onClick={() => onPending({ title: "Dezactivezi contul?", confirmLabel: "Dezactivează", tone: "danger", body: <p>{data.displayName} pierde imediat accesul la toate aplicațiile, iar sesiunile active sunt închise.</p>, run: () => api.setEmployeeStatus(id, false) })}>Dezactivează contul</button>
+                    onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.deactivateTitle, confirmLabel: tr.common.deactivate, tone: "danger", body: <p>{tr.employee.deactivateBody(data.displayName)}</p> }), run: () => api.setEmployeeStatus(id, false) })}>{m.deactivateAccount}</button>
                 : allowed("employees.activate") && <button type="button" className="button button-primary" disabled={busy}
-                    onClick={() => onPending({ title: "Activezi contul?", confirmLabel: "Activează", body: <p>Contul poate fi folosit din nou în aplicațiile la care are acces.</p>, run: () => api.setEmployeeStatus(id, true) })}>Activează contul</button>}
+                    onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.activateTitle, confirmLabel: tr.common.activate, body: <p>{tr.employee.activateBody}</p> }), run: () => api.setEmployeeStatus(id, true) })}>{m.activateAccount}</button>}
               {allowed("employees.reset_password") && <button type="button" className="button button-secondary" disabled={busy}
-                onClick={() => onPending({ title: "Resetezi parola?", confirmLabel: "Generează parolă temporară", tone: "danger", body: <p>Toate sesiunile angajatului sunt închise, iar la următoarea autentificare va trebui să își aleagă o parolă nouă.</p>,
-                  run: async () => { const result = await api.resetPassword(id); onSecret(result.temporaryPassword); return api.employee(id); } })}>Resetează parola</button>}
-              {!allowed("employees.deactivate") && !allowed("employees.activate") && !allowed("employees.reset_password") && <p className="muted">Nu ai acțiuni de securitate disponibile pentru acest cont.</p>}
+                onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.resetTitle, confirmLabel: tr.employee.resetConfirm, tone: "danger", body: <p>{tr.employee.resetBody}</p> }),
+                  run: async () => { const result = await api.resetPassword(id); onSecret(result.temporaryPassword); return api.employee(id); } })}>{m.resetPassword}</button>}
+              {!allowed("employees.deactivate") && !allowed("employees.activate") && !allowed("employees.reset_password") && <p className="muted">{m.noSecurityActions}</p>}
             </div>
           )}
         </Card>

@@ -44,7 +44,8 @@ button, input, select { font: inherit; color: inherit; }
 .boot { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 14px; color: var(--muted); }
 .auth-page { min-height: 100vh; display: grid; place-content: center; gap: 18px; padding: 24px; background: radial-gradient(1200px 500px at 50% -10%, #ece4d6 0%, var(--canvas) 55%); }
 .auth-panel { width: min(420px, calc(100vw - 32px)); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 32px; box-shadow: 0 12px 40px rgba(16, 18, 22, 0.08); }
-.auth-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+.auth-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 28px; }
+.auth-brand { display: flex; align-items: center; gap: 12px; }
 .auth-brand div, .sidebar-brand div { display: grid; line-height: 1.2; }
 .auth-brand strong { font-size: 15px; }
 .auth-brand span { color: var(--muted); font-size: 12.5px; }
@@ -91,7 +92,8 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .identity strong { color: #fff; }
 .identity span { font-size: 12px; color: #8b909b; }
 .main-column { min-width: 0; }
-.topbar { display: none; }
+.topbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 14px 32px 0; }
+.topbar .menu-toggle, .topbar-title { display: none; }
 .content { padding: 28px 32px 48px; }
 .page { display: grid; gap: 18px; max-width: 1280px; }
 .page.narrow { max-width: 860px; }
@@ -213,7 +215,9 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
   .shell { grid-template-columns: 1fr; }
   .sidebar { position: fixed; inset: 0 auto 0 0; width: 260px; z-index: 20; transform: translateX(-100%); transition: transform 0.2s; }
   .nav-open .sidebar { transform: none; box-shadow: 0 0 0 100vmax rgba(16, 18, 22, 0.4); }
-  .topbar { display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--line); padding: 10px 16px; }
+  .topbar { justify-content: flex-start; position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--line); padding: 10px 16px; }
+  .topbar-title { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar .menu-toggle { display: grid; }
   .menu-toggle { display: grid; gap: 4px; background: none; border: 0; padding: 6px; cursor: pointer; }
   .menu-toggle span { display: block; width: 18px; height: 2px; background: var(--ink); border-radius: 2px; }
   .content { padding: 18px 16px 40px; }
@@ -234,3 +238,10 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .permission-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 .permission-list small { color: var(--muted); margin-left: 4px; }
 .audit-main strong + strong { margin-top: 2px; }
+
+.locale-switch { display: inline-flex; flex: none; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.locale-switch button { border: 0; background: transparent; color: var(--muted); font: 600 12px/1 var(--font); letter-spacing: 0.04em; padding: 7px 10px; min-width: 38px; cursor: pointer; }
+.locale-switch button + button { border-left: 1px solid var(--line-strong); }
+.locale-switch button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.locale-switch button:hover:not([aria-pressed="true"]) { background: var(--accent-soft); color: var(--ink); }
+.locale-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
