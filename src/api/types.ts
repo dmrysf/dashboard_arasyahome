@@ -101,7 +101,9 @@ export type Overview = {
 
 /** GET /management/production-overview. Definitions live with the API (docs/production-overview.md). */
 export type SourceHealth = "healthy" | "stale" | "offline" | "no_contact" | "not_configured" | "disabled";
-export type ProductionActivityAction = "claimed" | "stage_completed" | "production_completed";
+export type ProductionActivityAction = "claimed" | "stage_completed" | "production_completed" | "owner_released" | "owner_reassigned";
+/** Owner interventions record whose ownership ended and who received it; Staff actions carry null. */
+export type OwnerRef = { id: string; displayName: string };
 
 export type ProductionOverview = {
   generatedAt: string;
@@ -127,12 +129,16 @@ export type ProductionOverview = {
     order: { globalOrderId: string; orderNumber: string; source: string };
     fromStage: { id: string; label: string };
     toStage: { id: string; label: string } | null;
+    previousOwner?: OwnerRef | null;
+    newOwner?: OwnerRef | null;
   }> | null;
   sources: Array<{ key: string; name: string; type: string; health: SourceHealth; lastContactAt: string | null; lastEventAt: string | null; activeOrders: number }> | null;
 };
 
-/** GET /management/orders and /management/orders/{globalOrderId} (Operations API 2.5.0). */
+/** GET /management/orders and /management/orders/{globalOrderId} (Operations API 2.6.0). */
 export type ProductionState = "active" | "completed" | "cancelled";
+/** Neutral, objective attention for active production. There is no SLA, so time never produces attention. */
+export type OrderAttention = "unassigned" | "owner_inactive" | "owner_no_staff_access" | "owner_stage_not_allowed";
 export type OrderSummary = {
   globalOrderId: string;
   orderNumber: string;
@@ -147,6 +153,7 @@ export type OrderSummary = {
     claimedAt: string | null;
     stageEnteredAt: string;
     completedAt: string | null;
+    attention: OrderAttention | null;
   };
   importedAt: string;
   acceptedAt: string | null;
@@ -157,7 +164,7 @@ export type OrderFacets = {
   commerceStatuses: Array<{ code: string; label: string | null }>;
   owners: Array<{ id: string; displayName: string }>;
 };
-export type OrderPage = { items: OrderSummary[]; nextCursor: string | null; facets: OrderFacets };
+export type OrderPage = { items: OrderSummary[]; nextCursor: string | null; facets: OrderFacets; counts: { unassignedActive: number; ownerAttention: number } };
 export type OrderItem = { line: number; name: string; sku: string | null; variant: string | null; color: string | null; width: number | null; height: number | null; unit: string | null; meters: number | null; quantity: number };
 export type OrderActivity = {
   id: string;
@@ -166,14 +173,36 @@ export type OrderActivity = {
   employee: { id: string; displayName: string };
   fromStage: { id: string; label: string };
   toStage: { id: string; label: string } | null;
+  previousOwner: OwnerRef | null;
+  newOwner: OwnerRef | null;
   productionVersion: number;
 };
 export type OrderDetail = Omit<OrderSummary, "commerce" | "production"> & {
   commerce: OrderSummary["commerce"] & { sourceChangedAt: string; lastSourceSeenAt: string };
-  production: OrderSummary["production"] & { changedAt: string | null; version: number; notes: string | null };
+  production: OrderSummary["production"] & {
+    changedAt: string | null;
+    version: number;
+    notes: string | null;
+    /** Whether the viewer holds production.manage_owner, and why this order cannot take an owner intervention. */
+    control: { canManageOwner: boolean; blockedReason: "production_completed" | "order_unavailable" | null };
+  };
   items: OrderItem[];
   activity: OrderActivity[] | null;
   activityTruncated: boolean;
+};
+
+/** GET /management/orders/{id}/eligible-owners: Staff employees allowed on the current stage, within the viewer's authority. */
+export type EligibleOwners = {
+  stage: { id: string; label: string };
+  productionVersion: number;
+  blockedReason: "production_completed" | "order_unavailable" | null;
+  items: Array<{ id: string; displayName: string; department: string; positionTitle: string | null; stage: { id: string; label: string } }>;
+};
+/** Result of POST …/release-owner and PUT …/owner. The stage is reported unchanged by design. */
+export type OwnerChange = {
+  globalOrderId: string;
+  action: "owner_released" | "owner_reassigned";
+  production: { version: number; stage: { id: string; label: string }; owner: OwnerRef | null; previousOwner: OwnerRef | null };
 };
 
 export type SystemStatus = {

@@ -142,6 +142,7 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
       {!data.isRoot && !data.manageable && <Notice>{data.id === me.employee.id ? m.ownAccount : m.aboveAuthority}</Notice>}
       {message && <Notice tone="success">{t.notices[message]}</Notice>}
       {error && <ErrorBanner error={error} />}
+      {!data.isRoot && <PilotReadiness data={data} />}
 
       <div className="grid-2">
         <Card title={m.profile} actions={allowed("employees.update") ? <button type="button" className="button button-secondary" disabled={busy || !profileChanged || profile.displayName.trim().length < 2}
@@ -255,5 +256,39 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * Account-side pilot checklist (docs/pilot-readiness.md) from fields the API already returns. It exposes only
+ * booleans and counts: never a password, hash or session. Phone login, claim and stage completion are verified
+ * in Staff afterwards.
+ */
+export function PilotReadiness({ data }: { data: EmployeeDetail }) {
+  const { t } = useI18n();
+  const p = t.employee.pilot;
+  const active = data.status === "active";
+  const staff = data.applications.includes("staff");
+  const stages = data.stageIds.length > 0;
+  const passwordChanged = !data.mustChangePassword;
+  const verdict = active && staff && stages ? (passwordChanged ? "ready" : "pending") : "not_ready";
+  const items: Array<{ key: string; ok: boolean; label: string; soft?: boolean }> = [
+    { key: "active", ok: active, label: p.active },
+    { key: "staff", ok: staff, label: p.staff },
+    { key: "stages", ok: stages, label: stages ? p.stages(data.stageIds.length) : p.noStages },
+    { key: "password", ok: passwordChanged, label: passwordChanged ? p.passwordChanged : p.passwordTemporary, soft: true },
+    { key: "login", ok: data.lastLoginAt !== null, label: data.lastLoginAt !== null ? p.firstLogin : p.noLogin, soft: true },
+  ];
+  return (
+    <Card title={p.title} description={p.hint} className="pilot-card section-gap"
+      actions={<span data-pilot={verdict}><Badge tone={verdict === "ready" ? "success" : verdict === "pending" ? "warning" : "neutral"}>{verdict === "ready" ? p.ready : verdict === "pending" ? p.pending : p.notReady}</Badge></span>}>
+      <ul className="pilot-list">
+        {items.map((item) => (
+          <li key={item.key} data-check={item.key} data-ok={item.ok ? "true" : "false"} className={item.ok ? "is-ok" : item.soft ? "is-pending" : "is-missing"}>
+            <span aria-hidden="true">{item.ok ? "✓" : item.soft ? "…" : "✕"}</span> {item.label}
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }

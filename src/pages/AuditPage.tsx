@@ -45,7 +45,7 @@ export function AuditPage() {
           {Object.entries(t.auditActions).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
         <select aria-label={t.audit.targetType} value={filters.targetType ?? ""} onChange={(event) => set("targetType", event.target.value)}>
-          <option value="">{t.audit.allTargets}</option><option value="employee">{t.audit.targetEmployees}</option><option value="role">{t.audit.targetRoles}</option><option value="department">{t.audit.targetDepartments}</option>
+          <option value="">{t.audit.allTargets}</option><option value="employee">{t.audit.targetEmployees}</option><option value="role">{t.audit.targetRoles}</option><option value="department">{t.audit.targetDepartments}</option><option value="order">{t.audit.targetOrders}</option>
         </select>
         <label className="date-filter">{t.audit.from}<input type="date" value={filters.from ?? ""} onChange={(event) => set("from", event.target.value)} /></label>
         <label className="date-filter">{t.audit.to}<input type="date" value={filters.to ?? ""} onChange={(event) => set("to", event.target.value)} /></label>

@@ -173,6 +173,8 @@ function Activity({ data }: { data: Overview }) {
                     <strong>{event.employee.displayName}</strong>
                     <span>{productionAction(event.action)} <strong className="mono">{event.order.orderNumber}</strong> · {stageName(event.fromStage.id, event.fromStage.label)}</span>
                     {event.toStage && <span className="muted small">{p.handedTo(stageName(event.toStage.id, event.toStage.label))}</span>}
+                    {event.action === "owner_reassigned" && <span className="muted small">{t.orders.ownerChange(event.previousOwner?.displayName ?? t.orders.nobody, event.newOwner?.displayName ?? t.orders.nobody)}</span>}
+                    {event.action === "owner_released" && <span className="muted small">{t.orders.ownerReleased(event.previousOwner?.displayName ?? t.orders.nobody)}</span>}
                   </div>
                   <div className="audit-meta"><span>{dateTime(event.occurredAt)}</span></div>
                 </li>

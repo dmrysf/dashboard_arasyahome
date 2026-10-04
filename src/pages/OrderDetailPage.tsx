@@ -1,10 +1,12 @@
-import { useCallback } from "react";
-import type { OrderDetail, OrderItem } from "../api/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ApiError, newIdempotencyKey } from "../api/client";
+import type { EligibleOwners, OrderDetail, OrderItem } from "../api/types";
 import { useDashboard } from "../app/context";
 import { usePolling } from "../app/usePolling";
-import { Card, ErrorBanner, Loading, PageHeader, RefreshBar } from "../components/ui";
+import { Card, ConfirmDialog, ErrorBanner, ErrorText, Loading, Notice, PageHeader, RefreshBar } from "../components/ui";
+import { toProblem, type Problem } from "../i18n";
 import { useI18n } from "../i18n/context";
-import { CommerceChip, OwnerName, ProductionStateBadge, StageChip, TimeInStage } from "./orderParts";
+import { AttentionBadge, CommerceChip, OwnerName, ProductionStateBadge, StageChip, TimeInStage } from "./orderParts";
 
 const STAGE_COUNT = 14;
 
@@ -33,12 +35,12 @@ export function OrderDetailView({ data, error, updatedAt, refreshing, refresh, o
       {error !== null && data && <div className="notice notice-warning" role="status">{o.refreshFailed}</div>}
       {error !== null && !data && <ErrorBanner error={error} onRetry={refresh} />}
       {!data && error === null && <Loading label={o.loading} />}
-      {data && <OrderDetailContent data={data} referenceTime={updatedAt ?? Date.parse(data.importedAt)} toolbar={<RefreshBar updatedAt={updatedAt} refreshing={refreshing} hasData onRefresh={refresh} />} />}
+      {data && <OrderDetailContent data={data} referenceTime={updatedAt ?? Date.parse(data.importedAt)} onChanged={refresh} toolbar={<RefreshBar updatedAt={updatedAt} refreshing={refreshing} hasData onRefresh={refresh} />} />}
     </div>
   );
 }
 
-export function OrderDetailContent({ data, referenceTime, toolbar }: { data: OrderDetail; referenceTime: number; toolbar?: React.ReactNode }) {
+export function OrderDetailContent({ data, referenceTime, toolbar, onChanged }: { data: OrderDetail; referenceTime: number; toolbar?: React.ReactNode; onChanged?: () => void }) {
   const { t, dateTime } = useI18n();
   const o = t.orders;
   const { commerce, production } = data;
@@ -62,7 +64,7 @@ export function OrderDetailContent({ data, referenceTime, toolbar }: { data: Ord
           <StageProgress ordinal={production.stage.ordinal} state={production.state} />
           <dl className="facts">
             <dt>{o.stage}</dt><dd><StageChip stage={production.stage} /> <span className="muted small">{o.stageProgress(String(production.stage.ordinal))}</span></dd>
-            <dt>{o.owner}</dt><dd><OwnerName owner={production.owner} /></dd>
+            <dt>{o.owner}</dt><dd><OwnerName owner={production.owner} /> <AttentionBadge attention={production.attention} /></dd>
             {production.claimedAt && <><dt>{o.claimedAt}</dt><dd>{dateTime(production.claimedAt)}</dd></>}
             <dt>{o.stageEnteredAt}</dt><dd>{dateTime(production.stageEnteredAt)}</dd>
             <dt>{o.timeInStage}</dt><dd><TimeInStage order={data} referenceTime={referenceTime} /></dd>
@@ -73,6 +75,7 @@ export function OrderDetailContent({ data, referenceTime, toolbar }: { data: Ord
           {production.completedAt && <p className="muted small">{o.completionNote}</p>}
         </section>
       </div>
+      <ProductionControl data={data} onChanged={onChanged} />
       <Items items={data.items} notes={production.notes} />
       <Timeline data={data} />
     </>
@@ -140,8 +143,10 @@ function Timeline({ data }: { data: OrderDetail }) {
               <div>
                 <strong>{productionAction(event.action)}</strong>
                 <span>{event.employee.displayName}</span>
+                {event.action === "owner_reassigned" && <span data-owner-change="">{o.ownerChange(event.previousOwner?.displayName ?? o.nobody, event.newOwner?.displayName ?? o.nobody)}</span>}
+                {event.action === "owner_released" && <span data-owner-change="">{o.ownerReleased(event.previousOwner?.displayName ?? o.nobody)}</span>}
                 <span className="muted small">
-                  {o.from}: {stageName(event.fromStage.id, event.fromStage.label)}
+                  {event.toStage || event.action === "claimed" ? <>{o.from}: {stageName(event.fromStage.id, event.fromStage.label)}</> : <>{o.stage}: {stageName(event.fromStage.id, event.fromStage.label)}</>}
                   {event.toStage && <> → {o.to}: {stageName(event.toStage.id, event.toStage.label)}</>}
                 </span>
               </div>
@@ -152,5 +157,179 @@ function Timeline({ data }: { data: OrderDetail }) {
       )}
       {data.activityTruncated && <p className="muted small">{o.timelineTruncated}</p>}
     </Card>
+  );
+}
+
+type ControlNotice = { kind: "reassigned"; name: string } | { kind: "released" } | { kind: "conflict" };
+
+/**
+ * Production Control V2: supervisor interventions on the current production owner only. There is no stage
+ * control here by design; the stage moves only through Staff. The server re-checks permission, eligibility,
+ * authority and the production version on every submission; hiding buttons is a convenience, not security.
+ */
+export function ProductionControl({ data, onChanged }: { data: OrderDetail; onChanged?: () => void }) {
+  const { api } = useDashboard();
+  const { t, dateTime, stage: stageName } = useI18n();
+  const o = t.orders;
+  const c = o.control;
+  const { production } = data;
+  const control = production.control;
+  const [dialog, setDialog] = useState<"reassign" | "release" | null>(null);
+  const [notice, setNotice] = useState<ControlNotice | null>(null);
+  const canAct = control.canManageOwner && control.blockedReason === null && production.state === "active";
+  const finish = (next: ControlNotice) => { setDialog(null); setNotice(next); onChanged?.(); };
+  return (
+    <section className="card control-card" data-section="control">
+      <div className="card-header"><div><h2>{c.title}</h2><p>{c.hint}</p></div></div>
+      {notice && <Notice tone={notice.kind === "conflict" ? "warning" : "success"}>{notice.kind === "reassigned" ? c.reassigned(notice.name) : notice.kind === "released" ? c.released : c.conflict}</Notice>}
+      <dl className="facts">
+        <dt>{o.stage}</dt><dd><StageChip stage={production.stage} /></dd>
+        <dt>{o.owner}</dt><dd><OwnerName owner={production.owner} /> <AttentionBadge attention={production.attention} /></dd>
+        {production.claimedAt && <><dt>{o.claimedAt}</dt><dd>{dateTime(production.claimedAt)}</dd></>}
+        <dt>{o.state}</dt><dd><ProductionStateBadge state={production.state} /> <span className="muted small">{c.version} {production.version}</span></dd>
+        <dt>{c.intervention}</dt><dd data-intervention={control.blockedReason ?? (control.canManageOwner ? "allowed" : "no_permission")}>
+          {control.blockedReason ? (c.blocked[control.blockedReason] ?? control.blockedReason) : control.canManageOwner ? c.allowed : <span className="muted">{c.noPermission}</span>}
+        </dd>
+      </dl>
+      {canAct && (
+        <div className="button-row control-actions">
+          <button type="button" className="button button-secondary" onClick={() => { setNotice(null); setDialog("reassign"); }}>{production.owner ? c.reassign : c.assign}</button>
+          {production.owner && <button type="button" className="button button-ghost" onClick={() => { setNotice(null); setDialog("release"); }}>{c.release}</button>}
+        </div>
+      )}
+      {dialog === "reassign" && <ReassignDialog data={data} onDone={finish} onCancel={() => setDialog(null)} load={(signal) => api.eligibleOwners(data.globalOrderId, signal)}
+        submit={(employeeId, version, key) => api.reassignOwner(data.globalOrderId, employeeId, version, key)} />}
+      {dialog === "release" && <ReleaseDialog data={data} onDone={finish} onCancel={() => setDialog(null)} stageLabel={stageName(production.stage.id, production.stage.label)}
+        submit={(version, key) => api.releaseOwner(data.globalOrderId, version, key)} />}
+    </section>
+  );
+}
+
+function ReleaseDialog({ data, stageLabel, submit, onDone, onCancel }: {
+  data: OrderDetail; stageLabel: string; submit: (version: number, key: string) => Promise<unknown>; onDone: (notice: ControlNotice) => void; onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  const c = t.orders.control;
+  const [key] = useState(newIdempotencyKey);
+  const [version] = useState(data.production.version);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<Problem | null>(null);
+  const confirm = async () => {
+    setBusy(true); setError(null);
+    try { await submit(version, key); onDone({ kind: "released" }); }
+    catch (caught) {
+      if (caught instanceof ApiError && caught.code === "ORDER_CHANGED") onDone({ kind: "conflict" });
+      else setError(toProblem(caught));
+    } finally { setBusy(false); }
+  };
+  return (
+    <ConfirmDialog title={c.releaseTitle} confirmLabel={c.confirmRelease} busy={busy} onConfirm={() => { void confirm(); }} onCancel={onCancel}>
+      <p>{c.releaseBody}</p>
+      <dl className="facts owner-summary">
+        <dt>{c.currentOwner}</dt><dd><strong>{data.production.owner?.displayName ?? t.orders.noOwner}</strong></dd>
+        <dt>{c.currentStage}</dt><dd>{stageLabel}</dd>
+      </dl>
+      <p className="muted small">{c.warning}</p>
+      {error && <ErrorText error={error} />}
+    </ConfirmDialog>
+  );
+}
+
+function ReassignDialog({ data, load, submit, onDone, onCancel }: {
+  data: OrderDetail;
+  load: (signal: AbortSignal) => Promise<EligibleOwners>;
+  submit: (employeeId: string, version: number, key: string) => Promise<unknown>;
+  onDone: (notice: ControlNotice) => void;
+  onCancel: () => void;
+}) {
+  const [key] = useState(newIdempotencyKey);
+  const [version] = useState(data.production.version);
+  const [eligible, setEligible] = useState<EligibleOwners | null>(null);
+  const [loadError, setLoadError] = useState<Problem | null>(null);
+  const [selected, setSelected] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<Problem | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    load(controller.signal).then(setEligible, (caught: unknown) => { if (!controller.signal.aborted) setLoadError(toProblem(caught)); });
+    return () => controller.abort();
+  }, [load]);
+  const confirm = async () => {
+    const candidate = eligible?.items.find((item) => item.id === selected);
+    if (!candidate) return;
+    setBusy(true); setError(null);
+    try { await submit(candidate.id, version, key); onDone({ kind: "reassigned", name: candidate.displayName }); }
+    catch (caught) {
+      if (caught instanceof ApiError && caught.code === "ORDER_CHANGED") onDone({ kind: "conflict" });
+      else setError(toProblem(caught));
+    } finally { setBusy(false); }
+  };
+  return <ReassignDialogView data={data} eligible={eligible} loadError={loadError} selected={selected} busy={busy} error={error}
+    onSelect={setSelected} onConfirm={() => { void confirm(); }} onCancel={onCancel} />;
+}
+
+export type ReassignDialogViewProps = {
+  data: OrderDetail;
+  eligible: EligibleOwners | null;
+  loadError: Problem | null;
+  selected: string;
+  busy: boolean;
+  error: Problem | null;
+  onSelect: (id: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
+/** Picker plus the explicit before/after summary. Only server-listed eligible employees can be chosen. */
+export function ReassignDialogView({ data, eligible, loadError, selected, busy, error, onSelect, onConfirm, onCancel }: ReassignDialogViewProps) {
+  const { t, stage: stageName } = useI18n();
+  const o = t.orders;
+  const c = o.control;
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open && typeof dialog.showModal === "function") dialog.showModal();
+    return () => { if (dialog?.open) dialog.close(); };
+  }, []);
+  const candidate = eligible?.items.find((item) => item.id === selected) ?? null;
+  const stageLabel = stageName(data.production.stage.id, data.production.stage.label);
+  return (
+    <dialog ref={ref} className="dialog owner-dialog" aria-labelledby="reassign-title" onCancel={(event) => { event.preventDefault(); if (!busy) onCancel(); }}>
+      <h2 id="reassign-title">{c.reassignTitle}</h2>
+      <div className="dialog-body">
+        <fieldset className="owner-picker" disabled={busy}>
+          <legend>{c.eligible}</legend>
+          <p className="muted small">{c.eligibleHint}</p>
+          {loadError ? <ErrorText error={loadError} />
+            : !eligible ? <Loading label={c.loadingEligible} />
+              : eligible.items.length === 0 ? <p className="muted" data-empty="eligible">{c.noEligible}</p>
+                : (
+                  <div className="owner-options">
+                    {eligible.items.map((item) => (
+                      <label key={item.id} className="owner-option" data-candidate={item.id} aria-label={item.displayName}>
+                        <input type="radio" name="owner-candidate" value={item.id} checked={selected === item.id} onChange={() => onSelect(item.id)} />
+                        <span>
+                          <strong>{item.displayName}</strong>
+                          <small>{[item.department, item.positionTitle].filter(Boolean).join(" · ")}</small>
+                          <small className="muted">{c.stagePermission(stageName(item.stage.id, item.stage.label))}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+        </fieldset>
+        <dl className="facts owner-summary" data-summary="">
+          <dt>{c.currentOwner}</dt><dd data-summary-current="">{data.production.owner?.displayName ?? o.noOwner}</dd>
+          <dt>{c.newOwner}</dt><dd data-summary-new="">{candidate ? <strong>{candidate.displayName}</strong> : <span className="muted">{c.notSelected}</span>}</dd>
+          <dt>{c.currentStage}</dt><dd data-summary-stage="">{stageLabel}</dd>
+        </dl>
+        <p className="notice notice-info owner-warning" role="note">{c.warning}</p>
+        {error && <ErrorText error={error} />}
+      </div>
+      <div className="dialog-actions">
+        <button type="button" className="button button-secondary" onClick={onCancel} disabled={busy}>{t.common.cancel}</button>
+        <button type="button" className="button button-primary" onClick={onConfirm} disabled={busy || !candidate}>{busy ? t.common.saving : c.confirmReassign}</button>
+      </div>
+    </dialog>
   );
 }

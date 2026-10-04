@@ -8,15 +8,26 @@ Central management console (`https://dashboard.arasyahome.ro`) for the Arasya id
 - Screens: Panou de control, Comenzi, Angajați, Roluri și permisiuni, Departamente, Aplicații, Audit, Sistem.
 - Authorization changes are reviewed in a confirmation dialog before anything is written. The protected root identity (`arasya.root.owner`) is read-only in the UI; the API enforces this independently (`ROOT_PROTECTED`).
 
+## Production Control V2: supervisor owner interventions (0.5.0)
+
+The order detail gains a **Control producție / Üretim Kontrolü** section (Operations API 2.6.0). It shows the current stage, owner, claim time, production version and state, and whether an owner intervention is possible.
+
+- Holders of `production.manage_owner` get exactly two actions: **Schimbă responsabilul / Sorumluyu Değiştir** (or **Atribuie responsabil** when nobody owns the order) and **Eliberează responsabilul / Sorumluluğu Serbest Bırak**. Without the permission the section explains why; the API enforces it regardless.
+- Reassignment picks from the server's list of eligible employees (active, Staff access, permission for the current stage, within the viewer's authority) and shows current owner, new owner and current stage with the warning that the stage and the store status do not change. Release asks for an explicit confirmation.
+- Each submission sends the production version the supervisor saw and a fresh `Idempotency-Key`. If Staff changed the order first, the API answers `ORDER_CHANGED`; the page reloads and says so instead of overwriting.
+- The timeline shows interventions (who, `A → B`, release). The order list adds a neutral attention state (no owner, owner inactive, owner without Staff access or without the current stage), a filter for orders whose owner can no longer work, and counters for unassigned active orders. There is no SLA, so nothing is called late.
+- The employee page shows a **Pilot readiness** card built from booleans the API already returns (`staff_arasyahome/docs/pilot-readiness.md`).
+- Still no stage control of any kind: no stage selector, jump, reset or reopen. Owner interventions do not change the Arasya production stage or the Trendhome WooCommerce order status.
+
 ## Production Control: Comenzi (0.4.0)
 
-`/comenzi` is a read-only order workspace on `GET /management/orders` and `GET /management/orders/{globalOrderId}` (Operations API 2.5.0, `orders.view_all`; the timeline also needs `activity.view_all`).
+`/comenzi` is an order workspace on `GET /management/orders` and `GET /management/orders/{globalOrderId}` (Operations API 2.5.0, `orders.view_all`; the timeline also needs `activity.view_all`).
 
 - Two independent states, shown with different shapes and headings: **Status magazin / Mağaza Durumu** (the source's commerce status, received inbound only) and **Etapă producție / Üretim Aşaması** (the Arasya curtain-production@1 stage). The Dashboard never derives one from the other.
 - Server-side filters (search by order number or global id, source, stage, store status, owner, assigned/unassigned, active/completed/cancelled) and cursor pages of 25/50/100.
 - Detail at `/comenzi/<source>:<id>` (the global id, never the bare order number): store section, production section with owner, stage entry and time in stage (same definition as the overview, no SLA wording), normalized items and measurements, production notes and the immutable production timeline.
 - List and detail refresh every 45 seconds while visible (shared poller), with manual refresh; a failed refresh keeps the last data.
-- No production action exists here: no stage selector, no claim, no override. Staff remains where stages change. Arasya production transitions do not mutate WooCommerce order statuses (see `staff_arasyahome/docs/production-control.md`).
+- No stage action exists here: no stage selector, no claim, no override. Staff remains where stages change (0.5.0 adds only the owner interventions above). Arasya production transitions do not mutate WooCommerce order statuses (see `staff_arasyahome/docs/production-control.md`).
 
 ## Production overview (0.3.0)
 

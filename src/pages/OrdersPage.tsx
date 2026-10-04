@@ -5,7 +5,7 @@ import { orderPath } from "../app/router";
 import { usePolling } from "../app/usePolling";
 import { EmptyState, ErrorBanner, Loading, PageHeader, RefreshBar } from "../components/ui";
 import { useI18n } from "../i18n/context";
-import { CommerceChip, OwnerName, ProductionStateBadge, StageChip, TimeInStage } from "./orderParts";
+import { AttentionBadge, CommerceChip, OwnerName, ProductionStateBadge, StageChip, TimeInStage } from "./orderParts";
 
 export type OrderFilters = { search: string; source: string; stage: string; commerceStatus: string; ownerId: string; assignment: string; state: string; limit: string };
 export const DEFAULT_ORDER_FILTERS: OrderFilters = { search: "", source: "", stage: "", commerceStatus: "", ownerId: "", assignment: "", state: "active", limit: "50" };
@@ -63,6 +63,7 @@ export function OrdersView({ data, error, updatedAt, refreshing, refresh, filter
     <div className="page">
       <PageHeader title={o.title} description={o.description} actions={<RefreshBar updatedAt={updatedAt} refreshing={refreshing} hasData={data !== null} onRefresh={refresh} />} />
       <OrderFilterBar filters={filters} facets={facets} onChange={onFilters} />
+      {data?.counts && <OwnerCounts counts={data.counts} filters={filters} onFilters={onFilters} />}
       {error !== null && data && <div className="notice notice-warning" role="status">{o.refreshFailed}</div>}
       {error !== null && !data && <div className="stack"><p className="muted">{o.loadFailed}</p><ErrorBanner error={error} onRetry={refresh} /></div>}
       {!data && error === null && <Loading label={o.loading} />}
@@ -77,6 +78,25 @@ export function OrdersView({ data, error, updatedAt, refreshing, refresh, filter
           </div>
         </div>
       </>)}
+    </div>
+  );
+}
+
+/** Supervisor counters over active production; each one applies its filter. Unassigned stays in view on purpose. */
+function OwnerCounts({ counts, filters, onFilters }: { counts: OrderPage["counts"]; filters: OrderFilters; onFilters: (filters: OrderFilters) => void }) {
+  const { t, number } = useI18n();
+  const o = t.orders;
+  const apply = (assignment: string) => onFilters({ ...filters, assignment, state: "active", ownerId: "" });
+  return (
+    <div className="order-counts" role="group" aria-label={o.countsLabel}>
+      <button type="button" className="count-chip" data-count="unassigned" aria-pressed={filters.assignment === "unassigned"} onClick={() => apply("unassigned")}>
+        {o.countUnassigned(number(counts.unassignedActive))}
+      </button>
+      {counts.ownerAttention > 0 && (
+        <button type="button" className="count-chip count-warning" data-count="owner_attention" aria-pressed={filters.assignment === "owner_attention"} onClick={() => apply("owner_attention")}>
+          {o.countAttention(number(counts.ownerAttention))}
+        </button>
+      )}
     </div>
   );
 }
@@ -113,6 +133,7 @@ function OrderFilterBar({ filters, facets, onChange }: { filters: OrderFilters; 
         <option value="">{o.anyAssignment}</option>
         <option value="assigned">{o.assigned}</option>
         <option value="unassigned">{o.unassigned}</option>
+        <option value="owner_attention">{o.ownerAttention}</option>
       </select>
       <select aria-label={o.state} value={filters.state} onChange={(event) => set("state", event.target.value)}>
         <option value="">{o.anyState}</option>
@@ -138,14 +159,14 @@ export function OrdersTable({ items, referenceTime }: { items: OrderSummary[]; r
         </thead>
         <tbody>
           {items.map((order) => (
-            <tr key={order.globalOrderId} data-order={order.globalOrderId} onClick={() => navigate(orderPath(order.globalOrderId))}>
+            <tr key={order.globalOrderId} data-order={order.globalOrderId} data-attention={order.production.attention ?? undefined} onClick={() => navigate(orderPath(order.globalOrderId))}>
               <td data-label={o.order}>
                 <a className="mono order-link" href={orderPath(order.globalOrderId)} onClick={(event) => { event.preventDefault(); event.stopPropagation(); navigate(orderPath(order.globalOrderId)); }}>{order.orderNumber}</a>
               </td>
               <td data-label={o.source}>{order.source.name}</td>
               <td data-label={o.commerceStatus}><CommerceChip status={order.commerce.status} /></td>
               <td data-label={o.stage}><StageChip stage={order.production.stage} /></td>
-              <td data-label={o.owner}><OwnerName owner={order.production.owner} /></td>
+              <td data-label={o.owner}><span className="owner-cell"><OwnerName owner={order.production.owner} />{order.production.attention && order.production.attention !== "unassigned" && <AttentionBadge attention={order.production.attention} />}</span></td>
               <td data-label={o.timeInStage}><TimeInStage order={order} referenceTime={referenceTime} /></td>
               <td data-label={o.importedAt}>{dateTime(order.importedAt)}</td>
               <td data-label={o.state}><ProductionStateBadge state={order.production.state} /></td>

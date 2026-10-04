@@ -81,6 +81,18 @@ export function describeAuditEvent(event: AuditEvent, i18n: Translator, stageFal
     case "department.created": return { sentences: [m.departmentCreated(actor, target)], details: [] };
     case "department.updated": return { sentences: [m.departmentUpdated(actor, target)], details: fieldDetails() };
     case "department.deleted": return { sentences: [m.departmentDeleted(actor, target)], details: [] };
+    case "production.owner.released":
+    case "production.owner.reassigned": {
+      // Production ownership interventions: names and the stage are server snapshots; the stage never changes.
+      const owner = (value: unknown) => (value && typeof value === "object" && typeof (value as { displayName?: unknown }).displayName === "string" ? (value as { displayName: string }).displayName : m.nobody);
+      const stage = metadata.stage && typeof metadata.stage === "object" ? metadata.stage as { id?: unknown; label?: unknown } : {};
+      const details = [
+        m.ownerChange(owner(metadata.previousOwner), owner(metadata.newOwner)),
+        ...(typeof stage.id === "string" ? [m.stageUnchanged(i18n.stage(stage.id, typeof stage.label === "string" ? stage.label : stageFallback(stage.id)))] : []),
+      ];
+      const sentence = event.action === "production.owner.released" ? m.ownerReleased(actor, event.targetLabel) : m.ownerReassigned(actor, event.targetLabel);
+      return { sentences: [sentence], details };
+    }
     case "root.bootstrapped": return { sentences: [m.rootBootstrapped], details: [] };
     case "root.password_recovered": return { sentences: [m.rootRecovered], details: [] };
     default: return { sentences: [m.generic(actor, target)], details: [] };

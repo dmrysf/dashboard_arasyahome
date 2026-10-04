@@ -45,3 +45,13 @@ export function TimeInStage({ order, referenceTime }: { order: Pick<OrderSummary
   if (order.production.state !== "active") return <span className="muted">—</span>;
   return <span>{duration(referenceTime - Date.parse(order.production.stageEnteredAt))}</span>;
 }
+
+/**
+ * Neutral operational attention, only for objective states (no owner, or an owner who can no longer act).
+ * There is no SLA, so nothing is ever called late; the tone is a warning, never an error.
+ */
+export function AttentionBadge({ attention }: { attention: OrderSummary["production"]["attention"] }) {
+  const { t } = useI18n();
+  if (!attention) return null;
+  return <span className="attention" data-attention={attention} title={t.orders.attentionLabel}><Badge tone={attention === "unassigned" ? "neutral" : "warning"}>{t.orders.attention[attention] ?? attention}</Badge></span>;
+}

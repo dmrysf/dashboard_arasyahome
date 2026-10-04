@@ -1,6 +1,16 @@
 import type {
-  Application, AuditPage, Department, EmployeeDetail, EmployeePage, ManagementMe, OrderDetail, OrderPage, Overview, Permission, ProductionOverview, Role, Session, SessionEmployee, SystemStatus, Workflow,
+  Application, AuditPage, Department, EligibleOwners, EmployeeDetail, EmployeePage, ManagementMe, OrderDetail, OrderPage, OwnerChange, Overview, Permission, ProductionOverview, Role, Session, SessionEmployee, SystemStatus, Workflow,
 } from "./types";
+
+/**
+ * A fresh Idempotency-Key for one user-confirmed mutation. Reusing it for a retry of the same submission lets
+ * the server replay the committed result instead of applying the change twice.
+ */
+export function newIdempotencyKey(): string {
+  if (typeof crypto.randomUUID === "function") return `dash-${crypto.randomUUID()}`;
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return `dash-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
 
 /** A typed API failure. `code` is the server error code; transport problems use NETWORK_UNAVAILABLE. */
 export class ApiError extends Error {
@@ -60,13 +70,14 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
   let csrfToken = "";
   const listeners = new Set<Listener>();
 
-  async function request<T>(path: string, init: { method?: string; body?: unknown; query?: Record<string, string | undefined>; signal?: AbortSignal } = {}): Promise<T> {
+  async function request<T>(path: string, init: { method?: string; body?: unknown; query?: Record<string, string | undefined>; signal?: AbortSignal; idempotencyKey?: string } = {}): Promise<T> {
     const method = init.method ?? "GET";
     const url = new URL(path, baseUrl);
     for (const [key, value] of Object.entries(init.query ?? {})) if (value) url.searchParams.set(key, value);
     const headers: Record<string, string> = { Accept: "application/json" };
     if (init.body !== undefined) headers["Content-Type"] = "application/json";
     if (method !== "GET" && csrfToken) headers["X-CSRF-Token"] = csrfToken;
+    if (init.idempotencyKey) headers["Idempotency-Key"] = init.idempotencyKey;
     let response: Response;
     try {
       response = await fetchImpl(url.toString(), { method, headers, credentials: "include", cache: "no-store", signal: init.signal, body: init.body === undefined ? undefined : JSON.stringify(init.body) });
@@ -122,6 +133,10 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     overview: () => request<Overview>("/management/dashboard"),
     orders: (query: Record<string, string | undefined>, signal?: AbortSignal) => request<OrderPage>("/management/orders", { query, signal }),
     order: (globalOrderId: string, signal?: AbortSignal) => request<OrderDetail>(`/management/orders/${encodeURIComponent(globalOrderId)}`, { signal }),
+    eligibleOwners: (globalOrderId: string, signal?: AbortSignal) => request<EligibleOwners>(`/management/orders/${encodeURIComponent(globalOrderId)}/eligible-owners`, { signal }),
+    /** Owner interventions change internal production ownership only. The key makes a browser retry safe. */
+    releaseOwner: (globalOrderId: string, expectedVersion: number, idempotencyKey: string) => request<OwnerChange>(`/management/orders/${encodeURIComponent(globalOrderId)}/release-owner`, { method: "POST", body: { expectedVersion }, idempotencyKey }),
+    reassignOwner: (globalOrderId: string, employeeId: string, expectedVersion: number, idempotencyKey: string) => request<OwnerChange>(`/management/orders/${encodeURIComponent(globalOrderId)}/owner`, { method: "PUT", body: { employeeId, expectedVersion }, idempotencyKey }),
     productionOverview: (source: string | undefined, signal?: AbortSignal) => request<ProductionOverview>("/management/production-overview", { query: { source }, signal }),
     system: () => request<SystemStatus>("/management/system"),
     workflow: () => request<Workflow>("/production/workflow"),
