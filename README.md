@@ -8,6 +8,10 @@ Central management console (`https://dashboard.arasyahome.ro`) for the Arasya id
 - Screens: Panou de control, Comenzi, Angajați, Roluri și permisiuni, Departamente, Aplicații, Audit, Sistem.
 - Authorization changes are reviewed in a confirmation dialog before anything is written. The protected root identity (`arasya.root.owner`) is read-only in the UI; the API enforces this independently (`ROOT_PROTECTED`).
 
+## B2B order permissions (0.5.2)
+
+Romanian and Turkish labels describe exactly four fixed order permissions: view, create/duplicate, edit drafts, and manage commercial status (finalize/cancel). Finalization does not send orders into Staff production. Permissions are still granted explicitly through the existing role editor; Operations API 2.9.0 / migration 010 grants no roles automatically.
+
 ## B2B localization (0.5.1)
 
 A small compatibility patch for B2B Companies V1 (Operations API 2.8.0). The `b2b` application is described as what it is: **Aplicația internă pentru vânzări en-gros și clienți B2B** / **Toptan satış ve B2B müşteri yönetimi uygulaması**, no longer as a partner portal. `b2b.access` and the four company permissions (`b2b.companies.view`, `.create`, `.update`, `.manage_status`) have Romanian and Turkish labels and descriptions. The role editor shows them in their own `b2b` group, so a Turkish screen never shows the server's Romanian label. Roles that use them are composed here as usual. B2B has no permission screen of its own. No other screen changed.
