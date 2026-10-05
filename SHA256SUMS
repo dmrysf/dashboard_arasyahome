@@ -4,7 +4,7 @@ b2f0bad2250cb03326d024f8821eceea5f5319ff2af427de1249f0f1a3b58bec  ./dist/assets/
 6d936229697debca4917ce18971a87c0482a04f177e8b124698b1d5516eee780  ./dist/assets/index-PXzD4TO5.css
 3bb1c84671b4dd5299b3b0f9d37d6b100f404b2035334958360c17ece528a0a9  ./dist/favicon.svg
 4fd40dd33800aa2979ae48a1bcf921e1354c220de682ba6d0b9e47a321c858ab  ./dist/index.html
-885d48ed70ab11f2b7b98913b3506b273501667f24cefb2b39af1258385db511  ./dist/release.json
+616e2053598791e28a0352e24f3bcd469dddc27989f4ea8e092c4da09ee2f1cf  ./dist/release.json
 331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1  ./dist/robots.txt
 fda3b08330101811ac5bc026b2033f0fbd6d2de4e1eb0e38cc04a9437c950e4c  ./scripts/cpanel-deploy.sh
 ed9eeea17afe42709f98ee5d243c2d38162e7d0bae73cf321d6022cb4b79b280  ./scripts/cpanel-rollback-dashboard.sh
