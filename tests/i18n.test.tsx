@@ -142,6 +142,11 @@ test("B2B application and its permissions are localized in both languages, never
     ["b2b.orders.create", "b2b", "Creare comenzi B2B"],
     ["b2b.orders.update", "b2b", "Editare ciorne B2B"],
     ["b2b.orders.manage_status", "b2b", "Finalizare comenzi B2B"],
+    ["b2b.accounts.view", "b2b", "Vizualizare conturi curente B2B"],
+    ["b2b.accounts.record_payment", "b2b", "Înregistrare plăți B2B"],
+    ["b2b.accounts.adjust", "b2b", "Ajustări cont curent B2B"],
+    ["b2b.accounts.reverse", "b2b", "Stornare mișcări cont curent B2B"],
+    ["b2b.accounts.export", "b2b", "Export extras de cont B2B"],
   ] as const;
   const catalog = b2b.filter(([key]) => key !== "b2b.access").map(([key, category, label]) => permission({ key, category, label }));
   const tr = text(render("tr", <RoleEditor id={9} existing={role({ id: 9, name: "Vânzări B2B", permissions: ["b2b.companies.view"] })} catalog={catalog} saved={false} onSaved={() => undefined} />));
@@ -150,6 +155,8 @@ test("B2B application and its permissions are localized in both languages, never
   const ro = text(render("ro", <RoleEditor id={9} existing={role({ id: 9, name: "Vânzări B2B", permissions: [] })} catalog={catalog} saved={false} onSaved={() => undefined} />));
   for (const label of ["B2B Siparişlerini Görüntüle", "B2B Siparişi Oluştur", "B2B Taslaklarını Düzenle", "B2B Sipariş Durumunu Yönet", "b2b.orders.manage_status"]) assert.ok(tr.includes(label), label);
   for (const label of ["Vizualizare comenzi B2B", "Creare comenzi B2B", "Editare ciorne B2B", "Finalizare/anulare comenzi B2B"]) assert.ok(ro.includes(label), label);
+  for (const label of ["B2B Cari Hesapları Görüntüle", "B2B Ödeme Kaydet", "B2B Cari Hesap Düzeltmeleri", "B2B Cari Hareketlerini Ters Çevir", "B2B Hesap Ekstresi Dışa Aktar"]) assert.ok(tr.includes(label), label);
+  for (const label of ["Vizualizare conturi curente B2B", "Înregistrare plăți B2B", "Ajustări cont curent B2B", "Stornare mișcări cont curent B2B", "Export extras de cont B2B"]) assert.ok(ro.includes(label), label);
   assert.ok(MESSAGES.ro.catalog.permissions["b2b.orders.manage_status"].description.includes("anulează"));
   assert.ok(MESSAGES.tr.catalog.permissions["b2b.orders.manage_status"].description.includes("iptal"));
   for (const label of ["B2B (vânzări en-gros)", "Vizualizare companii B2B", "Activare/dezactivare companii B2B"]) assert.ok(ro.includes(label), label);
