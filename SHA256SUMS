@@ -1,10 +1,10 @@
 59b2db21acfb23ed76d138f5aa9811175eaccb695daa7c836cd61b835409869f  ./.cpanel.yml
 67cca55d2b6989e36a83e88f29f6df0082edcd3fa62943acc8779d70036ace94  ./dist/.htaccess
-b2f0bad2250cb03326d024f8821eceea5f5319ff2af427de1249f0f1a3b58bec  ./dist/assets/index-DNLuG4yk.js
+79d4b0306aa0fcbf2905daf2d981141d5d5ee1d70c7b549fd4b62453814c99b3  ./dist/assets/index-DEdgPiei.js
 6d936229697debca4917ce18971a87c0482a04f177e8b124698b1d5516eee780  ./dist/assets/index-PXzD4TO5.css
 3bb1c84671b4dd5299b3b0f9d37d6b100f404b2035334958360c17ece528a0a9  ./dist/favicon.svg
-4fd40dd33800aa2979ae48a1bcf921e1354c220de682ba6d0b9e47a321c858ab  ./dist/index.html
-616e2053598791e28a0352e24f3bcd469dddc27989f4ea8e092c4da09ee2f1cf  ./dist/release.json
+bf2ced91dbb9bba3e1de85a5d0a1618db49ca44efeb47496ca772900af1dd2e4  ./dist/index.html
+9b40790681d782e086d09403b8476a1227b02d7ab95a3bd7d4fbbd78213da428  ./dist/release.json
 331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1  ./dist/robots.txt
 fda3b08330101811ac5bc026b2033f0fbd6d2de4e1eb0e38cc04a9437c950e4c  ./scripts/cpanel-deploy.sh
 ed9eeea17afe42709f98ee5d243c2d38162e7d0bae73cf321d6022cb4b79b280  ./scripts/cpanel-rollback-dashboard.sh
