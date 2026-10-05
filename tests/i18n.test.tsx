@@ -42,6 +42,10 @@ function render(locale: Locale, node: React.ReactNode, profile: ManagementMe = m
 }
 
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&quot;/g, "\"").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+test('the shared production timeline labels explicit B2B submission in both languages', () => {
+  assert.equal(createTranslator('ro').productionAction('production_submitted'), 'A trimis comanda B2B în producție');
+  assert.equal(createTranslator('tr').productionAction('production_submitted'), 'B2B siparişini üretime gönderdi');
+});
 const ROMANIAN_UI = /Angajați|Departament(e|ul)?\b|Roluri|Salvează|Anulează|Revizuiește|Parol[ăa]|Aplicații|Reîncearcă|Se încarcă|Ieși din cont|Funcție|Utilizator\b/;
 const stages = [
   { id: "material-preparation", ordinal: 2, label: "Pregătire material" },
@@ -139,6 +143,8 @@ test("B2B application and its permissions are localized in both languages, never
     ["b2b.companies.update", "b2b", "Editare companii B2B"],
     ["b2b.companies.manage_status", "b2b", "Activare/dezactivare companii B2B"],
     ["b2b.orders.view", "b2b", "Vizualizare comenzi B2B"],
+    ["b2b.production.view", "b2b", "Vizualizare producție B2B"],
+    ["b2b.production.submit", "b2b", "Trimitere comenzi B2B în producție"],
     ["b2b.orders.create", "b2b", "Creare comenzi B2B"],
     ["b2b.orders.update", "b2b", "Editare ciorne B2B"],
     ["b2b.orders.manage_status", "b2b", "Finalizare comenzi B2B"],

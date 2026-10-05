@@ -8,6 +8,10 @@ Central management console (`https://dashboard.arasyahome.ro`) for the Arasya id
 - Screens: Panou de control, Comenzi, Angajați, Roluri și permisiuni, Departamente, Aplicații, Audit, Sistem.
 - Authorization changes are reviewed in a confirmation dialog before anything is written. The protected root identity (`arasya.root.owner`) is read-only in the UI; the API enforces this independently (`ROOT_PROTECTED`).
 
+## B2B production permissions (0.5.4)
+
+Operations API 2.11.0 / additive migration 012 registers `b2b.production.view` and `b2b.production.submit`. Dashboard labels and descriptions are complete in RO/TR and clearly distinguish reading progress/submitting a finalized order from operating production. No role receives these automatically; B2B application access remains a separate assignment. The shared production timeline also translates the `production_submitted` event. No IAM architecture or source-integration change.
+
 ## B2B current account permissions (0.5.3)
 
 Romanian and Turkish labels for the five current account permissions of Operations API 2.10.0 / migration 011: view, record payment (and allocate), adjust (opening balances and adjustments), reverse, and export statements. They are granted explicitly through the existing role editor; migration 011 grants no role. The Dashboard shows no account data.
