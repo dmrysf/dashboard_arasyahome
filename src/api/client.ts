@@ -1,4 +1,5 @@
 import type {
+  DocumentLookupItem, OrderDocuments, RevisionRequest,
   Application, AuditPage, Department, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
 } from "./types";
 import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
@@ -191,6 +192,13 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     setWorkingHours: (days: WorkingDay[], idempotencyKey: string) => request<Organization>("/management/organization/working-hours", { method: "PUT", body: { days }, idempotencyKey }),
     assignResponsibility: (body: { responsibility: string; employeeId: string; startsAt?: string | null; endsAt?: string | null; note?: string | null }, idempotencyKey: string) => request<Organization>("/management/organization/responsibilities", { method: "POST", body, idempotencyKey }),
     revokeResponsibility: (id: string, reason: string | null, idempotencyKey: string) => request<Organization>(`/management/organization/responsibilities/${encodeURIComponent(id)}/revoke`, { method: "POST", body: reason ? { reason } : {}, idempotencyKey }),
+    // Production document revisions: the central approval of new workshop documents and QR codes.
+    documentRequests: (view: "pending" | "history", signal?: AbortSignal) => request<{ items: RevisionRequest[]; pendingCount: number }>("/production-documents/revision-requests", { query: { view }, signal }),
+    documentRequest: (id: string, signal?: AbortSignal) => request<RevisionRequest>(`/production-documents/revision-requests/${encodeURIComponent(id)}`, { signal }),
+    decideDocumentRequest: (id: string, body: { expectedVersion: number; decision: "approve" | "reject"; comment?: string }, idempotencyKey: string) => request<RevisionRequest>(`/production-documents/revision-requests/${encodeURIComponent(id)}/decision`, { method: "POST", body, idempotencyKey }),
+    orderDocuments: (globalOrderId: string, afterEvent?: number, signal?: AbortSignal) => request<OrderDocuments>(`/production-documents/orders/${encodeURIComponent(globalOrderId)}`, { query: afterEvent ? { afterEvent: String(afterEvent) } : {}, signal }),
+    documentLookup: (number: string) => request<{ items: DocumentLookupItem[] }>("/production-documents/lookup", { query: { number } }),
+    revokeDocument: (globalOrderId: string, body: { expectedDocumentVersion: number; reason: string }, idempotencyKey: string) => request<OrderDocuments>(`/production-documents/orders/${encodeURIComponent(globalOrderId)}/revoke`, { method: "POST", body, idempotencyKey }),
     productionSettings: () => request<ProductionSettings>("/management/production-settings"),
     createReason: (body: { key: string; label: string; requiresComment: boolean; sortOrder: number }, idempotencyKey: string) => request<ProductionSettings>("/management/production-settings/reasons", { method: "POST", body, idempotencyKey }),
     updateReason: (key: string, body: { label?: string; requiresComment?: boolean; status?: "active" | "inactive"; sortOrder?: number }, idempotencyKey: string) => request<ProductionSettings>(`/management/production-settings/reasons/${encodeURIComponent(key)}`, { method: "PATCH", body, idempotencyKey }),

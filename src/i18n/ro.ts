@@ -4,8 +4,10 @@
  * actions) are only lookup keys here; they are never translated or sent back to the server.
  */
 import { analyticsRo } from "./analytics";
+import { documentsRo } from "./documents";
 export const ro = {
   analytics: analyticsRo,
+  documents: documentsRo,
   locale: { short: "RO", name: "Română", switcher: "Limba interfeței" },
   brand: { product: "Panou de control", title: "Arasya · Panou de control", notConfigured: "Panoul de control nu este configurat." },
   common: {
@@ -95,6 +97,9 @@ export const ro = {
     organization: "Organizație",
     productionSettings: "Setări producție",
     displayDevices: "Dispozitive de afișare",
+    documentRevisions: "Revizii documente",
+    documentHistory: "Istoricul aprobărilor",
+    documents: "Documente de producție",
   },
   overview: {
     title: "Panou de control",
@@ -707,6 +712,12 @@ export const ro = {
     INVALID_IDEMPOTENCY_KEY: "Cererea nu a putut fi identificată. Reîncearcă.",
     SOURCE_STAGE_UNKNOWN: "Etapa comenzii nu face parte din fluxul de producție activ.",
     EXCEPTION_ALREADY_RESOLVED: "Cererea a fost deja rezolvată de alt manager.",
+    DOCUMENT_REQUEST_RESOLVED: "Cererea de revizie a fost deja soluționată.",
+    DOCUMENT_REQUEST_CHANGED: "Cererea de revizie s-a schimbat. Reîncarcă pagina.",
+    DOCUMENT_CONTENT_CHANGED: "Comanda s-a schimbat din nou după cerere. Este necesară o nouă cerere de revizie.",
+    DOCUMENT_CHANGED: "Documentul s-a schimbat. Reîncarcă pagina.",
+    DOCUMENT_NOT_ACTIVE: "Comanda nu are un document activ.",
+    DOCUMENT_REQUEST_NOT_FOUND: "Cererea de revizie nu a fost găsită.",
     EXCEPTION_CHANGED: "Cererea s-a modificat între timp. Datele au fost reîncărcate.",
     EXCEPTION_STATE_INVALID: "Cererea nu mai permite această acțiune.",
     EXCEPTION_NOT_FOUND: "Cererea nu a fost găsită.",
@@ -830,7 +841,7 @@ export const ro = {
     choose: "Alege angajatul",
     responsibilities: "Responsabilități",
     responsibility: "Responsabilitate",
-    kinds: { tailoring_intake_responsible: "Responsabil Primire Croitorie", operations_backup_approver: "Înlocuitor temporar Manager operațional" } as Record<string, string>,
+    kinds: { tailoring_intake_responsible: "Responsabil Primire Croitorie", operations_backup_approver: "Înlocuitor temporar Manager operațional", document_revision_backup_approver: "Înlocuitor temporar aprobare revizii documente" } as Record<string, string>,
     assign: "Atribuie",
     startsAt: "Început",
     endsAt: "Sfârșit",

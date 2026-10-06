@@ -23,6 +23,9 @@ export type Route =
   | { name: "production-settings" }
   | { name: "display-devices" }
   | { name: "transfer"; id: string }
+  | { name: "document-revisions"; view: "pending" | "history" }
+  | { name: "document-revision"; id: string }
+  | { name: "documents"; id?: string }
   | { name: "not-found" };
 
 export function parseRoute(pathname: string): Route {
@@ -64,6 +67,15 @@ export function parseRoute(pathname: string): Route {
   const lookup = /^\/cauta-comanda\/([^/]{1,600})$/.exec(path);
   if (lookup) {
     try { return { name: "order-lookup", id: decodeURIComponent(lookup[1]) }; } catch { return { name: "not-found" }; }
+  }
+  if (path === "/revizii-documente") return { name: "document-revisions", view: "pending" };
+  if (path === "/revizii-documente/istoric") return { name: "document-revisions", view: "history" };
+  const revisionRequest = /^\/revizii-documente\/cerere\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(path);
+  if (revisionRequest) return { name: "document-revision", id: revisionRequest[1] };
+  if (path === "/documente") return { name: "documents" };
+  const documents = /^\/documente\/([^/]{1,600})$/.exec(path);
+  if (documents) {
+    try { return { name: "documents", id: decodeURIComponent(documents[1]) }; } catch { return { name: "not-found" }; }
   }
   if (path === "/organizatie") return { name: "organization" };
   if (path === "/setari-productie") return { name: "production-settings" };

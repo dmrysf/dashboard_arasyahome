@@ -2,8 +2,10 @@ import type { Messages } from "./ro";
 
 /** Turkish interface text. It must match the Romanian reference shape exactly. */
 import { analyticsTr } from "./analytics";
+import { documentsTr } from "./documents";
 export const tr: Messages = {
   analytics: analyticsTr,
+  documents: documentsTr,
   locale: { short: "TR", name: "Türkçe", switcher: "Arayüz dili" },
   brand: { product: "Yönetim Paneli", title: "Arasya · Yönetim Paneli", notConfigured: "Yönetim Paneli yapılandırılmamış." },
   common: {
@@ -93,6 +95,9 @@ export const tr: Messages = {
     organization: "Organizasyon",
     productionSettings: "Üretim Ayarları",
     displayDevices: "Ekran Cihazları",
+    documentRevisions: "Belge revizyonları",
+    documentHistory: "Onay geçmişi",
+    documents: "Üretim belgeleri",
   },
   overview: {
     title: "Yönetim Paneli",
@@ -705,6 +710,12 @@ export const tr: Messages = {
     INVALID_IDEMPOTENCY_KEY: "İstek tanımlanamadı. Tekrar deneyin.",
     SOURCE_STAGE_UNKNOWN: "Siparişin aşaması aktif üretim akışının parçası değil.",
     EXCEPTION_ALREADY_RESOLVED: "Talep başka bir yönetici tarafından zaten sonuçlandırıldı.",
+    DOCUMENT_REQUEST_RESOLVED: "Revizyon talebi zaten sonuçlandırıldı.",
+    DOCUMENT_REQUEST_CHANGED: "Revizyon talebi değişti. Sayfayı yenileyin.",
+    DOCUMENT_CONTENT_CHANGED: "Sipariş talepten sonra yine değişti. Yeni bir revizyon talebi gerekli.",
+    DOCUMENT_CHANGED: "Belge değişti. Sayfayı yenileyin.",
+    DOCUMENT_NOT_ACTIVE: "Siparişin aktif belgesi yok.",
+    DOCUMENT_REQUEST_NOT_FOUND: "Revizyon talebi bulunamadı.",
     EXCEPTION_CHANGED: "Talep bu arada değişti. Veriler yenilendi.",
     EXCEPTION_STATE_INVALID: "Talep artık bu işleme izin vermiyor.",
     EXCEPTION_NOT_FOUND: "Talep bulunamadı.",
@@ -828,7 +839,7 @@ export const tr: Messages = {
     choose: "Çalışanı seçin",
     responsibilities: "Sorumluluklar",
     responsibility: "Sorumluluk",
-    kinds: { tailoring_intake_responsible: "Terzi Kabul Sorumlusu", operations_backup_approver: "Operasyon Müdürü geçici vekili" } as Record<string, string>,
+    kinds: { tailoring_intake_responsible: "Terzi Kabul Sorumlusu", operations_backup_approver: "Operasyon Müdürü geçici vekili", document_revision_backup_approver: "Belge revizyonu onayı geçici vekili" } as Record<string, string>,
     assign: "Ata",
     startsAt: "Başlangıç",
     endsAt: "Bitiş",

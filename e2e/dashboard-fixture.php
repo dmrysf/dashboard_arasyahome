@@ -122,6 +122,21 @@ $container->employeeAdmin()->create('Oprea Doina', 'oprea.intake.e2e', null, 'pr
 // The cutting-fault orders are created by the approvals spec itself (it runs last), so the production
 // overview figures asserted by the earlier specs stay unchanged.
 
+// Production documents: the primary revision approver, a CEO-appointed temporary backup (active window)
+// and a channel requester. Test-database grants only, as for the managers above.
+$documentPeople = [];
+foreach (['sinem.doc.e2e' => ['Sinem Yetiș', 'document-revision-approver'], 'backup.doc.e2e' => ['Bogdan Înlocuitor', null], 'online.doc.e2e' => ['Ioana Online', 'production-documents-operator']] as $username => [$name, $roleKey]) {
+    $person = $container->employeeAdmin()->create($name, $username, null, 'pregatire-material', 'employee', $exceptionPassword, [], 'e2e');
+    $pdo->prepare('DELETE FROM employee_application_access WHERE employee_uuid = ?')->execute([$person->employeeUuid]);
+    $pdo->prepare("INSERT INTO employee_application_access (employee_uuid, application_key, granted_at) VALUES (?, 'dashboard', UTC_TIMESTAMP(6))")->execute([$person->employeeUuid]);
+    if ($roleKey !== null) {
+        $pdo->prepare('INSERT INTO employee_role_assignments (employee_uuid, role_id, assigned_at) SELECT ?, role_id, UTC_TIMESTAMP(6) FROM roles WHERE role_key = ?')->execute([$person->employeeUuid, $roleKey]);
+    }
+    $documentPeople[$username] = $person->employeeUuid;
+}
+$pdo->prepare("INSERT INTO responsibility_assignments (assignment_uuid, responsibility_key, employee_uuid, starts_at, ends_at, note, created_at, created_by_employee_uuid)
+    VALUES (UUID(), 'document_revision_backup_approver', ?, UTC_TIMESTAMP(6) - INTERVAL 1 HOUR, UTC_TIMESTAMP(6) + INTERVAL 10 DAY, 'E2E backup', UTC_TIMESTAMP(6), ?)")->execute([$documentPeople['backup.doc.e2e'], $rootId]);
+
 // OutletPerdele last spoke 30 minutes ago (stale); Trendhome just now (healthy); Trendyol has no credentials.
 $analyticsReader=$container->employeeAdmin()->create('YETIS SINEM · Analiză test','sinem.analytics.e2e',null,'conducere','employee',$exceptionPassword,[],'e2e');
 $analyticsRole=(int)$pdo->query("SELECT role_id FROM roles WHERE role_key='analytics-reader'")->fetchColumn();
@@ -138,6 +153,7 @@ echo json_encode([
         'worker' => ['username' => 'mehmet.control.e2e', 'password' => 'control e2e passphrase 2026', 'name' => 'Mehmet Atölye'],
         'second' => ['username' => 'ali.control.e2e', 'password' => 'control e2e passphrase 2026', 'name' => 'Ali Demir'],
     ],
+    'documents' => ['approver' => 'sinem.doc.e2e', 'backup' => 'backup.doc.e2e', 'requester' => 'online.doc.e2e', 'password' => $exceptionPassword],
     'exceptions' => [
         'password' => $exceptionPassword,
         'managers' => $managers,

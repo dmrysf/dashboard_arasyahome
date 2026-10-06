@@ -35,7 +35,33 @@ export type Capabilities = {
   cancelExceptions: boolean;
   viewAnalytics?: boolean;
   manageAnalyticsPolicy?: boolean;
+  /** Production document revisions: primary approver or the CEO's scoped temporary backup. */
+  approveDocumentRevisions?: boolean;
+  documentRevisionViaBackup?: boolean;
+  viewDocumentHistory?: boolean;
+  revokeDocuments?: boolean;
 };
+
+export type DocumentChange = { field: string; line: number | null; before: string | null; after: string | null };
+export type RevisionRequestStatus = "pending" | "approved" | "rejected" | "superseded" | "generated" | "cancelled";
+/** A production document revision request with its exact, money-free production diff. */
+export type RevisionRequest = {
+  id: string; status: RevisionRequestStatus; version: number;
+  order: { id: string; number: string; source: string; stageId: string; stageLabel: string | null; ownerName: string | null; documentStatus: string; completed: boolean };
+  baseRevision: { number: number; status: "active" | "superseded" | "revoked" }; targetRevision: number; productionStarted: boolean; stageAtRequest: string;
+  requestedBy: string; requestedById: string; requestedAt: string; comment: string | null; changes: DocumentChange[]; changeCount?: number;
+  decidedBy: string | null; decidedVia: string | null; decisionComment: string | null; decidedAt: string | null; resolvedAt: string | null; resolvedBy: string | null; resolutionNote: string | null;
+  previousRequest: { id: string; status: RevisionRequestStatus; decisionComment: string | null; decidedAt: string | null } | null;
+};
+export type DocumentRevision = { id: string; number: number; status: "active" | "superseded" | "revoked"; qrHint: string; generatedAt: string; generatedBy: string; approvedBy: string | null; approvedAt: string | null;
+  staleAt: string | null; supersededAt: string | null; revokedAt: string | null; revokedBy: string | null; revokeReason: string | null; prints: number; lastPrintedAt: string | null };
+export type DocumentEvent = { seq: number; type: string; revisionNumber: number | null; requestId: string | null; actorName: string | null; occurredAt: string; details: Record<string, unknown> | null };
+export type OrderDocuments = {
+  order: { id: string; number: string; source: string; stageId: string; stageLabel: string | null; ownerName: string | null; completed: boolean; unavailable: boolean };
+  status: "none" | "active" | "stale" | "revoked"; version: number; activeRevision: DocumentRevision | null; latestRevisionNumber: number | null;
+  request: RevisionRequest | null; revisions: DocumentRevision[]; history?: DocumentEvent[]; nextHistoryCursor?: number | null;
+};
+export type DocumentLookupItem = { orderId: string; orderNumber: string; source: string; documentStatus: string; revisionNumber: number | null };
 
 export type ExceptionStatus = "awaiting_acknowledgment" | "awaiting_approval" | "approved" | "rejected" | "cancelled";
 
@@ -79,7 +105,7 @@ export type LookupDetail = {
 export type WorkingDay = { weekday: number; isOpen: boolean; opensAt: string | null; closesAt: string | null };
 
 export type Responsibility = {
-  id: string; responsibility: "tailoring_intake_responsible" | "operations_backup_approver"; employee: { id: string; displayName: string };
+  id: string; responsibility: "tailoring_intake_responsible" | "operations_backup_approver" | "document_revision_backup_approver"; employee: { id: string; displayName: string };
   startsAt: string; endsAt: string | null; note: string | null; createdAt: string; createdBy: string; revokedAt: string | null; revokedBy: string | null; revokeReason: string | null;
   state: "active" | "scheduled" | "ended" | "revoked";
 };

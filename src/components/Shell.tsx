@@ -18,6 +18,9 @@ export const NAVIGATION: NavItem[] = [
   { path: "/aprobari", label: "approvals", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari" || path.startsWith("/aprobari/cerere/") || path.startsWith("/aprobari/transfer/") },
   { path: "/aprobari/in-asteptare", label: "waiting", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari/in-asteptare" },
   { path: "/aprobari/istoric", label: "myApprovals", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari/istoric" },
+  { path: "/revizii-documente", label: "documentRevisions", visible: (me) => Boolean(me.capabilities?.approveDocumentRevisions), match: (path) => path === "/revizii-documente" || path.startsWith("/revizii-documente/cerere/") },
+  { path: "/revizii-documente/istoric", label: "documentHistory", visible: (me) => Boolean(me.capabilities?.approveDocumentRevisions), match: (path) => path === "/revizii-documente/istoric" },
+  { path: "/documente", label: "documents", visible: (me) => Boolean(me.capabilities?.viewDocumentHistory), match: (path) => path.startsWith("/documente") },
   { path: "/cauta-comanda", label: "orderSearch", visible: (me) => Boolean(me.capabilities?.lookupOrders), match: (path) => path.startsWith("/cauta-comanda") },
   { path: "/comenzi", label: "orders", visible: (_, can) => can("orders.view_all"), match: (path) => path.startsWith("/comenzi") },
   { path: "/angajati", label: "employees", visible: (_, can) => can("employees.view"), match: (path) => path.startsWith("/angajati") },
@@ -30,6 +33,20 @@ export const NAVIGATION: NavItem[] = [
   { path: "/audit", label: "audit", visible: (_, can) => can("iam.audit.view"), match: (path) => path.startsWith("/audit") },
   { path: "/sistem", label: "system", visible: (_, can) => can("system.view"), match: (path) => path.startsWith("/sistem") },
 ];
+
+/** Live count of document revision requests waiting for the revision approver. */
+function useRevisionCount(enabled: boolean): number | null {
+  const { api } = useDashboard();
+  const { revision } = useLive();
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const controller = new AbortController();
+    api.documentRequests("pending", controller.signal).then((page) => { if (!controller.signal.aborted) setCount(page.pendingCount); }, () => undefined);
+    return () => controller.abort();
+  }, [api, enabled, revision]);
+  return enabled ? count : null;
+}
 
 /** Live count of requests waiting for a manager decision, re-read on every live event. */
 function usePendingCount(enabled: boolean): number | null {
@@ -50,11 +67,12 @@ function LiveNotices() {
   const { t } = useI18n();
   const { last, connection } = useLive();
   const [dismissed, setDismissed] = useState(0);
-  const visible = last !== null && ["exception.approval_pending", "cutting.transfer.pending"].includes(last.type) && last.seq > dismissed;
+  const visible = last !== null && ["exception.approval_pending", "cutting.transfer.pending", "document.revision_requested"].includes(last.type) && last.seq > dismissed;
   return <>
     {connection === "reconnecting" && <p className="live-connection" role="status">{t.exceptions.reconnecting}</p>}
     {visible && <div className="live-notice" role="status" aria-live="assertive">
-      <span>{t.exceptions.newRequest(last.orderNumber ?? "")}</span>
+      <span>{last.type === "document.revision_requested" ? t.documents.newRequest(last.orderNumber ?? "", last.revisionNumber ?? 0) : t.exceptions.newRequest(last.orderNumber ?? "")}</span>
+      {last.type === "document.revision_requested" && last.requestId && <button type="button" className="button button-primary" onClick={() => { setDismissed(last.seq); navigate(`/revizii-documente/cerere/${last.requestId}`); }}>{t.documents.open}</button>}
       {last.exceptionId && <button type="button" className="button button-primary" onClick={() => { setDismissed(last.seq); navigate(`/aprobari/cerere/${last.exceptionId}`); }}>{t.exceptions.open}</button>}
       {last.transferId && <button type="button" className="button button-primary" onClick={() => { setDismissed(last.seq); navigate(`/aprobari/transfer/${last.transferId}`); }}>Deschide transferul</button>}
       <button type="button" className="button button-ghost" onClick={() => setDismissed(last.seq)}>{t.common.cancel}</button>
@@ -68,6 +86,7 @@ export function Shell({ pathname, onLogout, children }: { pathname: string; onLo
   const [open, setOpen] = useState(false);
   const items = NAVIGATION.filter((item) => item.visible(me, can));
   const pending = usePendingCount(Boolean(me.capabilities?.approveExceptions));
+  const revisions = useRevisionCount(Boolean(me.capabilities?.approveDocumentRevisions));
   return (
     <div className={`shell ${open ? "nav-open" : ""}`}>
       <aside className="sidebar">
@@ -76,7 +95,8 @@ export function Shell({ pathname, onLogout, children }: { pathname: string; onLo
           {items.map((item) => (
             <a key={item.path} href={item.path} className={item.match(pathname) ? "active" : ""} aria-current={item.match(pathname) ? "page" : undefined}
               onClick={(event) => { event.preventDefault(); setOpen(false); navigate(item.path); }}>{t.nav[item.label]}
-              {item.label === "approvals" && pending !== null && pending > 0 && <span className="nav-count" aria-label={t.exceptions.pendingCount(pending)}>{pending}</span>}</a>
+              {item.label === "approvals" && pending !== null && pending > 0 && <span className="nav-count" aria-label={t.exceptions.pendingCount(pending)}>{pending}</span>}
+              {item.label === "documentRevisions" && revisions !== null && revisions > 0 && <span className="nav-count" aria-label={t.documents.pendingCount(revisions)}>{revisions}</span>}</a>
           ))}
         </nav>
         <div className="sidebar-footer">

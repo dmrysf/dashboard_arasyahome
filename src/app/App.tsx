@@ -10,6 +10,7 @@ import { ProductionSettingsPage } from "../pages/ProductionSettingsPage";
 import { DisplayDevicesPage } from "../pages/DisplayDevicesPage";
 import { TransferDetailPage } from "../pages/CuttingTransfersPage";
 import { AnalyticsPage } from "../pages/AnalyticsPage";
+import { DocumentRevisionDetailPage, DocumentRevisionsPage, OrderDocumentsPage } from "../pages/DocumentRevisionsPage";
 import { useDashboard } from "./context";
 import { useI18n } from "../i18n/context";
 import { ChangePasswordPage, LoginPage, NoAccessPage } from "../pages/AuthPages";
@@ -88,8 +89,8 @@ export function App({ apiBaseUrl }: { apiBaseUrl: string }) {
 
   return (
     <DashboardContext.Provider value={context}>
-      {/* Only approvers consume live events in the Dashboard; nobody else opens the stream. */}
-      <LiveProvider api={api} enabled={Boolean(state.me.capabilities?.approveExceptions)}>
+      {/* Only approvers (exceptions or document revisions) consume live events; nobody else opens the stream. */}
+      <LiveProvider api={api} enabled={Boolean(state.me.capabilities?.approveExceptions || state.me.capabilities?.approveDocumentRevisions)}>
         <Shell pathname={pathname} onLogout={() => { void logout(); }}>{renderRoute(route)}</Shell>
       </LiveProvider>
     </DashboardContext.Provider>
@@ -122,6 +123,9 @@ function renderRoute(route: Route) {
     case "order-lookup": return <OrderLookupDetailPage key={route.id} id={route.id} />;
     case "organization": return <OrganizationPage />;
     case "production-settings": return <ProductionSettingsPage />;
+    case "document-revisions": return <DocumentRevisionsPage key={route.view} view={route.view} />;
+    case "document-revision": return <DocumentRevisionDetailPage key={route.id} id={route.id} />;
+    case "documents": return <OrderDocumentsPage key={route.id ?? "search"} id={route.id} />;
     case "orders": return <OrdersPage />;
     case "order": return <OrderDetailPage key={route.id} id={route.id} />;
     case "employees": return <EmployeesPage />;

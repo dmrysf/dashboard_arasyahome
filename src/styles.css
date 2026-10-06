@@ -427,3 +427,11 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
   .approval-detail .facts, .lookup-detail .facts { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
   .approval-detail .grid-2, .lookup-detail .grid-2 { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Production document revisions: readable diff that never overflows a phone screen. */
+.document-diff { width: 100%; table-layout: fixed; }
+.document-diff th, .document-diff td { overflow-wrap: anywhere; vertical-align: top; }
+.document-diff th:first-child, .document-diff td:first-child { width: 34%; }
+.document-diff .diff-before { color: var(--color-text-muted, #8a8f98); text-decoration: line-through; }
+.document-diff .diff-after strong { color: inherit; }
+.order-documents-page .inline-form, .document-revision-detail .facts dd { min-width: 0; overflow-wrap: anywhere; }
