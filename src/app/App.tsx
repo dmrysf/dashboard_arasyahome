@@ -85,7 +85,8 @@ export function App({ apiBaseUrl }: { apiBaseUrl: string }) {
 
   return (
     <DashboardContext.Provider value={context}>
-      <LiveProvider api={api} enabled>
+      {/* Only approvers consume live events in the Dashboard; nobody else opens the stream. */}
+      <LiveProvider api={api} enabled={Boolean(state.me.capabilities?.approveExceptions)}>
         <Shell pathname={pathname} onLogout={() => { void logout(); }}>{renderRoute(route)}</Shell>
       </LiveProvider>
     </DashboardContext.Provider>

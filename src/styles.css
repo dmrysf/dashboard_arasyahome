@@ -417,3 +417,13 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
   .hours-row, .stage-labels li { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .hours-row label, .stage-labels li span { grid-column: 1 / -1; }
 }
+/* Exception and lookup detail pages never widen the page on narrow phones: tables scroll inside their card. */
+.approval-detail .grid-2 > *, .lookup-detail .grid-2 > * { min-width: 0; }
+.approval-detail .card, .lookup-detail .card { min-width: 0; overflow-x: auto; }
+.approval-detail .page-header, .lookup-detail .page-header { flex-wrap: wrap; }
+.approval-detail .page-header h1, .lookup-detail .page-header h1, .approval-detail .page-header p, .lookup-detail .page-header p { overflow-wrap: anywhere; }
+.compact-table td, .facts dd { overflow-wrap: anywhere; }
+@media (max-width: 820px) {
+  .approval-detail .facts, .lookup-detail .facts { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  .approval-detail .grid-2, .lookup-detail .grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
