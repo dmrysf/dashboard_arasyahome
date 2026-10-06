@@ -14,7 +14,7 @@ export const canSeeOverview = (me: ManagementMe, can: (permission: string) => bo
 
 export const NAVIGATION: NavItem[] = [
   { path: "/", label: "overview", visible: canSeeOverview, match: (path) => path === "/" },
-  { path: "/aprobari", label: "approvals", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari" || path.startsWith("/aprobari/cerere/") },
+  { path: "/aprobari", label: "approvals", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari" || path.startsWith("/aprobari/cerere/") || path.startsWith("/aprobari/transfer/") },
   { path: "/aprobari/in-asteptare", label: "waiting", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari/in-asteptare" },
   { path: "/aprobari/istoric", label: "myApprovals", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari/istoric" },
   { path: "/cauta-comanda", label: "orderSearch", visible: (me) => Boolean(me.capabilities?.lookupOrders), match: (path) => path.startsWith("/cauta-comanda") },
@@ -25,6 +25,7 @@ export const NAVIGATION: NavItem[] = [
   { path: "/aplicatii", label: "applications", visible: (_, can) => can("applications.view"), match: (path) => path.startsWith("/aplicatii") },
   { path: "/organizatie", label: "organization", visible: (me) => Boolean(me.capabilities?.manageOrganization), match: (path) => path.startsWith("/organizatie") },
   { path: "/setari-productie", label: "productionSettings", visible: (me) => Boolean(me.capabilities?.manageProductionSettings), match: (path) => path.startsWith("/setari-productie") },
+  { path: "/dispozitive-afisare", label: "displayDevices", visible: (me) => me.isRoot, match: path => path === "/dispozitive-afisare" },
   { path: "/audit", label: "audit", visible: (_, can) => can("iam.audit.view"), match: (path) => path.startsWith("/audit") },
   { path: "/sistem", label: "system", visible: (_, can) => can("system.view"), match: (path) => path.startsWith("/sistem") },
 ];
@@ -37,7 +38,7 @@ function usePendingCount(enabled: boolean): number | null {
   useEffect(() => {
     if (!enabled) return undefined;
     const controller = new AbortController();
-    api.exceptions("pending", controller.signal).then((page) => { if (!controller.signal.aborted) setCount(page.items.length); }, () => undefined);
+    Promise.all([api.exceptions("pending", controller.signal), api.cuttingTransfers("pending", controller.signal)]).then(([page, transfers]) => { if (!controller.signal.aborted) setCount(page.items.length + transfers.items.length); }, () => undefined);
     return () => controller.abort();
   }, [api, enabled, revision]);
   return enabled ? count : null;
@@ -48,12 +49,13 @@ function LiveNotices() {
   const { t } = useI18n();
   const { last, connection } = useLive();
   const [dismissed, setDismissed] = useState(0);
-  const visible = last !== null && last.type === "exception.approval_pending" && last.seq > dismissed;
+  const visible = last !== null && ["exception.approval_pending", "cutting.transfer.pending"].includes(last.type) && last.seq > dismissed;
   return <>
     {connection === "reconnecting" && <p className="live-connection" role="status">{t.exceptions.reconnecting}</p>}
     {visible && <div className="live-notice" role="status" aria-live="assertive">
       <span>{t.exceptions.newRequest(last.orderNumber ?? "")}</span>
       {last.exceptionId && <button type="button" className="button button-primary" onClick={() => { setDismissed(last.seq); navigate(`/aprobari/cerere/${last.exceptionId}`); }}>{t.exceptions.open}</button>}
+      {last.transferId && <button type="button" className="button button-primary" onClick={() => { setDismissed(last.seq); navigate(`/aprobari/transfer/${last.transferId}`); }}>Deschide transferul</button>}
       <button type="button" className="button button-ghost" onClick={() => setDismissed(last.seq)}>{t.common.cancel}</button>
     </div>}
   </>;

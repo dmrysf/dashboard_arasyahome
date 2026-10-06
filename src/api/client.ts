@@ -1,6 +1,7 @@
 import type {
   Application, AuditPage, Department, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
 } from "./types";
+import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
 
 /**
  * A fresh Idempotency-Key for one user-confirmed mutation. Reusing it for a retry of the same submission lets
@@ -115,6 +116,15 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
 
   return {
     onSessionProblem(listener: Listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    cuttingTransfers: (view: "pending" | "waiting" | "mine", signal?: AbortSignal) => request<{ items: CuttingTransfer[] }>("/management/cutting/transfers", { query: { view }, signal }),
+    cuttingTransfer: (id: string, signal?: AbortSignal) => request<CuttingTransfer>(`/management/cutting/transfers/${encodeURIComponent(id)}`, { signal }),
+    decideTransfer: (id: string, body: { expectedVersion: number; decision: "approve" | "reject"; comment?: string }, key: string) => request<CuttingTransfer>(`/management/cutting/transfers/${encodeURIComponent(id)}/decision`, { method: "POST", body, idempotencyKey: key }),
+    cancelTransfer: (id: string, expectedVersion: number, comment: string, key: string) => request<CuttingTransfer>(`/management/cutting/transfers/${encodeURIComponent(id)}/cancel`, { method: "POST", body: { expectedVersion, comment }, idempotencyKey: key }),
+    displayDevices: (signal?: AbortSignal) => request<{ items: DisplayDevice[]; settings: DisplaySettings }>("/management/cutting/devices", { signal }),
+    createDisplay: (name: string, key: string) => request<DisplayPairing>("/management/cutting/devices", { method: "POST", body: { name }, idempotencyKey: key }),
+    repairDisplay: (id: string, key: string) => request<DisplayPairing>(`/management/cutting/devices/${encodeURIComponent(id)}/re-pair`, { method: "POST", body: { confirmed: true }, idempotencyKey: key }),
+    revokeDisplay: (id: string, key: string) => request<{ revoked: boolean }>(`/management/cutting/devices/${encodeURIComponent(id)}/revoke`, { method: "POST", body: { confirmed: true }, idempotencyKey: key }),
+    displayThresholds: (expectedVersion: number, thresholds: number[], key: string) => request<DisplaySettings>("/management/cutting/thresholds", { method: "PUT", body: { expectedVersion, thresholds }, idempotencyKey: key }),
     async getSession(): Promise<Session | null> {
       try { return await withSession(request("/auth/session")); }
       catch (error) {

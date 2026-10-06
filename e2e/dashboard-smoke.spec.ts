@@ -55,7 +55,7 @@ test("employee filters, creation and the one-time temporary password", async ({ 
   await page.getByLabel("Nume complet").fill("Test Angajat IAM");
   await page.getByLabel("Nume utilizator").fill("test.angajat.iam");
   await page.getByLabel("Departament").selectOption({ label: "Producție" });
-  await page.getByLabel("Pregătire material").check();
+  await page.getByLabel("Tăiere").check();
   await page.getByRole("button", { name: "Creează angajatul" }).click();
   await expect(page.getByTestId("one-time-secret")).toHaveText("Tmp-Smoke-0123456789");
   await expect(page.getByText("Parola temporară este afișată o singură dată.")).toBeVisible();
@@ -146,7 +146,7 @@ test("the interface switches between Romanian and Turkish, remembers the choice 
   await expect(page.getByRole("cell", { name: "Producție" }).first()).toBeVisible(); // business data stays as stored
   await page.getByRole("link", { name: "Ion Popescu" }).click();
   await expect(page.getByRole("heading", { name: "Uygulama Erişimleri" })).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: /Malzeme Hazırlığı/ })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /Kesim/ })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /Confecționare/ })).toBeVisible(); // unknown stage IDs keep the server label
 
   await nav.getByRole("link", { name: "Roller ve Yetkiler" }).click();
@@ -300,10 +300,10 @@ test("orders: server filters and cursor pages, detail with separate store and pr
 
   // A Staff employee claims and completes the stage; the open detail follows within one polling interval.
   api.control.owner = { id: "e-mehmet", displayName: "Mehmet Atölye" };
-  api.control.stage = { id: "material-preparation", label: "Pregătire material", ordinal: 2 };
+  api.control.stage = { id: "material-preparation", label: "Tăiere", ordinal: 2 };
   await expect(page.getByRole("button", { name: "Actualizează" })).toBeEnabled();
   await page.clock.runFor(46_000);
-  await expect(page.locator('[data-section="production"] [data-kind="production"]')).toHaveText(/Pregătire material/);
+  await expect(page.locator('[data-section="production"] [data-kind="production"]')).toHaveText(/Tăiere/);
   await expect(page.locator('[data-section="production"]')).toContainText("Mehmet Atölye");
   await expect(page.locator('[data-event="claimed"]')).toContainText("Mehmet Atölye");
   await expect(page.locator('[data-section="commerce"]')).toContainText("Se procesează");
@@ -316,7 +316,7 @@ test("orders: server filters and cursor pages, detail with separate store and pr
 
   await page.getByRole("button", { name: "TR — Türkçe" }).click();
   await expect(page.getByRole("heading", { name: "Arasya Üretimi" })).toBeVisible();
-  await expect(page.locator('[data-section="production"] [data-kind="production"]')).toHaveText(/Malzeme Hazırlığı/);
+  await expect(page.locator('[data-section="production"] [data-kind="production"]')).toHaveText(/Kesim/);
   await page.getByRole("button", { name: "← Siparişler" }).click();
   await expect(page.getByRole("columnheader", { name: "Üretim Aşaması" })).toBeVisible();
 
@@ -391,7 +391,7 @@ test("production control: a supervisor reassigns and releases the owner; stage a
   await page.getByRole("dialog").getByRole("radio", { name: "Cem Kaya" }).check();
   await page.getByRole("dialog").getByRole("button", { name: "Confirmă schimbarea" }).click();
   await expect(control.getByRole("status")).toHaveText("Comanda s-a schimbat între timp, de exemplu în Staff. Datele au fost reîncărcate. Verifică-le și încearcă din nou.");
-  await expect(stageChip).toHaveText(/Pregătire material/);
+  await expect(stageChip).toHaveText(/Tăiere/);
   await expect(control).toContainText("Fără responsabil");
 
   // Turkish and phone.

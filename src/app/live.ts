@@ -1,4 +1,4 @@
-export type LiveEvent = { seq: number; type: string; exceptionId?: string; orderId?: string; orderNumber?: string; status?: string; decidedBy?: string };
+export type LiveEvent = { seq: number; type: string; exceptionId?: string; transferId?: string; orderId?: string; orderNumber?: string; status?: string; decidedBy?: string };
 type Frame = { event: string; id: number | null; data: Record<string, unknown> };
 
 /** Parses a complete text/event-stream body; malformed data lines are skipped. */
@@ -47,6 +47,7 @@ export function startLive(options: LiveOptions): () => void {
   let cursor: number | null = null;
   let lastDelivered = 0;
   let failures = 0;
+  let bootstrapped = false;
   void (async () => {
     while (!controller.signal.aborted) {
       try {
@@ -62,9 +63,10 @@ export function startLive(options: LiveOptions): () => void {
           if (frame.id === null || frame.id <= lastDelivered) continue;
           lastDelivered = frame.id;
           const text = (key: string) => (typeof frame.data[key] === "string" ? frame.data[key] as string : undefined);
-          options.onEvent({ seq: frame.id, type: frame.event, exceptionId: text("exceptionId"), orderId: text("orderId"), orderNumber: text("orderNumber"), status: text("status"), decidedBy: text("decidedBy") });
+          options.onEvent({ seq: frame.id, type: frame.event, exceptionId: text("exceptionId"), transferId: text("transferId"), orderId: text("orderId"), orderNumber: text("orderNumber"), status: text("status"), decidedBy: text("decidedBy") });
         }
-        if (failures > 0) options.onState?.("connected");
+        if (failures > 0 || !bootstrapped) options.onState?.("connected");
+        bootstrapped = true;
         failures = 0;
         await sleep(visible() ? 2_500 : 15_000, controller.signal);
       } catch {

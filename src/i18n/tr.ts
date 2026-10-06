@@ -89,6 +89,7 @@ export const tr: Messages = {
     orderSearch: "Sipariş Ara",
     organization: "Organizasyon",
     productionSettings: "Üretim Ayarları",
+    displayDevices: "Ekran Cihazları",
   },
   overview: {
     title: "Yönetim Paneli",
@@ -944,7 +945,7 @@ export const tr: Messages = {
     },
     stages: {
       waiting: "Bekliyor",
-      "material-preparation": "Malzeme Hazırlığı",
+      "material-preparation": "Kesim",
       "workshop-receiving": "Atölye Kabul",
       labeling: "Etiketleme",
       "material-straightening": "Kumaş Düzeltme",

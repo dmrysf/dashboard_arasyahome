@@ -7,6 +7,7 @@ import { useLive } from "../app/liveContext";
 import { Badge, Card, ConfirmDialog, EmptyState, ErrorBanner, ErrorText, Field, Loading, Notice, PageHeader } from "../components/ui";
 import { toProblem, type Problem } from "../i18n";
 import { useI18n } from "../i18n/context";
+import { TransferQueue } from "./CuttingTransfersPage";
 
 export type ApprovalView = "pending" | "waiting" | "mine";
 
@@ -29,6 +30,7 @@ export function ApprovalsPage({ view }: { view: ApprovalView }) {
     <div className="page approvals-page">
       <PageHeader title={title} description={hint} />
       {me.capabilities.approvalViaBackup && <Notice tone="warning">{x.backupNotice}</Notice>}
+      <TransferQueue view={view} />
       {error && <ErrorBanner error={error} onRetry={reload} />}
       {!data && !error && <Loading />}
       {data && data.items.length === 0 && <EmptyState title={x.empty} />}

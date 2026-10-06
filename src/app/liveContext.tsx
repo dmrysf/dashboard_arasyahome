@@ -13,7 +13,7 @@ export function LiveProvider({ api, enabled, children }: { api: DashboardApi; en
     return startLive({
       fetchBatch: (after, signal) => api.liveEvents(after, signal),
       onEvent: (event) => setState((current) => ({ ...current, revision: current.revision + 1, last: event })),
-      onState: (connection) => setState((current) => ({ ...current, connection })),
+      onState: (connection) => setState((current) => ({ ...current, connection, revision: connection === "connected" ? current.revision + 1 : current.revision })),
     });
   }, [api, enabled]);
   return <LiveContext.Provider value={state}>{children}</LiveContext.Provider>;

@@ -43,7 +43,8 @@ async function pendingRequest(number: string) {
   const cutter = await staff(fixture.exceptions.cutter);
   const intake = await staff(fixture.exceptions.intake);
   const id = encodeURIComponent(`trendhome:${number}`);
-  await cutter.post(`/orders/${id}/claim`, { expectedVersion: 1 });
+  const pool=await (await cutter.context.get("/cutting/pool")).json();
+  await cutter.post(`/orders/${id}/claim`, { expectedVersion: 1, qrToken:qr, ownedCount:pool.ownedCount, confirmedMultiple:pool.ownedCount>0 });
   await cutter.post(`/orders/${id}/transition`, { expectedVersion: 2 });
   const order = await intake.post(`/orders/${id}/claim`, { expectedVersion: 3 });
   const itemIds = order.products.filter((item: { name: string }) => item.name !== "Voal A").map((item: { id: string }) => item.id);

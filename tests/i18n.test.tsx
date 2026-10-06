@@ -48,7 +48,7 @@ test('the shared production timeline labels explicit B2B submission in both lang
 });
 const ROMANIAN_UI = /Angajați|Departament(e|ul)?\b|Roluri|Salvează|Anulează|Revizuiește|Parol[ăa]|Aplicații|Reîncearcă|Se încarcă|Ieși din cont|Funcție|Utilizator\b/;
 const stages = [
-  { id: "material-preparation", ordinal: 2, label: "Pregătire material" },
+  { id: "material-preparation", ordinal: 2, label: "Tăiere" },
   { id: "quality-control", ordinal: 12, label: "Control calitate" },
 ];
 
@@ -109,7 +109,7 @@ test("6: navigation and the shell are fully translated", () => {
 
 test("7, 16: the employee screen is translated, business values stay as stored, and root is the protected Ana Yönetici", () => {
   const html = text(editor("tr"));
-  for (const label of ["Profil", "Uygulama Erişimleri", "Roller ve Yetkiler", "Staff Aşamaları", "Hiyerarşi", "Güvenlik", "Erişimi gözden geçir", "Hesabı Devre Dışı Bırak", "Malzeme Hazırlığı", "Kalite Kontrol", "Yönetim Paneli",
+  for (const label of ["Profil", "Uygulama Erişimleri", "Roller ve Yetkiler", "Staff Aşamaları", "Hiyerarşi", "Güvenlik", "Erişimi gözden geçir", "Hesabı Devre Dışı Bırak", "Kesim", "Kalite Kontrol", "Yönetim Paneli",
     "Değişiklik kaydedildi", "Bu işlem için gerekli yetki seviyesine sahip değilsiniz."]) assert.match(html, new RegExp(label), label);
   assert.match(html, /Producție/, "department names are business data");
   assert.match(html, /Ion Popescu/);
@@ -233,9 +233,9 @@ test("stage labels: all 14 canonical stage IDs are localized; IDs themselves nev
   assert.deepEqual(Object.keys(MESSAGES.ro.catalog.stages), ids);
   assert.deepEqual(Object.keys(MESSAGES.tr.catalog.stages), ids);
   const tr = createTranslator("tr");
-  assert.equal(tr.stage("material-preparation"), "Malzeme Hazırlığı");
+  assert.equal(tr.stage("material-preparation"), "Kesim");
   assert.equal(tr.stage("delivery"), "Teslimat");
-  assert.equal(createTranslator("ro").stage("material-preparation"), "Pregătire material");
+  assert.equal(createTranslator("ro").stage("material-preparation"), "Tăiere");
   assert.equal(tr.stage("new-stage", "Etapă nouă"), "Etapă nouă", "an unknown stage keeps the API label");
   assert.equal(tr.stage("toString"), "toString", "object prototype names are not dictionary entries");
 });

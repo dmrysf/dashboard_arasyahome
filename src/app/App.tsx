@@ -7,6 +7,8 @@ import { ApprovalDetailPage, ApprovalsPage } from "../pages/ApprovalsPage";
 import { OrderLookupDetailPage, OrderSearchPage } from "../pages/OrderSearchPage";
 import { OrganizationPage } from "../pages/OrganizationPage";
 import { ProductionSettingsPage } from "../pages/ProductionSettingsPage";
+import { DisplayDevicesPage } from "../pages/DisplayDevicesPage";
+import { TransferDetailPage } from "../pages/CuttingTransfersPage";
 import { useDashboard } from "./context";
 import { useI18n } from "../i18n/context";
 import { ChangePasswordPage, LoginPage, NoAccessPage } from "../pages/AuthPages";
@@ -112,6 +114,8 @@ function renderRoute(route: Route) {
     case "overview": return <Home />;
     case "approvals": return <ApprovalsPage key={route.view} view={route.view} />;
     case "approval": return <ApprovalDetailPage key={route.id} id={route.id} />;
+    case "transfer": return <TransferDetailPage key={route.id} id={route.id} />;
+    case "display-devices": return <DisplayDevicesPage />;
     case "order-search": return <OrderSearchPage />;
     case "order-lookup": return <OrderLookupDetailPage key={route.id} id={route.id} />;
     case "organization": return <OrganizationPage />;

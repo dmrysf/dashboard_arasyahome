@@ -1,5 +1,7 @@
 # Arasya Dashboard
 
+Dashboard **0.7.0**, with Operations API **2.14.0** and migration **015**, adds cutting transfers to the existing narrow operations approval center and a Root-only display-device administration page. Approval never changes ownership; target acceptance plus the same canonical QR does. No broad IAM grants or production deployment are part of this milestone. See the API repository's `docs/cutting-pool.md` for rollout and recovery.
+
 Central management console (`https://dashboard.arasyahome.ro`) for the Arasya identity and access system. The Dashboard has no users table and no permission copy: `https://api.arasyahome.ro` (Operations API 2.5+) is the only identity provider, and every screen reflects the authorization the API returns.
 
 - React 19 + Vite 8 + TypeScript. Interface in Romanian (default and fallback) and Turkish, chosen with the RO | TR switch.

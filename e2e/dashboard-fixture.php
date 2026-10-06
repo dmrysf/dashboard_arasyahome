@@ -117,6 +117,7 @@ foreach (['denisa.ops.e2e' => 'Denisa Voican', 'hikmet.ops.e2e' => 'Hikmet Yerli
     $managers[] = ['username' => $username, 'name' => $name];
 }
 $container->employeeAdmin()->create('Crama Florin', 'crama.cut.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, ['material-preparation'], 'e2e');
+$container->employeeAdmin()->create('Andrea Tăiere', 'andrea.cut.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, ['material-preparation'], 'e2e');
 $container->employeeAdmin()->create('Oprea Doina', 'oprea.intake.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, ['workshop-receiving'], 'e2e');
 // The cutting-fault orders are created by the approvals spec itself (it runs last), so the production
 // overview figures asserted by the earlier specs stay unchanged.

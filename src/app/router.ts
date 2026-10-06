@@ -20,6 +20,8 @@ export type Route =
   | { name: "order-lookup"; id: string }
   | { name: "organization" }
   | { name: "production-settings" }
+  | { name: "display-devices" }
+  | { name: "transfer"; id: string }
   | { name: "not-found" };
 
 export function parseRoute(pathname: string): Route {
@@ -43,6 +45,9 @@ export function parseRoute(pathname: string): Route {
   if (path === "/audit") return { name: "audit" };
   if (path === "/sistem") return { name: "system" };
   if (path === "/aprobari") return { name: "approvals", view: "pending" };
+  const transfer = /^\/aprobari\/transfer\/([0-9a-f-]{36})$/.exec(path);
+  if (transfer) return { name: "transfer", id: transfer[1] };
+  if (path === "/dispozitive-afisare") return { name: "display-devices" };
   if (path === "/aprobari/in-asteptare") return { name: "approvals", view: "waiting" };
   if (path === "/aprobari/istoric") return { name: "approvals", view: "mine" };
   const approval = /^\/aprobari\/cerere\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(path);

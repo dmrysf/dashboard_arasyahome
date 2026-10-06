@@ -55,7 +55,7 @@ function detail(overrides: Partial<OrderDetail> = {}): OrderDetail {
     ],
     activity: [
       { id: "a1", action: "claimed", occurredAt: "2026-10-04T07:14:00.000Z", employee: WORKER, fromStage: { id: "waiting", label: "În așteptare" }, toStage: null, previousOwner: null, newOwner: null, productionVersion: 2 },
-      { id: "a2", action: "stage_completed", occurredAt: "2026-10-04T07:20:00.000Z", employee: WORKER, fromStage: { id: "waiting", label: "În așteptare" }, toStage: { id: "material-preparation", label: "Pregătire material" }, previousOwner: null, newOwner: null, productionVersion: 3 },
+      { id: "a2", action: "stage_completed", occurredAt: "2026-10-04T07:20:00.000Z", employee: WORKER, fromStage: { id: "waiting", label: "În așteptare" }, toStage: { id: "material-preparation", label: "Tăiere" }, previousOwner: null, newOwner: null, productionVersion: 3 },
     ],
     activityTruncated: false,
     ...overrides,
@@ -182,9 +182,9 @@ test("the production timeline lists the import and then the immutable activity i
   const ro = text(html);
   assert.ok(ro.includes("Comanda a fost importată în Arasya"));
   assert.ok(ro.includes("A preluat comanda Mehmet Yılmaz Din: În așteptare"));
-  assert.ok(ro.includes("A finalizat etapa Mehmet Yılmaz Din: În așteptare → Către: Pregătire material"));
+  assert.ok(ro.includes("A finalizat etapa Mehmet Yılmaz Din: În așteptare → Către: Tăiere"));
   const tr = text(view("tr"));
-  assert.ok(tr.includes("Siparişi üstlendi") && tr.includes("Aşamayı tamamladı") && tr.includes("Malzeme Hazırlığı"));
+  assert.ok(tr.includes("Siparişi üstlendi") && tr.includes("Aşamayı tamamladı") && tr.includes("Kesim"));
   assert.ok(text(view("ro", detail({ activity: null }))).includes("„Vizualizare activitate”"));
   assert.ok(text(view("ro", detail({ activity: [], activityTruncated: false }))).includes("Nicio acțiune de producție încă."));
   assert.ok(text(view("ro", detail({ activityTruncated: true }))).includes("primele 500"));

@@ -146,7 +146,7 @@ async function trendhomeEvent(eventId: string, status: { code: string; label: st
   const signature = "v1=" + createHmac("sha256", "trendhome-integration-secret-0123456789abcdef").update(`${timestamp}.${body}`).digest("hex");
   const response = await fetch(`${API}/integrations/sources/trendhome/orders`, { method: "POST", headers: { "Content-Type": "application/json", "X-Arasya-Timestamp": timestamp, "X-Arasya-Signature": signature }, body });
   expect(response.status).toBe(200);
-  expect((await response.json()).outcome).toBe("applied");
+  const payload=await response.json(); expect(payload.outcome).toBe("applied"); return payload.qr as string;
 }
 
 test("production control: list, detail, Staff progress, independent commerce updates, RO/TR and mobile", async ({ browser }) => {
@@ -204,9 +204,9 @@ test("production control: list, detail, Staff progress, independent commerce upd
   await expect(root.locator('[data-event="claimed"]')).toContainText(control.worker.name);
   expect(await staffAction(`${orderApiPath}/transition`, { expectedVersion: 2 })).toBe(200);
   await root.getByRole("button", { name: "Actualizează" }).click();
-  await expect(production.locator('[data-kind="production"]')).toHaveText(/Pregătire material/);
+  await expect(production.locator('[data-kind="production"]')).toHaveText(/Tăiere/);
   await expect(production).toContainText("Fără responsabil");
-  await expect(root.locator('[data-event="stage_completed"]')).toContainText("Din: În așteptare → Către: Pregătire material");
+  await expect(root.locator('[data-event="stage_completed"]')).toContainText("Din: În așteptare → Către: Tăiere");
   // 10: the store status stored in Operations is untouched by production.
   await expect(commerce).toContainText("Se procesează");
 
@@ -214,13 +214,13 @@ test("production control: list, detail, Staff progress, independent commerce upd
   await trendhomeEvent("dashboard-e2e-90001-2", { code: "shipped", label: "Expediat" });
   await root.getByRole("button", { name: "Actualizează" }).click();
   await expect(commerce).toContainText("Expediat");
-  await expect(production.locator('[data-kind="production"]')).toHaveText(/Pregătire material/);
+  await expect(production.locator('[data-kind="production"]')).toHaveText(/Tăiere/);
   expect(await root.locator("[data-event]").evaluateAll((items) => items.map((item) => item.getAttribute("data-event")))).toEqual(["imported", "claimed", "stage_completed"]);
 
   // 16: Turkish, in place.
   await root.getByRole("button", { name: "TR — Türkçe" }).click();
   await expect(root.getByRole("heading", { name: "Mağaza (kaynak)" })).toBeVisible();
-  await expect(production.locator('[data-kind="production"]')).toHaveText(/Malzeme Hazırlığı/);
+  await expect(production.locator('[data-kind="production"]')).toHaveText(/Kesim/);
   await expect(root.locator('[data-event="stage_completed"]')).toContainText("Aşamayı tamamladı");
   await root.getByRole("button", { name: "← Siparişler" }).click();
   await expect(root.getByRole("columnheader", { name: "Mağaza Durumu" })).toBeVisible();
@@ -263,7 +263,7 @@ test("production control V2: supervisor reassigns and releases ownership; stage 
   root.on("request", watch);
 
   // 1-2: a controlled Trendhome order (never a customer order) is claimed by Ali in Staff.
-  await trendhomeEvent("dashboard-e2e-90002-1", { code: "processing", label: "Se procesează" }, "90002", "waiting");
+  const controlQr=await trendhomeEvent("dashboard-e2e-90002-1", { code: "processing", label: "Se procesează" }, "90002", "waiting");
   const aliPage = await newEmployeePage(browser);
   const mehmetPage = await newEmployeePage(browser);
   await aliPage.goto("/");
@@ -301,9 +301,9 @@ test("production control V2: supervisor reassigns and releases ownership; stage 
   expect(await staffOperation(mehmetPage, mehmet, `${orderPath}/transition`, { expectedVersion: 3 })).toBe(200);
   // 9: the Dashboard follows.
   await root.getByRole("button", { name: "Actualizează" }).click();
-  await expect(stageChip).toHaveText(/Pregătire material/);
+  await expect(stageChip).toHaveText(/Tăiere/);
   await expect(control).toContainText("Fără responsabil");
-  expect(await staffOperation(mehmetPage, mehmet, `${orderPath}/claim`, { expectedVersion: 4 })).toBe(200);
+  expect(await staffOperation(mehmetPage, mehmet, `${orderPath}/claim`, { expectedVersion: 4, qrToken:controlQr, ownedCount:0 })).toBe(200);
   await root.getByRole("button", { name: "Actualizează" }).click();
   await expect(control).toContainText(mehmet.name);
 
@@ -314,11 +314,11 @@ test("production control V2: supervisor reassigns and releases ownership; stage 
   await release.getByRole("button", { name: "Eliberează responsabilul" }).click();
   await expect(control.getByRole("status")).toContainText("Responsabil eliberat.");
   await expect(control).toContainText("Fără responsabil");
-  await expect(stageChip).toHaveText(/Pregătire material/);
+  await expect(stageChip).toHaveText(/Tăiere/);
   await expect(storeChip).toHaveText(/Se procesează/);
 
   // 13: an eligible employee claims normally through Staff.
-  expect(await staffOperation(aliPage, ali, `${orderPath}/claim`, { expectedVersion: 6 })).toBe(200);
+  expect(await staffOperation(aliPage, ali, `${orderPath}/claim`, { expectedVersion: 6, qrToken:controlQr, ownedCount:0 })).toBe(200);
   await root.getByRole("button", { name: "Actualizează" }).click();
   await expect(control).toContainText(ali.name);
 
