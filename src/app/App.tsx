@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, createApi, SESSION_CODES, type DashboardApi } from "../api/client";
 import type { Session } from "../api/types";
-import { Shell } from "../components/Shell";
+import { canSeeOverview, NAVIGATION, Shell } from "../components/Shell";
+import { LiveProvider } from "./liveContext";
+import { ApprovalDetailPage, ApprovalsPage } from "../pages/ApprovalsPage";
+import { OrderLookupDetailPage, OrderSearchPage } from "../pages/OrderSearchPage";
+import { OrganizationPage } from "../pages/OrganizationPage";
+import { ProductionSettingsPage } from "../pages/ProductionSettingsPage";
+import { useDashboard } from "./context";
 import { useI18n } from "../i18n/context";
 import { ChangePasswordPage, LoginPage, NoAccessPage } from "../pages/AuthPages";
 import { ApplicationsPage } from "../pages/ApplicationsPage";
@@ -79,9 +85,20 @@ export function App({ apiBaseUrl }: { apiBaseUrl: string }) {
 
   return (
     <DashboardContext.Provider value={context}>
-      <Shell pathname={pathname} onLogout={() => { void logout(); }}>{renderRoute(route)}</Shell>
+      <LiveProvider api={api} enabled>
+        <Shell pathname={pathname} onLogout={() => { void logout(); }}>{renderRoute(route)}</Shell>
+      </LiveProvider>
     </DashboardContext.Provider>
   );
+}
+
+/** Narrow roles (for example operations managers) start on their first section instead of the overview. */
+function Home() {
+  const { me, can, navigate } = useDashboard();
+  const first = NAVIGATION.find((item) => item.path !== "/" && item.visible(me, can));
+  const showOverview = canSeeOverview(me, can);
+  useEffect(() => { if (!showOverview && first) navigate(first.path); }, [first, navigate, showOverview]);
+  return showOverview || !first ? <OverviewPage /> : null;
 }
 
 function NotFound() {
@@ -91,7 +108,13 @@ function NotFound() {
 
 function renderRoute(route: Route) {
   switch (route.name) {
-    case "overview": return <OverviewPage />;
+    case "overview": return <Home />;
+    case "approvals": return <ApprovalsPage key={route.view} view={route.view} />;
+    case "approval": return <ApprovalDetailPage key={route.id} id={route.id} />;
+    case "order-search": return <OrderSearchPage />;
+    case "order-lookup": return <OrderLookupDetailPage key={route.id} id={route.id} />;
+    case "organization": return <OrganizationPage />;
+    case "production-settings": return <ProductionSettingsPage />;
     case "orders": return <OrdersPage />;
     case "order": return <OrderDetailPage key={route.id} id={route.id} />;
     case "employees": return <EmployeesPage />;

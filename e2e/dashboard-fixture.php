@@ -100,6 +100,27 @@ $container->employeeAdmin()->create('Mehmet Atölye', 'mehmet.control.e2e', 'E2E
 // Production Control V2: a second Staff worker for the same stages, so ownership can move A -> B.
 $container->employeeAdmin()->create('Ali Demir', 'ali.control.e2e', 'E2E-ALI', 'pregatire-material', 'employee', 'control e2e passphrase 2026', ['waiting', 'material-preparation'], 'e2e');
 
+// Production exceptions: two operations managers with the one shared role, plus a cutting employee and a
+// tailoring intake employee.
+$exceptionPassword = 'exceptions e2e passphrase 2026';
+$opsRole = (int) $pdo->query("SELECT role_id FROM roles WHERE role_key = 'operations-manager'")->fetchColumn();
+$managers = [];
+foreach (['denisa.ops.e2e' => 'Denisa Voican', 'hikmet.ops.e2e' => 'Hikmet Yerlikaya'] as $username => $name) {
+    $manager = $container->employeeAdmin()->create($name, $username, null, 'pregatire-material', 'employee', $exceptionPassword, [], 'e2e');
+    // The root of this disposable database still holds its one-time password (the suite changes it in the
+    // browser), so the official IAM service correctly refuses root actions here; the grants are written
+    // directly into the test database instead. Production never uses this path.
+    $pdo->prepare('DELETE FROM employee_application_access WHERE employee_uuid = ?')->execute([$manager->employeeUuid]);
+    $pdo->prepare("INSERT INTO employee_application_access (employee_uuid, application_key, granted_at) VALUES (?, 'dashboard', UTC_TIMESTAMP(6))")->execute([$manager->employeeUuid]);
+    $pdo->prepare('INSERT INTO employee_role_assignments (employee_uuid, role_id, assigned_at) VALUES (?, ?, UTC_TIMESTAMP(6))')->execute([$manager->employeeUuid, $opsRole]);
+    $pdo->prepare("UPDATE employees SET position_title = 'Manager operațional' WHERE employee_uuid = ?")->execute([$manager->employeeUuid]);
+    $managers[] = ['username' => $username, 'name' => $name];
+}
+$container->employeeAdmin()->create('Crama Florin', 'crama.cut.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, ['material-preparation'], 'e2e');
+$container->employeeAdmin()->create('Oprea Doina', 'oprea.intake.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, ['workshop-receiving'], 'e2e');
+// The cutting-fault orders are created by the approvals spec itself (it runs last), so the production
+// overview figures asserted by the earlier specs stay unchanged.
+
 // OutletPerdele last spoke 30 minutes ago (stale); Trendhome just now (healthy); Trendyol has no credentials.
 $pdo->prepare("UPDATE order_sources SET last_contact_at = :at WHERE source_key = 'outletperdele'")->execute(['at' => gmdate('Y-m-d H:i:s', time() - 1800) . '.000000']);
 
@@ -112,6 +133,12 @@ echo json_encode([
         'order' => 'trendhome:90001', 'number' => '90001',
         'worker' => ['username' => 'mehmet.control.e2e', 'password' => 'control e2e passphrase 2026', 'name' => 'Mehmet Atölye'],
         'second' => ['username' => 'ali.control.e2e', 'password' => 'control e2e passphrase 2026', 'name' => 'Ali Demir'],
+    ],
+    'exceptions' => [
+        'password' => $exceptionPassword,
+        'managers' => $managers,
+        'cutter' => 'crama.cut.e2e',
+        'intake' => 'oprea.intake.e2e',
     ],
     'production' => [
         'summary' => ['active' => 5, 'waiting' => 3, 'inWork' => 2, 'unassigned' => 4, 'completedToday' => 1],

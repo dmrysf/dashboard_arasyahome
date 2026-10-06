@@ -14,6 +14,12 @@ export type Route =
   | { name: "applications" }
   | { name: "audit" }
   | { name: "system" }
+  | { name: "approvals"; view: "pending" | "waiting" | "mine" }
+  | { name: "approval"; id: string }
+  | { name: "order-search" }
+  | { name: "order-lookup"; id: string }
+  | { name: "organization" }
+  | { name: "production-settings" }
   | { name: "not-found" };
 
 export function parseRoute(pathname: string): Route {
@@ -36,6 +42,18 @@ export function parseRoute(pathname: string): Route {
   if (path === "/aplicatii") return { name: "applications" };
   if (path === "/audit") return { name: "audit" };
   if (path === "/sistem") return { name: "system" };
+  if (path === "/aprobari") return { name: "approvals", view: "pending" };
+  if (path === "/aprobari/in-asteptare") return { name: "approvals", view: "waiting" };
+  if (path === "/aprobari/istoric") return { name: "approvals", view: "mine" };
+  const approval = /^\/aprobari\/cerere\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(path);
+  if (approval) return { name: "approval", id: approval[1] };
+  if (path === "/cauta-comanda") return { name: "order-search" };
+  const lookup = /^\/cauta-comanda\/([^/]{1,600})$/.exec(path);
+  if (lookup) {
+    try { return { name: "order-lookup", id: decodeURIComponent(lookup[1]) }; } catch { return { name: "not-found" }; }
+  }
+  if (path === "/organizatie") return { name: "organization" };
+  if (path === "/setari-productie") return { name: "production-settings" };
   return { name: "not-found" };
 }
 

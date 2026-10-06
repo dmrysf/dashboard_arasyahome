@@ -1,25 +1,70 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import type { ManagementMe } from "../api/types";
 import { useDashboard } from "../app/context";
+import { useLive } from "../app/liveContext";
 import type { Messages } from "../i18n";
 import { useI18n } from "../i18n/context";
 import { LocaleSwitcher, RootBadge } from "./ui";
 
-const NAVIGATION: Array<{ path: string; label: keyof Messages["nav"]; permission: string; match: (path: string) => boolean }> = [
-  { path: "/", label: "overview", permission: "dashboard.overview.view", match: (path) => path === "/" },
-  { path: "/comenzi", label: "orders", permission: "orders.view_all", match: (path) => path.startsWith("/comenzi") },
-  { path: "/angajati", label: "employees", permission: "employees.view", match: (path) => path.startsWith("/angajati") },
-  { path: "/roluri", label: "roles", permission: "roles.view", match: (path) => path.startsWith("/roluri") },
-  { path: "/departamente", label: "departments", permission: "departments.view", match: (path) => path.startsWith("/departamente") },
-  { path: "/aplicatii", label: "applications", permission: "applications.view", match: (path) => path.startsWith("/aplicatii") },
-  { path: "/audit", label: "audit", permission: "iam.audit.view", match: (path) => path.startsWith("/audit") },
-  { path: "/sistem", label: "system", permission: "system.view", match: (path) => path.startsWith("/sistem") },
+type NavItem = { path: string; label: keyof Messages["nav"]; visible: (me: ManagementMe, can: (permission: string) => boolean) => boolean; match: (path: string) => boolean };
+
+/** Company-wide overview only for identities that may see organisation or production data. */
+export const canSeeOverview = (me: ManagementMe, can: (permission: string) => boolean) =>
+  can("dashboard.overview.view") && (me.isRoot || can("employees.view") || can("production.view") || can("orders.view_all"));
+
+export const NAVIGATION: NavItem[] = [
+  { path: "/", label: "overview", visible: canSeeOverview, match: (path) => path === "/" },
+  { path: "/aprobari", label: "approvals", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari" || path.startsWith("/aprobari/cerere/") },
+  { path: "/aprobari/in-asteptare", label: "waiting", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari/in-asteptare" },
+  { path: "/aprobari/istoric", label: "myApprovals", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari/istoric" },
+  { path: "/cauta-comanda", label: "orderSearch", visible: (me) => Boolean(me.capabilities?.lookupOrders), match: (path) => path.startsWith("/cauta-comanda") },
+  { path: "/comenzi", label: "orders", visible: (_, can) => can("orders.view_all"), match: (path) => path.startsWith("/comenzi") },
+  { path: "/angajati", label: "employees", visible: (_, can) => can("employees.view"), match: (path) => path.startsWith("/angajati") },
+  { path: "/roluri", label: "roles", visible: (_, can) => can("roles.view"), match: (path) => path.startsWith("/roluri") },
+  { path: "/departamente", label: "departments", visible: (_, can) => can("departments.view"), match: (path) => path.startsWith("/departamente") },
+  { path: "/aplicatii", label: "applications", visible: (_, can) => can("applications.view"), match: (path) => path.startsWith("/aplicatii") },
+  { path: "/organizatie", label: "organization", visible: (me) => Boolean(me.capabilities?.manageOrganization), match: (path) => path.startsWith("/organizatie") },
+  { path: "/setari-productie", label: "productionSettings", visible: (me) => Boolean(me.capabilities?.manageProductionSettings), match: (path) => path.startsWith("/setari-productie") },
+  { path: "/audit", label: "audit", visible: (_, can) => can("iam.audit.view"), match: (path) => path.startsWith("/audit") },
+  { path: "/sistem", label: "system", visible: (_, can) => can("system.view"), match: (path) => path.startsWith("/sistem") },
 ];
+
+/** Live count of requests waiting for a manager decision, re-read on every live event. */
+function usePendingCount(enabled: boolean): number | null {
+  const { api } = useDashboard();
+  const { revision } = useLive();
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const controller = new AbortController();
+    api.exceptions("pending", controller.signal).then((page) => { if (!controller.signal.aborted) setCount(page.items.length); }, () => undefined);
+    return () => controller.abort();
+  }, [api, enabled, revision]);
+  return enabled ? count : null;
+}
+
+function LiveNotices() {
+  const { navigate } = useDashboard();
+  const { t } = useI18n();
+  const { last, connection } = useLive();
+  const [dismissed, setDismissed] = useState(0);
+  const visible = last !== null && last.type === "exception.approval_pending" && last.seq > dismissed;
+  return <>
+    {connection === "reconnecting" && <p className="live-connection" role="status">{t.exceptions.reconnecting}</p>}
+    {visible && <div className="live-notice" role="status" aria-live="assertive">
+      <span>{t.exceptions.newRequest(last.orderNumber ?? "")}</span>
+      {last.exceptionId && <button type="button" className="button button-primary" onClick={() => { setDismissed(last.seq); navigate(`/aprobari/cerere/${last.exceptionId}`); }}>{t.exceptions.open}</button>}
+      <button type="button" className="button button-ghost" onClick={() => setDismissed(last.seq)}>{t.common.cancel}</button>
+    </div>}
+  </>;
+}
 
 export function Shell({ pathname, onLogout, children }: { pathname: string; onLogout: () => void; children: ReactNode }) {
   const { me, can, navigate } = useDashboard();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const items = NAVIGATION.filter((item) => can(item.permission));
+  const items = NAVIGATION.filter((item) => item.visible(me, can));
+  const pending = usePendingCount(Boolean(me.capabilities?.approveExceptions));
   return (
     <div className={`shell ${open ? "nav-open" : ""}`}>
       <aside className="sidebar">
@@ -27,13 +72,14 @@ export function Shell({ pathname, onLogout, children }: { pathname: string; onLo
         <nav aria-label={t.shell.navigation}>
           {items.map((item) => (
             <a key={item.path} href={item.path} className={item.match(pathname) ? "active" : ""} aria-current={item.match(pathname) ? "page" : undefined}
-              onClick={(event) => { event.preventDefault(); setOpen(false); navigate(item.path); }}>{t.nav[item.label]}</a>
+              onClick={(event) => { event.preventDefault(); setOpen(false); navigate(item.path); }}>{t.nav[item.label]}
+              {item.label === "approvals" && pending !== null && pending > 0 && <span className="nav-count" aria-label={t.exceptions.pendingCount(pending)}>{pending}</span>}</a>
           ))}
         </nav>
         <div className="sidebar-footer">
           <div className="identity">
             <strong>{me.employee.displayName}</strong>
-            <span>{me.employee.username}</span>
+            <span>{me.employee.positionTitle ?? me.employee.username}</span>
             {me.isRoot && <RootBadge />}
           </div>
           <button type="button" className="button button-ghost button-block" onClick={onLogout}>{t.common.logout}</button>
@@ -43,10 +89,12 @@ export function Shell({ pathname, onLogout, children }: { pathname: string; onLo
         <div className="topbar">
           <button type="button" className="menu-toggle" aria-label={t.shell.menu} aria-expanded={open} onClick={() => setOpen((value) => !value)}><span /><span /><span /></button>
           <strong className="topbar-title">{t.brand.title}</strong>
+          {pending !== null && pending > 0 && <button type="button" className="topbar-count" onClick={() => navigate("/aprobari")}>{t.exceptions.pendingCount(pending)}</button>}
           <LocaleSwitcher />
         </div>
         <main className="content">{children}</main>
       </div>
+      <LiveNotices />
     </div>
   );
 }

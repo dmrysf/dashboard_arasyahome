@@ -18,7 +18,7 @@ export function OverviewPage() {
       {error && <ErrorBanner error={error} onRetry={reload} />}
       {!data && !error && <Loading />}
       {data && <>
-        <div className="metric-grid">
+        {data.counts && <div className="metric-grid">
           {([
             ["activeEmployees", t.overview.activeEmployees, data.counts.activeEmployees, "/angajati"],
             ["dashboardUsers", t.overview.dashboardUsers, data.counts.dashboardUsers, "/angajati"],
@@ -28,7 +28,7 @@ export function OverviewPage() {
           ] as const).map(([key, label, value, path]) => (
             <button type="button" className="metric" key={key} onClick={() => navigate(path)}><span>{label}</span><strong>{number(value)}</strong></button>
           ))}
-        </div>
+        </div>}
         <div className="grid-2">
           <Card title={t.overview.recentActivity} actions={can("iam.audit.view") ? <button type="button" className="button button-ghost" onClick={() => navigate("/audit")}>{t.overview.seeAll}</button> : undefined}>
             {data.recentAudit ? <AuditList items={data.recentAudit} compact /> : <p className="muted">{t.overview.auditNeedsPermission}</p>}

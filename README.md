@@ -8,6 +8,10 @@ Central management console (`https://dashboard.arasyahome.ro`) for the Arasya id
 - Screens: Panou de control, Comenzi, Angajați, Roluri și permisiuni, Departamente, Aplicații, Audit, Sistem.
 - Authorization changes are reviewed in a confirmation dialog before anything is written. The protected root identity (`arasya.root.owner`) is read-only in the UI; the API enforces this independently (`ROOT_PROTECTED`).
 
+## Production approvals (0.6.0)
+
+Operations API 2.13.0 / additive migration 014 ([design](https://github.com/dmrysf/staff_arasyahome/blob/main/docs/production-exceptions.md)). Operations managers ("Manager operațional", one shared role) see only Aprobări, În așteptare, Aprobările mele and Caută comandă (exact number, no list). One decision approves or rejects a cutting fault return; the other manager's screen closes live. A temporary backup approver appointed by the CEO decides through the same screens. Root and the CEO principal manage Organizație (CEO, Responsabil Primire Croitorie, backup approver, working hours); root alone manages Setări producție (approval mode, fault reasons, stage display labels). Live updates use the authenticated `/live/events` stream; no page refresh is needed.
+
 ## B2B project permissions (0.5.5)
 
 Operations API 2.12.0 / additive migration 013 registers `b2b.projects.view`, `.create`, `.update`, `.archive` and `.convert` for the Visual Project Builder core. Dashboard labels and descriptions are complete in RO/TR; `convert` states that Classic order creation is also required. No role receives these automatically. No IAM architecture change.

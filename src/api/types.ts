@@ -22,6 +22,77 @@ export type ManagementMe = {
   grantablePermissions: string[];
   applications: string[];
   authorizationVersion: number;
+  /** Server-computed navigation capabilities; every route still authorizes on its own. */
+  capabilities?: Capabilities;
+};
+
+export type Capabilities = {
+  approveExceptions: boolean;
+  approvalViaBackup: boolean;
+  lookupOrders: boolean;
+  manageOrganization: boolean;
+  manageProductionSettings: boolean;
+  cancelExceptions: boolean;
+};
+
+export type ExceptionStatus = "awaiting_acknowledgment" | "awaiting_approval" | "approved" | "rejected" | "cancelled";
+
+export type ExceptionDecision = {
+  attempt: number; status: "pending" | "approved" | "rejected" | "cancelled"; openedReason: "acknowledged" | "rereview"; openedBy: string; openedComment: string | null;
+  openedAt: string; decidedAt: string | null; decidedBy: string | null; decidedById: string | null; decidedVia: string | null; comment: string | null; waitSeconds: number | null;
+};
+
+/** A cutting fault return request as managers see it. Meters are exact decimal strings ("17.000"). */
+export type ExceptionSummary = {
+  id: string; number: string; type: "cutting_fault"; status: ExceptionStatus; version: number;
+  order: { id: string; orderNumber: string; source: string; sourceName: string };
+  reason: { key: string; label: string }; lineCount: number; faultMeters: string; arrivalNumber: number; reworkCycle: number | null; repeatedError: boolean;
+  detector: { displayName: string }; responsible: { displayName: string };
+  reportedAt: string; acknowledgedAt: string | null; resolvedAt: string | null; pendingSince: string | null; attempts: number;
+  myDecisions?: { attempt: number; status: string; decidedAt: string; comment: string | null }[];
+  decisions?: ExceptionDecision[];
+};
+
+export type ExceptionDetail = ExceptionSummary & {
+  detectorComment: string | null; acknowledgmentComment: string | null; qrVerifiedAt: string | null; cancelReason: string | null;
+  lines: { itemId: string; lineNumber: number; name: string; code: string | null; variant: string | null; color: string | null; quantity: number; meters: string }[];
+  decisions: ExceptionDecision[];
+  timeline: { action: string; actor: string; at: string; version: number; details: Record<string, unknown> | null }[];
+  orderHistory: ExceptionSummary[];
+  actions: { canDecide: boolean; canCancel: boolean; involved: boolean };
+};
+
+export type LookupMatch = { id: string; orderNumber: string; source: string; sourceName: string; stage: { id: string; label: string }; completed: boolean; unavailable: boolean; blockedByException: boolean };
+
+export type LookupDetail = {
+  order: {
+    id: string; orderNumber: string; source: string; sourceName: string; stage: { id: string; label: string; ordinal: number }; completed: boolean; unavailable: boolean;
+    productionVersion: number; owner: { displayName: string; department: string | null; since: string | null } | null; openExceptionId: string | null;
+    arrivalNumber: number; reworkCycles: number; repeatedErrors: boolean;
+    items: { id: string; lineNumber: number; name: string; code: string | null; variant: string | null; color: string | null; meters: string | null; quantity: number }[];
+  };
+  exceptions: ExceptionSummary[];
+};
+
+export type WorkingDay = { weekday: number; isOpen: boolean; opensAt: string | null; closesAt: string | null };
+
+export type Responsibility = {
+  id: string; responsibility: "tailoring_intake_responsible" | "operations_backup_approver"; employee: { id: string; displayName: string };
+  startsAt: string; endsAt: string | null; note: string | null; createdAt: string; createdBy: string; revokedAt: string | null; revokedBy: string | null; revokeReason: string | null;
+  state: "active" | "scheduled" | "ended" | "revoked";
+};
+
+export type Organization = {
+  ceo: { id: string; displayName: string; positionTitle: string | null; since: string } | null;
+  canDesignateCeo: boolean; timezone: string; workingHours: WorkingDay[]; responsibilities: Responsibility[];
+};
+
+export type FaultReason = { key: string; label: string; requiresComment: boolean; status: "active" | "inactive"; sortOrder: number };
+
+export type ProductionSettings = {
+  policy: { approvalMode: string; availableModes: string[] };
+  reasons: FaultReason[];
+  stages: { id: string; ordinal: number; label: string }[];
 };
 
 export type RoleRef = { id: number; key: string; name: string; authorityRank: number; status: string };
@@ -45,7 +116,7 @@ export type EmployeeSummary = {
   manageable: boolean;
 };
 
-export type EmployeeDetail = EmployeeSummary & { rolePermissions: string[] };
+export type EmployeeDetail = EmployeeSummary & { rolePermissions: string[]; secondaryDepartments?: { id: number; name: string }[] };
 
 export type EmployeePage = { items: EmployeeSummary[]; nextCursor: string | null; total: number };
 
@@ -94,7 +165,8 @@ export type AuditEvent = {
 export type AuditPage = { items: AuditEvent[]; nextCursor: string | null };
 
 export type Overview = {
-  counts: { activeEmployees: number; dashboardUsers: number; staffUsers: number; departments: number; roles: number };
+  /** Null for identities without employees.view: company-wide counts are organisation analytics. */
+  counts: null | { activeEmployees: number; dashboardUsers: number; staffUsers: number; departments: number; roles: number };
   applications: Array<{ key: string; name: string; status: string }>;
   recentAudit: AuditEvent[] | null;
 };

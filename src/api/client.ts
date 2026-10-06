@@ -1,5 +1,5 @@
 import type {
-  Application, AuditPage, Department, EligibleOwners, EmployeeDetail, EmployeePage, ManagementMe, OrderDetail, OrderPage, OwnerChange, Overview, Permission, ProductionOverview, Role, Session, SessionEmployee, SystemStatus, Workflow,
+  Application, AuditPage, Department, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
 } from "./types";
 
 /**
@@ -165,5 +165,29 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     updateDepartment: (id: number, body: { name?: string; description?: string | null; parentId?: number | null; status?: "active" | "inactive" }) => request<{ department: Department }>(`/management/departments/${id}`, { method: "PATCH", body }),
     deleteDepartment: (id: number) => request<{ ok: true }>(`/management/departments/${id}`, { method: "DELETE" }),
     audit: (query: Record<string, string | undefined>) => request<AuditPage>("/management/audit", { query }),
+    // Production exceptions (approvals). Every decision carries the version the manager saw and an idempotency key.
+    exceptions: (view: "pending" | "waiting" | "mine", signal?: AbortSignal) => request<{ items: ExceptionSummary[] }>("/management/production-exceptions", { query: { view }, signal }),
+    exception: (id: string, signal?: AbortSignal) => request<ExceptionDetail>(`/management/production-exceptions/${encodeURIComponent(id)}`, { signal }),
+    decideException: (id: string, body: { expectedVersion: number; decision: "approve" | "reject"; comment?: string }, idempotencyKey: string) => request<ExceptionDetail>(`/management/production-exceptions/${encodeURIComponent(id)}/decision`, { method: "POST", body, idempotencyKey }),
+    cancelException: (id: string, body: { expectedVersion: number; reason: string }, idempotencyKey: string) => request<ExceptionDetail>(`/management/production-exceptions/${encodeURIComponent(id)}/cancel`, { method: "POST", body, idempotencyKey }),
+    lookupOrders: (number: string) => request<{ items: LookupMatch[] }>("/management/order-lookup", { query: { number } }),
+    lookupOrder: (globalOrderId: string, signal?: AbortSignal) => request<LookupDetail>(`/management/order-lookup/${encodeURIComponent(globalOrderId)}`, { signal }),
+    organization: () => request<Organization>("/management/organization"),
+    designateCeo: (employeeId: string, idempotencyKey: string) => request<Organization>("/management/organization/ceo", { method: "PUT", body: { employeeId }, idempotencyKey }),
+    setWorkingHours: (days: WorkingDay[], idempotencyKey: string) => request<Organization>("/management/organization/working-hours", { method: "PUT", body: { days }, idempotencyKey }),
+    assignResponsibility: (body: { responsibility: string; employeeId: string; startsAt?: string | null; endsAt?: string | null; note?: string | null }, idempotencyKey: string) => request<Organization>("/management/organization/responsibilities", { method: "POST", body, idempotencyKey }),
+    revokeResponsibility: (id: string, reason: string | null, idempotencyKey: string) => request<Organization>(`/management/organization/responsibilities/${encodeURIComponent(id)}/revoke`, { method: "POST", body: reason ? { reason } : {}, idempotencyKey }),
+    productionSettings: () => request<ProductionSettings>("/management/production-settings"),
+    createReason: (body: { key: string; label: string; requiresComment: boolean; sortOrder: number }, idempotencyKey: string) => request<ProductionSettings>("/management/production-settings/reasons", { method: "POST", body, idempotencyKey }),
+    updateReason: (key: string, body: { label?: string; requiresComment?: boolean; status?: "active" | "inactive"; sortOrder?: number }, idempotencyKey: string) => request<ProductionSettings>(`/management/production-settings/reasons/${encodeURIComponent(key)}`, { method: "PATCH", body, idempotencyKey }),
+    renameStage: (stageId: string, label: string, idempotencyKey: string) => request<ProductionSettings>(`/management/production-settings/stages/${encodeURIComponent(stageId)}`, { method: "PATCH", body: { label }, idempotencyKey }),
+    /** One batch of the authenticated live event stream (text/event-stream), answered by the API at once. */
+    async liveEvents(after: number | null, signal: AbortSignal): Promise<{ status: number; text: string }> {
+      const url = new URL("/live/events", baseUrl);
+      if (after !== null) url.searchParams.set("after", String(after));
+      const response = await fetchImpl(url.toString(), { method: "GET", headers: { Accept: "text/event-stream" }, credentials: "include", cache: "no-store", signal });
+      if (response.status === 401) listeners.forEach((listener) => listener(new ApiError("SESSION_EXPIRED", 401)));
+      return { status: response.status, text: response.ok ? await response.text() : "" };
+    },
   };
 }
