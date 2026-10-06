@@ -13,6 +13,7 @@ export const canSeeOverview = (me: ManagementMe, can: (permission: string) => bo
   can("dashboard.overview.view") && (me.isRoot || can("employees.view") || can("production.view") || can("orders.view_all"));
 
 export const NAVIGATION: NavItem[] = [
+  { path: "/analiza/angajati", label: "analytics", visible: (me) => Boolean(me.capabilities?.viewAnalytics), match: path => path.startsWith("/analiza") },
   { path: "/", label: "overview", visible: canSeeOverview, match: (path) => path === "/" },
   { path: "/aprobari", label: "approvals", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari" || path.startsWith("/aprobari/cerere/") || path.startsWith("/aprobari/transfer/") },
   { path: "/aprobari/in-asteptare", label: "waiting", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari/in-asteptare" },

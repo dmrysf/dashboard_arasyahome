@@ -1,7 +1,9 @@
 import type { Messages } from "./ro";
 
 /** Turkish interface text. It must match the Romanian reference shape exactly. */
+import { analyticsTr } from "./analytics";
 export const tr: Messages = {
+  analytics: analyticsTr,
   locale: { short: "TR", name: "Türkçe", switcher: "Arayüz dili" },
   brand: { product: "Yönetim Paneli", title: "Arasya · Yönetim Paneli", notConfigured: "Yönetim Paneli yapılandırılmamış." },
   common: {
@@ -75,6 +77,7 @@ export const tr: Messages = {
   },
   shell: { navigation: "Ana menü", menu: "Menü" },
   nav: {
+    analytics: "Yönetim analizi",
     overview: "Yönetim Paneli",
     orders: "Siparişler",
     employees: "Çalışanlar",
@@ -640,6 +643,9 @@ export const tr: Messages = {
     changeSaved: "Değişiklik kaydedildi.",
   },
   errors: {
+    INVALID_DATE_RANGE: "En fazla 366 günlük geçerli bir tarih aralığı seçin.",
+    ANALYTICS_POLICY_CHANGED: "Politika değişti. Yeniden kaydetmeden önce raporu yenileyin.",
+    ANALYTICS_REBUILD_REQUIRED: "Analiz projeksiyonu resmi mekanizmayla yeniden kurulmalıdır.",
     fallback: "İşlem tamamlanamadı.",
     ORDER_NOT_FOUND: "Sipariş bulunamadı.",
     AUTHENTICATION_REQUIRED: "Devam etmek için giriş yapın.",
@@ -870,6 +876,7 @@ export const tr: Messages = {
       finance: { name: "Finans", option: "Finans", description: "Finans uygulaması" },
     },
     categories: {
+      analytics: "Yönetim analizi",
       dashboard: "Yönetim Paneli",
       employees: "Çalışanlar",
       roles: "Roller",
@@ -884,6 +891,7 @@ export const tr: Messages = {
       b2b: "B2B (toptan satış)",
     },
     permissions: {
+      "analytics.view": { label: "Yönetim analizi", description: "Üretim kayıtlarını ve sürelerini görür; yönetim veya üretim işlemi yetkisi vermez." },
       "staff.access": { label: "Staff Erişimi", description: "Staff uygulamasına erişim." },
       "dashboard.access": { label: "Yönetim Paneli Erişimi", description: "Merkezi yönetim paneline erişim." },
       "b2b.access": { label: "B2B Erişimi", description: "Toptan satış ve B2B müşteri yönetimi uygulamasına erişim." },

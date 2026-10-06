@@ -33,6 +33,8 @@ export type Capabilities = {
   manageOrganization: boolean;
   manageProductionSettings: boolean;
   cancelExceptions: boolean;
+  viewAnalytics?: boolean;
+  manageAnalyticsPolicy?: boolean;
 };
 
 export type ExceptionStatus = "awaiting_acknowledgment" | "awaiting_approval" | "approved" | "rejected" | "cancelled";

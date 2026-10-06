@@ -1,0 +1,27 @@
+.analytics-page { max-width: 1280px; }
+.analytics-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 16px; }
+.analytics-tabs a { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 12px; font-weight: 600; }
+.analytics-tabs a[aria-current="page"] { background: var(--ink); color: var(--surface); }
+.analytics-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.analytics-filters .field { flex: 1 1 180px; min-width: 0; margin: 0; }
+.analytics-filters .button { flex: 0 0 auto; }
+.analytics-method { margin: 16px 0; color: var(--muted); }
+.analytics-method summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+.analytics-method p { margin-top: 10px; max-width: 90ch; }
+.analytics-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(190px,100%),1fr)); gap: 14px; margin: 16px 0; }
+.analytics-stat { min-width: 0; border-left: 2px solid var(--line); padding-left: 12px; overflow-wrap: anywhere; }
+.analytics-stat dt { color: var(--muted); font-size: 12px; }
+.analytics-stat dd { margin: 5px 0 0; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.analytics-stat small { display: block; margin-top: 5px; color: var(--muted); }
+.analytics-quality { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; border-top: 1px solid var(--line); padding-top: 16px; }
+.analytics-quality section { min-width: 0; }
+.analytics-employee h3 { margin-top: 18px; font-size: 14px; }
+.analytics-timeline { list-style: none; padding: 0; margin: 0; }
+.analytics-timeline li { border-left: 2px solid var(--line-strong); padding: 4px 0 18px 16px; margin-left: 4px; overflow-wrap: anywhere; }
+.analytics-timeline p { margin: 5px 0; color: var(--muted); }
+.analytics-trends { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(270px,100%),1fr)); gap: 16px; }
+.analytics-trends section { border-bottom: 1px solid var(--line); min-width: 0; padding-bottom: 12px; }
+.analytics-trends .analytics-stat dd { font-size: 14px; }
+.analytics-lines { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(300px,100%),1fr)); gap: 16px; }
+@media (max-width: 600px) { .analytics-quality { grid-template-columns: 1fr; } .analytics-stat dd { font-size: 16px; } .analytics-tabs a { padding: 7px 9px; } .analytics-filters .button { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .analytics-page *, .analytics-tabs * { transition: none; animation: none; } }

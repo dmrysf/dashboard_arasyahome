@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 export type Route =
+  | { name: "analytics"; section: "employees" | "departments" | "managers" | "sources" | "companies" | "orders" | "policy"; id?: string }
   | { name: "overview" }
   | { name: "orders" }
   | { name: "order"; id: string }
@@ -25,8 +26,15 @@ export type Route =
   | { name: "not-found" };
 
 export function parseRoute(pathname: string): Route {
-  const path = pathname.replace(/\/+$/, "") || "/";
+  const path = pathname.split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/";
   if (path === "/") return { name: "overview" };
+  const analytics = /^\/analiza\/(angajati|departamente|aprobari|surse|firme|comenzi|politica)(?:\/([0-9a-f-]{36}))?$/.exec(path);
+  if (analytics) {
+    const sections = { angajati: "employees", departamente: "departments", aprobari: "managers", surse: "sources", firme: "companies", comenzi: "orders", politica: "policy" } as const;
+    const section = sections[analytics[1] as keyof typeof sections];
+    if (analytics[2] && !["employees", "companies", "orders"].includes(section)) return { name: "not-found" };
+    return { name: "analytics", section, ...(analytics[2] ? { id: analytics[2] } : {}) };
+  }
   if (path === "/comenzi") return { name: "orders" };
   const order = /^\/comenzi\/([^/]{1,600})$/.exec(path);
   if (order) {

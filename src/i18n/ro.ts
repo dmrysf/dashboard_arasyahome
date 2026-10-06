@@ -3,7 +3,9 @@
  * match (see `Messages`). Stable server identifiers (permission keys, stage IDs, application keys, audit
  * actions) are only lookup keys here; they are never translated or sent back to the server.
  */
+import { analyticsRo } from "./analytics";
 export const ro = {
+  analytics: analyticsRo,
   locale: { short: "RO", name: "Română", switcher: "Limba interfeței" },
   brand: { product: "Panou de control", title: "Arasya · Panou de control", notConfigured: "Panoul de control nu este configurat." },
   common: {
@@ -77,6 +79,7 @@ export const ro = {
   },
   shell: { navigation: "Navigare principală", menu: "Meniu" },
   nav: {
+    analytics: "Analiză managerială",
     overview: "Panou de control",
     orders: "Comenzi",
     employees: "Angajați",
@@ -642,6 +645,9 @@ export const ro = {
     changeSaved: "Modificarea a fost salvată.",
   },
   errors: {
+    INVALID_DATE_RANGE: "Alege un interval valid de cel mult 366 de zile.",
+    ANALYTICS_POLICY_CHANGED: "Politica s-a schimbat. Actualizează raportul înainte de a salva din nou.",
+    ANALYTICS_REBUILD_REQUIRED: "Proiecția analitică trebuie reconstruită prin mecanismul oficial.",
     fallback: "Operațiunea nu a putut fi finalizată.",
     ORDER_NOT_FOUND: "Comanda nu a fost găsită.",
     AUTHENTICATION_REQUIRED: "Autentifică-te pentru a continua.",
@@ -872,6 +878,7 @@ export const ro = {
       finance: { name: "Financiar", option: "Financiar", description: "Aplicația financiară" },
     },
     categories: {
+      analytics: "Analiză managerială",
       dashboard: "Panou de control",
       employees: "Angajați",
       roles: "Roluri",
@@ -886,6 +893,7 @@ export const ro = {
       b2b: "B2B (vânzări en-gros)",
     },
     permissions: {
+      "analytics.view": { label: "Analiză managerială", description: "Vede fapte și durate de producție, fără administrare sau acțiuni de producție." },
       "staff.access": { label: "Acces Staff", description: "Acces la aplicația Staff." },
       "dashboard.access": { label: "Acces Panou de control", description: "Acces la panoul central de administrare." },
       "b2b.access": { label: "Acces B2B", description: "Acces la aplicația internă pentru vânzări en-gros și clienți B2B." },

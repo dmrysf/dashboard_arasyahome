@@ -123,10 +123,13 @@ $container->employeeAdmin()->create('Oprea Doina', 'oprea.intake.e2e', null, 'pr
 // overview figures asserted by the earlier specs stay unchanged.
 
 // OutletPerdele last spoke 30 minutes ago (stale); Trendhome just now (healthy); Trendyol has no credentials.
+$analyticsReader=$container->employeeAdmin()->create('YETIS SINEM · Analiză test','sinem.analytics.e2e',null,'conducere','employee',$exceptionPassword,[],'e2e');
+$analyticsRole=(int)$pdo->query("SELECT role_id FROM roles WHERE role_key='analytics-reader'")->fetchColumn();
 $pdo->prepare("UPDATE order_sources SET last_contact_at = :at WHERE source_key = 'outletperdele'")->execute(['at' => gmdate('Y-m-d H:i:s', time() - 1800) . '.000000']);
 
 echo json_encode([
     'root' => ['id' => $rootId, 'username' => RootBootstrapService::ROOT_USERNAME, 'password' => $rootPassword],
+    'analytics' => ['readerId'=>$analyticsReader->employeeUuid,'readerUsername'=>'sinem.analytics.e2e','readerPassword'=>$exceptionPassword,'roleId'=>$analyticsRole],
     'role' => ['id' => (int) $role['role_id'], 'name' => (string) $role['name']],
     'stage' => ['id' => (string) $stage['stage_id'], 'label' => (string) $stage['label']],
     'department' => ['id' => (int) $department['department_id'], 'name' => (string) $department['name']],

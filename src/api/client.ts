@@ -2,6 +2,7 @@ import type {
   Application, AuditPage, Department, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
 } from "./types";
 import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
+import type { AnalyticsPolicy } from "./analytics";
 
 /**
  * A fresh Idempotency-Key for one user-confirmed mutation. Reusing it for a retry of the same submission lets
@@ -140,6 +141,9 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     },
     health: () => request<{ status: string; version: string }>("/health"),
     me: () => request<ManagementMe>("/management/me"),
+    analytics: <T>(section: string, query: Record<string, string | undefined>, signal?: AbortSignal) => request<T>(`/management/analytics/${section}`, { query, signal }),
+    analyticsPolicy: (signal?: AbortSignal) => request<AnalyticsPolicy>("/management/analytics/policy", { signal }),
+    updateAnalyticsPolicy: (body: { approvalGraceMinutes: number; expectedVersion: number }, key: string) => request<AnalyticsPolicy>("/management/analytics/policy", { method: "PUT", body, idempotencyKey: key }),
     overview: () => request<Overview>("/management/dashboard"),
     orders: (query: Record<string, string | undefined>, signal?: AbortSignal) => request<OrderPage>("/management/orders", { query, signal }),
     order: (globalOrderId: string, signal?: AbortSignal) => request<OrderDetail>(`/management/orders/${encodeURIComponent(globalOrderId)}`, { signal }),

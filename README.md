@@ -1,5 +1,7 @@
 # Arasya Dashboard
 
+Dashboard **0.8.0** / Operations API **2.15.0** adds Management Analytics V1: employee/department facts, approval response metrics, source/company distributions and canonical lifecycle drilldown. It uses additive migration **016**, an explicitly assigned central IAM `analytics-reader` permission and separate Dashboard application access. Root and the canonical CEO may read; operations-manager stays narrow and is server-denied even with an accidental analytics grant. Only Root can edit approval grace. Reports are RO/TR, responsive and deliberately refreshed; no scores, financial leakage or production deployment. See the API repository's `docs/management-analytics.md` for formulas, rebuild and manual rollout.
+
 Dashboard **0.7.0**, with Operations API **2.14.0** and migration **015**, adds cutting transfers to the existing narrow operations approval center and a Root-only display-device administration page. Approval never changes ownership; target acceptance plus the same canonical QR does. No broad IAM grants or production deployment are part of this milestone. See the API repository's `docs/cutting-pool.md` for rollout and recovery.
 
 Central management console (`https://dashboard.arasyahome.ro`) for the Arasya identity and access system. The Dashboard has no users table and no permission copy: `https://api.arasyahome.ro` (Operations API 2.5+) is the only identity provider, and every screen reflects the authorization the API returns.

@@ -9,6 +9,7 @@ import { OrganizationPage } from "../pages/OrganizationPage";
 import { ProductionSettingsPage } from "../pages/ProductionSettingsPage";
 import { DisplayDevicesPage } from "../pages/DisplayDevicesPage";
 import { TransferDetailPage } from "../pages/CuttingTransfersPage";
+import { AnalyticsPage } from "../pages/AnalyticsPage";
 import { useDashboard } from "./context";
 import { useI18n } from "../i18n/context";
 import { ChangePasswordPage, LoginPage, NoAccessPage } from "../pages/AuthPages";
@@ -111,6 +112,7 @@ function NotFound() {
 
 function renderRoute(route: Route) {
   switch (route.name) {
+    case "analytics": return <AnalyticsPage key={`${route.section}-${route.id ?? "list"}`} section={route.section} id={route.id} />;
     case "overview": return <Home />;
     case "approvals": return <ApprovalsPage key={route.view} view={route.view} />;
     case "approval": return <ApprovalDetailPage key={route.id} id={route.id} />;
