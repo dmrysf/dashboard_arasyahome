@@ -79,7 +79,8 @@ test("operations managers: narrow navigation, one approval wins, the other scree
   for (const who of [denisa, hikmet]) {
     if ((await who.page.viewportSize())!.width < 900) await who.page.getByRole("button", { name: "Meniu" }).click();
     await expect(who.page.getByRole("navigation", { name: "Navigare principală" }).getByRole("link")).toHaveText([/^Aprobări\d*$/, "În așteptare", "Aprobările mele", "Caută comandă"]);
-    if ((await who.page.viewportSize())!.width < 900) await who.page.getByRole("button", { name: "Meniu" }).click();
+    // Choosing a section closes the phone menu (the open sidebar covers the toggle).
+    if ((await who.page.viewportSize())!.width < 900) await who.page.getByRole("navigation", { name: "Navigare principală" }).getByRole("link", { name: /^Aprobări( \d+ în așteptare)?$/ }).click();
   }
   // Direct links to management areas render no data for them.
   await hikmet.page.goto("/angajati");
