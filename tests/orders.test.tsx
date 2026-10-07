@@ -190,6 +190,18 @@ test("the production timeline lists the import and then the immutable activity i
   assert.ok(text(view("ro", detail({ activityTruncated: true }))).includes("primele 500"));
 });
 
+test("an explicit production authority takeover and its release are labelled, never shown as an unknown action", () => {
+  const authority = detail({ activity: [
+    { id: "t1", action: "authority_taken_over", occurredAt: "2026-10-04T07:30:00.000Z", employee: WORKER, fromStage: { id: "waiting", label: "În așteptare" }, toStage: { id: "ironing", label: "Călcare" }, previousOwner: null, newOwner: null, productionVersion: 2 },
+    { id: "t2", action: "authority_released", occurredAt: "2026-10-04T07:40:00.000Z", employee: WORKER, fromStage: { id: "ironing", label: "Călcare" }, toStage: { id: "waiting", label: "În așteptare" }, previousOwner: null, newOwner: null, productionVersion: 3 },
+  ] });
+  const ro = text(view("ro", authority));
+  assert.ok(ro.includes("A preluat producția comenzii în Arasya") && ro.includes("A redat producția comenzii sursei (YD SOFT)"), ro);
+  assert.ok(!ro.includes("Acțiune de producție Mehmet"), "no generic fallback label");
+  const tr = text(view("tr", authority));
+  assert.ok(tr.includes("Siparişin üretimini Arasya'ya devraldı") && tr.includes("Siparişin üretimini kaynağa (YD SOFT) geri verdi"));
+});
+
 test("completed production is explicitly not a completed or shipped store order", () => {
   const done = detail({ commerce: { status: { code: "processing", label: "Se procesează" }, availability: "active", sourceChangedAt: "2026-10-04T07:06:00.000Z", lastSourceSeenAt: "2026-10-04T11:00:00.000Z" },
     production: { ...detail().production, state: "completed", stage: { id: "delivery", label: "Livrare", ordinal: 14 }, owner: null, completedAt: "2026-10-04T11:30:00.000Z" } });
