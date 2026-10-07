@@ -163,7 +163,7 @@ export const tr: Messages = {
     employee: "Çalışan",
     action: "İşlem",
     time: "Saat",
-    actions: { production_submitted: "B2B siparişini üretime gönderdi", claimed: "Siparişi üstlendi", stage_completed: "Aşamayı tamamladı", production_completed: "Üretimi tamamladı", owner_released: "Sorumluluğu serbest bıraktı", owner_reassigned: "Sorumluyu değiştirdi", fault_reported: "Siparişi kesime iade etti (talep)", fault_rejected: "İade talebi reddedildi", fault_rereview_requested: "Yeniden değerlendirme istedi", fault_returned: "Kesime iade onaylandı", fault_cancelled: "İade talebi iptal edildi" } as Record<string, string>,
+    actions: { production_submitted: "B2B siparişini üretime gönderdi", claimed: "Siparişi üstlendi", stage_completed: "Aşamayı tamamladı", production_completed: "Üretimi tamamladı", owner_released: "Sorumluluğu serbest bıraktı", owner_reassigned: "Sorumluyu değiştirdi", fault_reported: "Siparişi kesime iade etti (talep)", fault_rejected: "İade talebi reddedildi", fault_rereview_requested: "Yeniden değerlendirme istedi", fault_returned: "Kesime iade onaylandı", fault_cancelled: "İade talebi iptal edildi", authority_taken_over: "Siparişin üretimini Arasya'ya devraldı", authority_released: "Siparişin üretimini kaynağa (YD SOFT) geri verdi" } as Record<string, string>,
     unknownAction: "Üretim işlemi",
     handedTo: (stage: string) => `devredilen aşama: ${stage}`,
     sources: "Sipariş Kaynakları",

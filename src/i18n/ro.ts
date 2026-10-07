@@ -165,7 +165,7 @@ export const ro = {
     employee: "Angajat",
     action: "Acțiune",
     time: "Ora",
-    actions: { production_submitted: "A trimis comanda B2B în producție", claimed: "A preluat comanda", stage_completed: "A finalizat etapa", production_completed: "A finalizat producția", owner_released: "A eliberat responsabilul", owner_reassigned: "A schimbat responsabilul", fault_reported: "A returnat comanda la tăiere (cerere)", fault_rejected: "Cererea de returnare a fost respinsă", fault_rereview_requested: "A cerut reanalizarea", fault_returned: "Returnare la tăiere aprobată", fault_cancelled: "Cererea de returnare a fost anulată" } as Record<string, string>,
+    actions: { production_submitted: "A trimis comanda B2B în producție", claimed: "A preluat comanda", stage_completed: "A finalizat etapa", production_completed: "A finalizat producția", owner_released: "A eliberat responsabilul", owner_reassigned: "A schimbat responsabilul", fault_reported: "A returnat comanda la tăiere (cerere)", fault_rejected: "Cererea de returnare a fost respinsă", fault_rereview_requested: "A cerut reanalizarea", fault_returned: "Returnare la tăiere aprobată", fault_cancelled: "Cererea de returnare a fost anulată", authority_taken_over: "A preluat producția comenzii în Arasya", authority_released: "A redat producția comenzii sursei (YD SOFT)" } as Record<string, string>,
     unknownAction: "Acțiune de producție",
     handedTo: (stage: string) => `predată la ${stage}`,
     sources: "Surse de comenzi",

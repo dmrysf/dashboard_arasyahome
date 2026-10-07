@@ -201,7 +201,7 @@ export type Overview = {
 
 /** GET /management/production-overview. Definitions live with the API (docs/production-overview.md). */
 export type SourceHealth = "healthy" | "stale" | "offline" | "no_contact" | "not_configured" | "disabled";
-export type ProductionActivityAction = "claimed" | "stage_completed" | "production_completed" | "owner_released" | "owner_reassigned" | "production_submitted";
+export type ProductionActivityAction = "claimed" | "stage_completed" | "production_completed" | "owner_released" | "owner_reassigned" | "production_submitted" | "authority_taken_over" | "authority_released";
 /** Owner interventions record whose ownership ended and who received it; Staff actions carry null. */
 export type OwnerRef = { id: string; displayName: string };
 
