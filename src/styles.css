@@ -385,6 +385,10 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .name-list { display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .stage-coverage td:first-child { white-space: nowrap; }
 .secondary-list { margin-top: 12px; }
+/* Employee page: long usernames, permission keys and audit details wrap instead of widening a phone screen. */
+.employee-page .grid-2 > *, .employee-page .card, .employee-activity { min-width: 0; }
+.employee-page .card, .employee-page .page-header, .employee-activity { overflow-wrap: anywhere; }
+.employee-page .page-header { flex-wrap: wrap; }
 @media (max-width: 820px) {
   .control-card .facts, .owner-summary { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .control-card .facts dt, .owner-summary dt { margin-top: 8px; font-size: 12px; }

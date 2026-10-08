@@ -79,7 +79,7 @@ export function EmployeeDetailPage({ id }: { id: string }) {
         onPending={setPending}
         onSecret={setSecret}
       />
-      {can("iam.audit.view") && <Card title={t.employee.activity} className="section-gap">{audit.error ? <ErrorBanner error={audit.error} onRetry={audit.reload} /> : audit.data ? <AuditList items={audit.data.items} stageLabel={(stage) => workflow.data?.stages.find((item) => item.id === stage)?.label} /> : <Loading />}</Card>}
+      {can("iam.audit.view") && <Card title={t.employee.activity} className="section-gap employee-activity">{audit.error ? <ErrorBanner error={audit.error} onRetry={audit.reload} /> : audit.data ? <AuditList items={audit.data.items} stageLabel={(stage) => workflow.data?.stages.find((item) => item.id === stage)?.label} /> : <Loading />}</Card>}
       {pending && <PendingDialog pending={pending} busy={busy} onConfirm={() => { void confirm(); }} onCancel={() => setPending(null)} />}
     </>
   );
@@ -147,7 +147,7 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
   const departmentName = (departmentId: number) => departments.find((department) => department.id === departmentId)?.name ?? data.secondaryDepartments?.find((department) => department.id === departmentId)?.name ?? `#${departmentId}`;
 
   return (
-    <div className="page">
+    <div className="page employee-page">
       <button type="button" className="back-link" onClick={() => navigate("/angajati")}>{m.back}</button>
       <PageHeader title={data.displayName} description={`${data.username} · ${data.positionTitle ?? m.noPosition} · ${data.department.name}`}
         actions={<div className="header-badges">{data.isRoot && <RootBadge />}<StatusBadge status={data.status} />{data.mustChangePassword && <Badge tone="warning">{t.common.temporaryPassword}</Badge>}</div>} />
