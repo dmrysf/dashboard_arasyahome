@@ -1,5 +1,7 @@
 # Arasya Dashboard
 
+Dashboard **0.12.1** lets long buttons on the employee page wrap on a 360 px phone instead of widening the screen (the *Salvează departamentele suplimentare* button overflowed on Linux Chromium fonts).
+
 Dashboard **0.12.0** makes employee administration ready for the factory pilot. No API change; works with Operations API 2.22 and later.
 
 - **Pregătire operațională.** The readiness card on the employee page now depends on the applications the person actually has. A Dashboard-only manager or a B2B finance user is no longer shown as "not ready" for lacking Staff stages. The statuses are: inactive, no application, incomplete configuration (Staff without a stage, Dashboard or B2B without a role, stages without Staff), waiting for the password change, ready. A document permission without a source is shown for information only.
