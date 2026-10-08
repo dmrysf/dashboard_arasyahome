@@ -391,6 +391,7 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .employee-page .page-header, .employee-page .card-header { flex-wrap: wrap; }
 .employee-page .card, .employee-activity { grid-template-columns: minmax(0, 1fr); }
 .employee-page .field { min-width: 0; }
+.employee-page .button { max-width: 100%; height: auto; min-height: 36px; white-space: normal; text-align: center; }
 @media (max-width: 820px) {
   .control-card .facts, .owner-summary { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .control-card .facts dt, .owner-summary dt { margin-top: 8px; font-size: 12px; }
