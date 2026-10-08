@@ -75,6 +75,15 @@ export function describeAuditEvent(event: AuditEvent, i18n: Translator, stageFal
     case "employee.roles_changed": return { sentences: [m.rolesChanged(actor, target)], details: [`${show(before)} → ${show(after)}`] };
     case "employee.stages_changed": return { sentences: [m.stagesChanged(actor, target)], details: [`${show(before, stageLabel)} → ${show(after, stageLabel)}`] };
     case "employee.manager_changed": return { sentences: [m.managerChanged(actor, target)], details: [] };
+    case "employee.document_scopes_changed": {
+      // {before|after: {operate: [...], approve: [...]}}: source keys only, rendered as stored.
+      const scope = (value: unknown, capability: "operate" | "approve") => value && typeof value === "object" ? (value as Record<string, unknown>)[capability] : undefined;
+      const e = i18n.t.employee;
+      return { sentences: [m.documentScopesChanged(actor, target)], details: [
+        `${e.scopeOperate}: ${show(scope(before, "operate"))} → ${show(scope(after, "operate"))}`,
+        `${e.scopeApprove}: ${show(scope(before, "approve"))} → ${show(scope(after, "approve"))}`,
+      ] };
+    }
     case "role.created": return { sentences: [m.roleCreated(actor, target)], details: typeof metadata.authorityRank === "number" ? [m.rankDetail(metadata.authorityRank)] : [] };
     case "role.updated": return { sentences: [m.roleUpdated(actor, target)], details: fieldDetails() };
     case "role.deleted": return { sentences: [m.roleDeleted(actor, target)], details: [] };

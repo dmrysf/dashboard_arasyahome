@@ -144,7 +144,16 @@ export type EmployeeSummary = {
   manageable: boolean;
 };
 
-export type EmployeeDetail = EmployeeSummary & { rolePermissions: string[]; secondaryDepartments?: { id: number; name: string }[] };
+/** Order sources a document permission reaches (API 2.22+). Root reaches every source and has none stored. */
+export type DocumentScopes = { operate: string[]; approve: string[] };
+export type EmployeeDetail = EmployeeSummary & {
+  rolePermissions: string[];
+  secondaryDepartments?: { id: number; name: string }[];
+  /** Absent on an API older than 2.22; null for root. */
+  documentScopes?: DocumentScopes | null;
+  /** Active sources the root-only scope editor offers; null for every other viewer and for root itself. */
+  documentScopeSources?: Array<{ key: string; name: string }> | null;
+};
 
 export type EmployeePage = { items: EmployeeSummary[]; nextCursor: string | null; total: number };
 

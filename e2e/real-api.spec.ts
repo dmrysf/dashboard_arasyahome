@@ -388,7 +388,15 @@ test("7-10 root grants Staff access, assigns a role and one Staff stage, and the
   await review(root, "Revizuiește rolurile", "Aplică rolurile");
   await root.getByRole("checkbox", { name: new RegExp(`${escape(fixture.stage.label)}$`) }).check();
   await review(root, "Revizuiește etapele", "Aplică etapele");
+  // Document scopes: root only, per source and capability, reviewed like every other grant.
+  await expect(root.getByRole("checkbox", { name: "Trendhome: Aprobare" })).not.toBeChecked();
+  await root.getByRole("checkbox", { name: "Trendhome: Aprobare" }).check();
+  await review(root, "Revizuiește sursele", "Aplică sursele");
   await root.reload();
+  await expect(root.getByRole("checkbox", { name: "Trendhome: Aprobare" })).toBeChecked();
+  await expect(root.getByRole("checkbox", { name: "Trendhome: Operare" })).not.toBeChecked();
+  await root.getByRole("checkbox", { name: "Trendhome: Aprobare" }).uncheck();
+  await review(root, "Revizuiește sursele", "Aplică sursele");
   await expect(root.getByRole("checkbox", { name: "Staff", exact: true })).toBeChecked();
   await expect(root.getByRole("checkbox", { name: "Panou de control", exact: true })).not.toBeChecked();
   await expect(root.getByRole("checkbox", { name: new RegExp(`^${escape(fixture.role.name)} nivel`) })).toBeChecked();
@@ -401,6 +409,8 @@ test("11 the IAM audit records the management changes in Romanian", async () => 
   await expect(root.getByText(`${EMPLOYEE.name} a primit acces la Staff.`)).toBeVisible();
   await expect(root.getByText(`Administrator principal a modificat rolurile utilizatorului ${EMPLOYEE.name}.`)).toBeVisible();
   await expect(root.getByText(`Administrator principal a modificat etapele Staff ale utilizatorului ${EMPLOYEE.name}.`)).toBeVisible();
+  await expect(root.getByText(`Administrator principal a modificat sursele pentru documente ale utilizatorului ${EMPLOYEE.name}.`)).toHaveCount(2);
+  await expect(root.getByText("Aprobare: — → trendhome")).toBeVisible();
   await expect(root.locator("body")).not.toContainText(temporaryPassword);
 });
 
@@ -449,7 +459,8 @@ test("17-18 deactivating the user rejects its existing session", async () => {
 test("19 the root identity has no modification controls in the Dashboard", async () => {
   await root.goto(`/angajati/${fixture.root.id}`);
   await expect(root.getByText("Cont de sistem protejat.")).toBeVisible();
-  for (const name of ["Dezactivează contul", "Resetează parola", "Revizuiește accesul", "Revizuiește rolurile", "Revizuiește etapele", "Salvează profilul"]) {
+  await expect(root.getByText("Surse pentru documente")).toHaveCount(0);
+  for (const name of ["Dezactivează contul", "Resetează parola", "Revizuiește accesul", "Revizuiește rolurile", "Revizuiește etapele", "Revizuiește sursele", "Salvează profilul"]) {
     await expect(root.getByRole("button", { name })).toHaveCount(0);
   }
   for (const box of await root.getByRole("checkbox").all()) await expect(box).toBeDisabled();

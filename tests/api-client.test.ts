@@ -130,3 +130,15 @@ test("transport failures and non-JSON server failures get stable codes", async (
   const broken = createApi(API, (async () => new Response("<html>Fatal error</html>", { status: 500 })) as typeof fetch);
   await assert.rejects(broken.roles(), (error: unknown) => error instanceof ApiError && error.code === "SERVER_ERROR" && !error.message.includes("Fatal"));
 });
+
+test("document scopes are replaced with both capabilities stated, under the session CSRF token", async () => {
+  const { fetchImpl, calls } = fakeFetch((call) => call.url.pathname === "/auth/session" ? { body: sessionPayload({}, "csrf-scope") } : { body: employee() });
+  const api = createApi(API, fetchImpl);
+  await api.getSession();
+  await api.setDocumentScopes(employee().id, { operate: [], approve: ["outletperdele", "trendhome"] });
+  const put = calls[1];
+  assert.equal(put.method, "PUT");
+  assert.equal(put.url.pathname, `/management/employees/${employee().id}/document-scopes`);
+  assert.deepEqual(put.body, { operate: [], approve: ["outletperdele", "trendhome"] });
+  assert.equal(put.headers["X-CSRF-Token"], "csrf-scope");
+});

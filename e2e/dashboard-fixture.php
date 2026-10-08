@@ -134,6 +134,15 @@ foreach (['sinem.doc.e2e' => ['Sinem Yetiș', 'document-revision-approver'], 'ba
     }
     $documentPeople[$username] = $person->employeeUuid;
 }
+// API 2.22+: a document permission reaches only the sources scoped to the identity (root-granted in
+// production; written directly here, like the role grants above).
+if ($pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'employee_document_scopes'")->fetchColumn() > 0) {
+    $scope = $pdo->prepare("INSERT INTO employee_document_scopes (employee_uuid, capability, source_key, granted_at, granted_by_employee_uuid)
+        SELECT ?, ?, source_key, UTC_TIMESTAMP(6), ? FROM order_sources WHERE status = 'active'");
+    foreach (['sinem.doc.e2e' => 'approve', 'backup.doc.e2e' => 'approve', 'online.doc.e2e' => 'operate'] as $username => $capability) {
+        $scope->execute([$documentPeople[$username], $capability, $rootId]);
+    }
+}
 $pdo->prepare("INSERT INTO responsibility_assignments (assignment_uuid, responsibility_key, employee_uuid, starts_at, ends_at, note, created_at, created_by_employee_uuid)
     VALUES (UUID(), 'document_revision_backup_approver', ?, UTC_TIMESTAMP(6) - INTERVAL 1 HOUR, UTC_TIMESTAMP(6) + INTERVAL 10 DAY, 'E2E backup', UTC_TIMESTAMP(6), ?)")->execute([$documentPeople['backup.doc.e2e'], $rootId]);
 

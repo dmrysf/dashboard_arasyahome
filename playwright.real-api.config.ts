@@ -41,6 +41,9 @@ export default defineConfig({
         // The fixture's test signing secrets, so source health reflects real signed contact.
         ARASYA_SOURCE_SECRET_TRENDHOME: "trendhome-integration-secret-0123456789abcdef",
         ARASYA_SOURCE_SECRET_OUTLETPERDELE: "outletperdele-integration-secret-0123456789ab",
+        // API 2.17+: a secret alone no longer allows ingestion; the test sources are explicitly active.
+        ARASYA_SOURCE_MODE_TRENDHOME: "active",
+        ARASYA_SOURCE_MODE_OUTLETPERDELE: "active",
       },
     },
     {

@@ -435,3 +435,5 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .document-diff .diff-before { color: var(--color-text-muted, #8a8f98); text-decoration: line-through; }
 .document-diff .diff-after strong { color: inherit; }
 .order-documents-page .inline-form, .document-revision-detail .facts dd { min-width: 0; overflow-wrap: anywhere; }
+.document-scopes .data-table tbody tr { cursor: default; }
+.document-scopes .data-table tbody tr:hover { background: transparent; }
