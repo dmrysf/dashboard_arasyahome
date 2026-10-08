@@ -70,6 +70,12 @@ test("IAM audit events read as Romanian sentences", () => {
   assert.deepEqual(describeAuditEvent(event({ action: "employee.deactivated", actorType: "root", actorLabel: "Administrator principal (arasya.root.owner)" }), ro).sentences, ["Administrator principal a dezactivat utilizatorul Ion Popescu."]);
   const stages = describeAuditEvent(event({ action: "employee.stages_changed", metadata: { before: [], after: ["sewing"] } }), ro, (id) => id === "sewing" ? "Confecționare" : undefined);
   assert.deepEqual(stages.details, ["— → Confecționare"]);
+  const scopes = describeAuditEvent(event({ action: "employee.document_scopes_changed", actorType: "root", actorLabel: "Administrator principal (arasya.root.owner)",
+    metadata: { before: { operate: [], approve: [] }, after: { operate: ["trendhome"], approve: ["outletperdele", "trendhome"] }, secret: "x" } }), ro);
+  assert.deepEqual(scopes.sentences, ["Administrator principal a modificat sursele pentru documente ale utilizatorului Ion Popescu."]);
+  assert.deepEqual(scopes.details, ["Operare: — → trendhome", "Aprobare: — → outletperdele, trendhome"]);
+  const malformed = describeAuditEvent(event({ action: "employee.document_scopes_changed", metadata: { before: "x", after: null } }), ro);
+  assert.deepEqual(malformed.details, ["Operare: — → —", "Aprobare: — → —"]);
 });
 
 test("audit rendering ignores undocumented metadata so secrets can never appear", () => {

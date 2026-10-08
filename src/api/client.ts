@@ -1,6 +1,6 @@
 import type {
   DocumentLookupItem, OrderDocuments, RevisionRequest,
-  Application, AuditPage, Department, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
+  Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
 } from "./types";
 import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
 import type { AnalyticsPolicy } from "./analytics";
@@ -167,6 +167,8 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     setApplications: (id: string, applications: string[]) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/applications`, { method: "PUT", body: { applications } }),
     setRoles: (id: string, roleIds: number[]) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/roles`, { method: "PUT", body: { roleIds } }),
     setStages: (id: string, stageIds: string[]) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/stages`, { method: "PUT", body: { stageIds } }),
+    /** Root only: the order sources this identity's document permissions reach. */
+    setDocumentScopes: (id: string, scopes: DocumentScopes) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/document-scopes`, { method: "PUT", body: scopes }),
     setManager: (id: string, managerId: string | null) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/manager`, { method: "PUT", body: { managerId } }),
     applications: () => request<{ items: Application[] }>("/management/applications"),
     permissions: () => request<{ items: Permission[] }>("/management/permissions"),

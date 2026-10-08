@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useDashboard } from "../app/context";
 import { useLoader } from "../app/useLoader";
-import type { Department, EmployeeDetail, EmployeeSummary, Permission, Role, WorkflowStage } from "../api/types";
+import type { Department, DocumentScopes, EmployeeDetail, EmployeeSummary, Permission, Role, WorkflowStage } from "../api/types";
 import { Badge, Card, ConfirmDialog, ErrorBanner, Field, Loading, Notice, OneTimeSecret, PageHeader, RootBadge, StatusBadge } from "../components/ui";
 import { toProblem, type Messages, type NoticeKey, type Problem, type Translator } from "../i18n";
 import { useI18n } from "../i18n/context";
@@ -115,6 +115,7 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
   const [roleIds, setRoleIds] = useState<number[]>(data.roles.map((role) => role.id));
   const [stageIds, setStageIds] = useState<string[]>(data.stageIds);
   const [managerId, setManagerId] = useState(data.manager?.id ?? "");
+  const [scopes, setScopes] = useState<DocumentScopes>(data.documentScopes ?? { operate: [], approve: [] });
 
   // Root and identities at or above the actor's authority are read-only. The API enforces this anyway.
   const editable = data.manageable && !data.isRoot;
@@ -225,6 +226,9 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
           </div>
         </Card>
 
+        {data.documentScopes && <DocumentScopesCard data={data} scopes={scopes} editable={editable && me.isRoot && Array.isArray(data.documentScopeSources)}
+          busy={busy} onChange={setScopes} onPending={onPending} />}
+
         <Card title={m.hierarchy} description={m.hierarchyHint}
           actions={allowed("employees.manage_hierarchy") ? <button type="button" className="button button-secondary" disabled={busy || managerId === (data.manager?.id ?? "")}
             onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.managerTitle, confirmLabel: tr.common.save, body: <p>{tr.employee.managerBody}</p> }),
@@ -256,6 +260,62 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * Order sources this identity's document permissions reach (API 2.22). Shown when the API reports scopes
+ * (never for root, which reaches every source). Only root edits them; the API refuses everybody else with
+ * ROOT_ONLY, so the editor is read-only for every other viewer.
+ */
+export function DocumentScopesCard({ data, scopes, editable, busy, onChange, onPending }: {
+  data: EmployeeDetail; scopes: DocumentScopes; editable: boolean; busy: boolean;
+  onChange: (scopes: DocumentScopes) => void; onPending: (pending: Pending) => void;
+}) {
+  const { api } = useDashboard();
+  const { t } = useI18n();
+  const m = t.employee;
+  const saved = data.documentScopes ?? { operate: [], approve: [] };
+  // A source that is no longer active stays listed while a scope still names it, so it can be removed.
+  const offered = data.documentScopeSources ?? [];
+  const keys = [...new Set([...offered.map((source) => source.key), ...saved.operate, ...saved.approve])];
+  const sourceName = (key: string) => offered.find((source) => source.key === key)?.name ?? key;
+  const changed = !sameSet(scopes.operate, saved.operate) || !sameSet(scopes.approve, saved.approve);
+  const flip = (capability: keyof DocumentScopes, key: string) => onChange({ ...scopes, [capability]: toggle(scopes[capability], key) });
+  const line = (tr: Messages, label: string, before: string[], after: string[]) => {
+    const names = (items: string[]) => items.length ? items.map(sourceName).join(", ") : tr.common.nothing;
+    return <p>{label}: {tr.common.before}: <strong>{names(before)}</strong> · {tr.common.after}: <strong>{names(after)}</strong></p>;
+  };
+  return (
+    <Card title={m.documentScopes} description={m.documentScopesHint}
+      actions={editable ? <button type="button" className="button button-secondary" disabled={busy || !changed}
+        onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.scopesTitle, confirmLabel: tr.employee.applyScopes,
+          body: <>{line(tr, tr.employee.scopesOperateList, saved.operate, scopes.operate)}{line(tr, tr.employee.scopesApproveList, saved.approve, scopes.approve)}<p>{tr.employee.scopesApply}</p></> }),
+          run: () => api.setDocumentScopes(data.id, { operate: [...scopes.operate].sort(), approve: [...scopes.approve].sort() }) })}>{m.reviewScopes}</button> : undefined}>
+      <div className="document-scopes">
+        {keys.length === 0 ? <p className="muted">{t.common.nothing}</p> : (
+          <table className="data-table compact-table">
+            <thead><tr><th>{m.scopeSource}</th><th>{m.scopeOperate}</th><th>{m.scopeApprove}</th></tr></thead>
+            <tbody>
+              {keys.map((key) => (
+                <tr key={key} data-source={key}>
+                  <td>{sourceName(key)} <small className="mono">{key}</small></td>
+                  {(["operate", "approve"] as const).map((capability) => (
+                    <td key={capability}>
+                      <label className={`check ${editable ? "" : "disabled"}`}>
+                        <input type="checkbox" data-capability={capability} aria-label={`${sourceName(key)}: ${capability === "operate" ? m.scopeOperate : m.scopeApprove}`}
+                          disabled={!editable} checked={scopes[capability].includes(key)} onChange={() => flip(capability, key)} />
+                      </label>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <p className="muted small">{editable ? m.scopesNeedPermission : m.scopesRootOnly}</p>
+    </Card>
   );
 }
 

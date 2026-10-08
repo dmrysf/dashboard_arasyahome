@@ -108,3 +108,51 @@ test("set helpers used by the review dialogs compare membership, not order", () 
   assert.deepEqual(toggle(["staff"], "dashboard"), ["staff", "dashboard"]);
   assert.deepEqual(toggle(["staff", "dashboard"], "staff"), ["dashboard"]);
 });
+
+const scopeSources = [{ key: "b2b", name: "B2B" }, { key: "outletperdele", name: "OutletPerdele" }, { key: "trendhome", name: "Trendhome" }];
+const scopeCheckboxes = (html: string) => [...html.matchAll(/<tr data-source="([^"]+)">(.*?)<\/tr>/g)].flatMap((row) =>
+  [...row[2].matchAll(/<input type="checkbox"([^>]*)>/g)].map((input) => ({
+    source: row[1],
+    capability: /data-capability="(\w+)"/.exec(input[1])?.[1],
+    checked: input[1].includes("checked"),
+    enabled: !input[1].includes("disabled"),
+  })));
+
+test("root edits document scopes per source and capability; the change goes through a review", () => {
+  const html = editor(employee({ documentScopes: { operate: ["trendhome"], approve: ["outletperdele", "trendhome"] }, documentScopeSources: scopeSources }), me({ isRoot: true, authorityRank: null }));
+  assert.match(html, /Surse pentru documente/);
+  assert.ok(buttons(html).includes("Revizuiește sursele"), "root gets a review button, never an instant mutation");
+  const boxes = scopeCheckboxes(html);
+  assert.equal(boxes.length, 6);
+  assert.ok(boxes.every((box) => box.enabled));
+  assert.deepEqual(boxes.filter((box) => box.checked).map((box) => `${box.capability}:${box.source}`).sort(), ["approve:outletperdele", "approve:trendhome", "operate:trendhome"]);
+  assert.match(html, /Sursele nu acordă drepturi/);
+});
+
+test("a non-root administrator, the CEO included, sees document scopes read-only", () => {
+  const html = editor(employee({ documentScopes: { operate: [], approve: ["trendhome"] }, documentScopeSources: null }));
+  assert.match(html, /Surse pentru documente/);
+  assert.equal(buttons(html).includes("Revizuiește sursele"), false);
+  const boxes = scopeCheckboxes(html);
+  assert.deepEqual(boxes.map((box) => `${box.capability}:${box.source}:${box.checked}:${box.enabled}`), ["operate:trendhome:false:false", "approve:trendhome:true:false"]);
+  assert.match(html, /Doar administratorul principal poate schimba sursele/);
+});
+
+test("an unscoped identity shows an explicit empty scope instead of hiding it", () => {
+  const html = editor(employee({ documentScopes: { operate: [], approve: [] }, documentScopeSources: null }));
+  assert.match(html, /Surse pentru documente/);
+  assert.equal(scopeCheckboxes(html).length, 0);
+});
+
+test("a source no longer offered stays listed while a scope still names it, so root can remove it", () => {
+  const html = editor(employee({ documentScopes: { operate: ["trendyol"], approve: [] }, documentScopeSources: scopeSources }), me({ isRoot: true, authorityRank: null }));
+  const trendyol = scopeCheckboxes(html).filter((box) => box.source === "trendyol");
+  assert.deepEqual(trendyol.map((box) => `${box.capability}:${box.checked}:${box.enabled}`), ["operate:true:true", "approve:false:true"]);
+});
+
+test("root itself and an API without scopes show no document scope card", () => {
+  for (const profile of [me(), me({ isRoot: true, authorityRank: null })]) {
+    assert.doesNotMatch(editor({ ...root(), documentScopes: null, documentScopeSources: null }, profile), /Surse pentru documente/);
+  }
+  assert.doesNotMatch(editor(employee()), /Surse pentru documente/);
+});
