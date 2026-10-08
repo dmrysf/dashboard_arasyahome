@@ -424,11 +424,11 @@ test("10b readiness, secondary departments and stage coverage use the server sta
   // Wider glyphs than the local system font, so the check also holds on Linux fonts in CI.
   const wide = "body, body * { letter-spacing: 0.08em !important; }";
   await root.addStyleTag({ content: wide });
-  expect(await root.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  expect(await root.evaluate(overflowing)).toEqual([]);
   await root.goto(`/angajati/${employeeId}`);
   await expect(root.locator("[data-pilot]")).toBeVisible();
   await root.addStyleTag({ content: wide });
-  expect(await root.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  expect(await root.evaluate(overflowing)).toEqual([]);
   if (viewport) await root.setViewportSize(viewport);
 });
 
