@@ -404,6 +404,30 @@ test("7-10 root grants Staff access, assigns a role and one Staff stage, and the
   await expect(root.getByRole("checkbox", { name: new RegExp(`${escape(fixture.stage.label)}$`) })).toBeChecked();
 });
 
+test("10b readiness, secondary departments and stage coverage use the server state", async () => {
+  // Staff + role + stage are granted; only the first password change is outstanding.
+  await expect(root.locator("[data-pilot]")).toHaveAttribute("data-pilot", "password_pending");
+  await expect(root.getByText("Poate lucra în Staff după schimbarea parolei temporare")).toBeVisible();
+  const secondary = root.locator("[data-secondary-departments]");
+  await expect(secondary.getByRole("checkbox", { name: fixture.department.name })).toHaveCount(0);
+  await secondary.getByRole("checkbox", { name: "Depozit E2E" }).check();
+  await review(root, "Salvează departamentele suplimentare", "Salvează");
+  await root.reload();
+  await expect(root.locator("[data-secondary-departments]").getByRole("checkbox", { name: "Depozit E2E" })).toBeChecked();
+  await root.goto("/angajati/etape");
+  await expect(root.getByRole("heading", { name: "Acoperire etape de producție" })).toBeVisible();
+  const row = root.locator(`tr[data-stage="${fixture.stage.id}"]`);
+  await expect(row.getByRole("cell").nth(2)).toContainText(EMPLOYEE.name);
+  // Phone width: the coverage table and the employee page never scroll horizontally.
+  const viewport = root.viewportSize();
+  await root.setViewportSize({ width: 360, height: 780 });
+  expect(await root.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await root.goto(`/angajati/${employeeId}`);
+  await expect(root.locator("[data-pilot]")).toBeVisible();
+  expect(await root.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  if (viewport) await root.setViewportSize(viewport);
+});
+
 test("11 the IAM audit records the management changes in Romanian", async () => {
   await root.getByRole("navigation").getByRole("link", { name: "Audit" }).click();
   await expect(root.getByText(`Administrator principal a creat contul ${EMPLOYEE.name}.`)).toBeVisible();

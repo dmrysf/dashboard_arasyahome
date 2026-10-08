@@ -382,6 +382,9 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .pilot-list .is-pending span { color: var(--warning); }
 .pilot-list .is-missing { color: var(--ink-soft); }
 .pilot-list .is-missing span { color: var(--danger); }
+.name-list { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.stage-coverage td:first-child { white-space: nowrap; }
+.secondary-list { margin-top: 12px; }
 @media (max-width: 820px) {
   .control-card .facts, .owner-summary { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .control-card .facts dt, .owner-summary dt { margin-top: 8px; font-size: 12px; }

@@ -7,6 +7,7 @@ export type Route =
   | { name: "order"; id: string }
   | { name: "employees" }
   | { name: "employee-new" }
+  | { name: "stage-coverage" }
   | { name: "employee"; id: string }
   | { name: "roles" }
   | { name: "role-new" }
@@ -45,6 +46,7 @@ export function parseRoute(pathname: string): Route {
   }
   if (path === "/angajati") return { name: "employees" };
   if (path === "/angajati/nou") return { name: "employee-new" };
+  if (path === "/angajati/etape") return { name: "stage-coverage" };
   const employee = /^\/angajati\/([0-9a-f-]{36})$/.exec(path);
   if (employee) return { name: "employee", id: employee[1] };
   if (path === "/roluri") return { name: "roles" };

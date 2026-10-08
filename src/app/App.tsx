@@ -22,6 +22,7 @@ import { EmployeeDetailPage } from "../pages/EmployeeDetailPage";
 import { OrderDetailPage } from "../pages/OrderDetailPage";
 import { OrdersPage } from "../pages/OrdersPage";
 import { EmployeesPage } from "../pages/EmployeesPage";
+import { StageCoveragePage } from "../pages/StageCoveragePage";
 import { OverviewPage } from "../pages/OverviewPage";
 import { RoleEditorPage } from "../pages/RoleEditorPage";
 import { RolesPage } from "../pages/RolesPage";
@@ -137,6 +138,7 @@ function renderRoute(route: Route) {
     case "order": return <OrderDetailPage key={route.id} id={route.id} />;
     case "employees": return <EmployeesPage />;
     case "employee-new": return <EmployeeCreatePage />;
+    case "stage-coverage": return <StageCoveragePage />;
     case "employee": return <EmployeeDetailPage key={route.id} id={route.id} />;
     case "roles": return <RolesPage />;
     case "role-new": return <RoleEditorPage key="new" />;
