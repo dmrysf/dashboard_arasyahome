@@ -80,7 +80,7 @@ function LiveNotices() {
   </>;
 }
 
-export function Shell({ pathname, onLogout, children }: { pathname: string; onLogout: () => void; children: ReactNode }) {
+export function Shell({ pathname, onLogout, onChangePassword, passwordChanged = false, children }: { pathname: string; onLogout: () => void; onChangePassword?: () => void; passwordChanged?: boolean; children: ReactNode }) {
   const { me, can, navigate } = useDashboard();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -105,6 +105,8 @@ export function Shell({ pathname, onLogout, children }: { pathname: string; onLo
             <span>{me.employee.positionTitle ?? me.employee.username}</span>
             {me.isRoot && <RootBadge />}
           </div>
+          {passwordChanged && <p className="password-changed" role="status">{t.auth.passwordChanged}</p>}
+          {onChangePassword && <button type="button" className="button button-ghost button-block" onClick={onChangePassword}>{t.auth.changePassword}</button>}
           <button type="button" className="button button-ghost button-block" onClick={onLogout}>{t.common.logout}</button>
         </div>
       </aside>

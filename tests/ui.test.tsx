@@ -156,3 +156,24 @@ test("root itself and an API without scopes show no document scope card", () => 
   }
   assert.doesNotMatch(editor(employee()), /Surse pentru documente/);
 });
+
+test("first login: Romanian checks before the server, and one Show/Hide control per password field", async () => {
+  const { passwordProblem, ChangePasswordPage } = await import("../src/pages/AuthPages");
+  assert.equal(passwordProblem("Temp-2026-Password!", "o parolă personală lungă", "o parolă personală lungă", "yetis.sinem"), null);
+  assert.equal(passwordProblem("", "o parolă personală lungă", "o parolă personală lungă", "yetis.sinem"), "passwordMissing");
+  assert.equal(passwordProblem("Temp-2026-Password!", "scurtă", "scurtă", "yetis.sinem"), "passwordTooShort");
+  assert.equal(passwordProblem("Temp-2026-Password!", "Temp-2026-Password!", "Temp-2026-Password!", "yetis.sinem"), "passwordSame");
+  assert.equal(passwordProblem("Temp-2026-Password!", "Yetis.Sinem-personal", "Yetis.Sinem-personal", "yetis.sinem"), "passwordContainsUsername");
+  assert.equal(passwordProblem("Temp-2026-Password!", "o parolă personală lungă", "alta", "yetis.sinem"), "passwordMismatch");
+  const forced = renderToStaticMarkup(<I18nProvider locale="ro"><ChangePasswordPage displayName="Sinem" username="yetis.sinem" onChange={async () => undefined} onLogout={() => undefined} /></I18nProvider>);
+  assert.match(forced, /Setează parola personală/);
+  assert.match(forced, /role="note"/);
+  assert.match(forced, /Înainte de a accesa informațiile companiei/);
+  for (const name of ["Afișează parola curentă", "Afișează noua parolă", "Afișează confirmarea parolei"]) assert.match(forced, new RegExp(`aria-label="${name}"`));
+  assert.equal(forced.match(/class="password-toggle" aria-controls="[^"]+" aria-pressed="false"/g)?.length, 3);
+  assert.equal(forced.match(/type="password"/g)?.length, 3);
+  const voluntary = renderToStaticMarkup(<I18nProvider locale="ro"><ChangePasswordPage voluntary displayName="Sinem" username="yetis.sinem" onChange={async () => undefined} onLogout={() => undefined} onCancel={() => undefined} /></I18nProvider>);
+  assert.match(voluntary, /Schimbă parola/);
+  assert.doesNotMatch(voluntary, /role="note"/);
+  assert.match(voluntary, /Anulează/);
+});
