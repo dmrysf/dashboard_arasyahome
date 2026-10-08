@@ -45,6 +45,8 @@ $rootId = (string) $pdo->query('SELECT employee_uuid FROM system_root_identity')
 $role = $pdo->query("SELECT role_id, name FROM roles WHERE role_key = 'employee'")->fetch();
 $stage = $pdo->query("SELECT ps.stage_id, ps.display_name AS label FROM production_stages ps INNER JOIN production_workflows pw ON pw.workflow_id = ps.workflow_id WHERE ps.status = 'active' AND pw.status = 'active' ORDER BY ps.ordinal LIMIT 1")->fetch();
 $department = $pdo->query("SELECT department_id, name FROM departments WHERE status = 'active' ORDER BY department_id LIMIT 1")->fetch();
+// A second active department, offered as an additional (secondary) function on the employee page.
+$pdo->exec("INSERT INTO departments (department_key, name, status, created_at, updated_at) VALUES ('e2e-depozit', 'Depozit E2E', 'active', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))");
 
 // Real production data for the overview, written through the real signed ingestion and Staff operations.
 $kernel = $container->kernel();

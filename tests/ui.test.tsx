@@ -177,3 +177,23 @@ test("first login: Romanian checks before the server, and one Show/Hide control 
   assert.doesNotMatch(voluntary, /role="note"/);
   assert.match(voluntary, /Anulează/);
 });
+
+test("secondary departments are shown and edited through the reviewed flow; direct reports are listed", () => {
+  const departments = [
+    { id: 2, key: "productie", name: "Producție", description: null, status: "active" as const, parentId: null, employeeCount: 3, activeEmployeeCount: 3 },
+    { id: 4, key: "depozit", name: "Depozit", description: null, status: "active" as const, parentId: null, employeeCount: 1, activeEmployeeCount: 1 },
+  ];
+  const data = employee({ secondaryDepartments: [{ id: 4, name: "Depozit" }] });
+  const html = render(<EmployeeEditor data={data} departments={departments} roles={[role()]} catalog={[permission()]} applicationKeys={["staff"]}
+    stages={stages} managers={[]} reports={[employee({ id: "44444444-4444-4444-8444-444444444444", displayName: "Maria Subordonată" })]} busy={false} message={null} error={null} secret="" onPending={() => undefined} onSecret={() => undefined} />);
+  assert.match(html, /Departamente suplimentare/);
+  assert.match(html, /<input type="checkbox" checked=""\/>Depozit/, "the held secondary department is ticked");
+  const section = /<section[^>]*data-secondary-departments[^>]*>(.*?)<\/section>/.exec(html)?.[1] ?? "";
+  assert.ok(section.includes("Depozit") && !section.includes("Producție"), "the primary department is not offered as additional");
+  assert.ok(buttons(html).includes("Salvează departamentele suplimentare"));
+  assert.match(html, /Subordonați direcți \(1\)/);
+  assert.match(html, /Maria Subordonată/);
+  const readOnly = editor(employee({ secondaryDepartments: [{ id: 4, name: "Depozit" }], manageable: false }));
+  assert.ok(!buttons(readOnly).includes("Salvează departamentele suplimentare"));
+  assert.match(readOnly, /Depozit/);
+});

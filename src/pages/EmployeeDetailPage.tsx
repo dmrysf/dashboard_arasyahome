@@ -6,6 +6,7 @@ import { Badge, Card, ConfirmDialog, ErrorBanner, Field, Loading, Notice, OneTim
 import { toProblem, type Messages, type NoticeKey, type Problem, type Translator } from "../i18n";
 import { useI18n } from "../i18n/context";
 import { AuditList } from "./AuditList";
+import { loadAllEmployees, readiness, readinessTone, type ReadinessCheck } from "./readiness";
 
 /** A reviewed change. Its dialog text is rendered from the active language, so it follows a language switch. */
 export type Pending = {
@@ -32,7 +33,8 @@ export function EmployeeDetailPage({ id }: { id: string }) {
   const catalog = useLoader(() => can("roles.view") ? api.permissions() : Promise.resolve(NO_ITEMS));
   const applications = useLoader(() => can("applications.view") ? api.applications() : Promise.resolve(NO_ITEMS));
   const workflow = useLoader(() => api.workflow());
-  const managers = useLoader(() => can("employees.manage_hierarchy") ? api.employees({ status: "active", limit: "100" }) : Promise.resolve({ items: [], nextCursor: null, total: 0 }));
+  // The whole directory (a small organisation): manager choices and direct reports, beyond one page of 100.
+  const directory = useLoader(() => loadAllEmployees(api, {}), id);
   const audit = useLoader(() => can("iam.audit.view") ? api.audit({ targetType: "employee", targetId: id, limit: "20" }) : Promise.resolve(null), id);
 
   const [pending, setPending] = useState<Pending | null>(null);
@@ -68,7 +70,8 @@ export function EmployeeDetailPage({ id }: { id: string }) {
         catalog={catalog.data?.items ?? []}
         applicationKeys={applications.data?.items.filter((item) => item.status === "active").map((item) => item.key) ?? []}
         stages={workflow.data.stages}
-        managers={managers.data?.items ?? []}
+        managers={directory.data?.items.filter((item) => item.status === "active") ?? []}
+        reports={directory.data?.items.filter((item) => item.manager?.id === id) ?? []}
         busy={busy}
         message={message}
         error={error}
@@ -76,7 +79,7 @@ export function EmployeeDetailPage({ id }: { id: string }) {
         onPending={setPending}
         onSecret={setSecret}
       />
-      {can("iam.audit.view") && <Card title={t.employee.activity} className="section-gap">{audit.error ? <ErrorBanner error={audit.error} onRetry={audit.reload} /> : audit.data ? <AuditList items={audit.data.items} stageLabel={(stage) => workflow.data?.stages.find((item) => item.id === stage)?.label} /> : <Loading />}</Card>}
+      {can("iam.audit.view") && <Card title={t.employee.activity} className="section-gap employee-activity">{audit.error ? <ErrorBanner error={audit.error} onRetry={audit.reload} /> : audit.data ? <AuditList items={audit.data.items} stageLabel={(stage) => workflow.data?.stages.find((item) => item.id === stage)?.label} /> : <Loading />}</Card>}
       {pending && <PendingDialog pending={pending} busy={busy} onConfirm={() => { void confirm(); }} onCancel={() => setPending(null)} />}
     </>
   );
@@ -96,6 +99,7 @@ export type EditorProps = {
   applicationKeys: string[];
   stages: WorkflowStage[];
   managers: EmployeeSummary[];
+  reports?: EmployeeSummary[];
   busy: boolean;
   message: NoticeKey | null;
   error: Problem | null;
@@ -105,7 +109,7 @@ export type EditorProps = {
 };
 
 /** Form state starts from the latest server copy; every accepted change remounts it from the server. */
-export function EmployeeEditor({ data, departments, roles, catalog, applicationKeys, stages, managers, busy, message, error, secret, onPending, onSecret }: EditorProps) {
+export function EmployeeEditor({ data, departments, roles, catalog, applicationKeys, stages, managers, reports = [], busy, message, error, secret, onPending, onSecret }: EditorProps) {
   const { api, can, me, navigate } = useDashboard();
   const { t, dateTime, application, stage: stageName, permission } = useI18n();
   const m = t.employee;
@@ -115,6 +119,8 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
   const [roleIds, setRoleIds] = useState<number[]>(data.roles.map((role) => role.id));
   const [stageIds, setStageIds] = useState<string[]>(data.stageIds);
   const [managerId, setManagerId] = useState(data.manager?.id ?? "");
+  const savedSecondary = (data.secondaryDepartments ?? []).map((department) => department.id);
+  const [secondaryIds, setSecondaryIds] = useState<number[]>(savedSecondary);
   const [scopes, setScopes] = useState<DocumentScopes>(data.documentScopes ?? { operate: [], approve: [] });
 
   // Root and identities at or above the actor's authority are read-only. The API enforces this anyway.
@@ -133,9 +139,15 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
   const profileChanged = profile.displayName.trim() !== data.displayName || profile.positionTitle.trim() !== (data.positionTitle ?? "") || profile.departmentId !== String(data.department.id);
   const departmentOptions = (departments.length ? departments : [{ id: data.department.id, name: data.department.name, status: "active" as const }])
     .filter((department) => department.status === "active" || department.id === data.department.id);
+  // Additional functions: any active department except the saved primary one, plus every one still held.
+  const secondaryOptions = [
+    ...departments.filter((department) => department.status === "active" && department.id !== data.department.id),
+    ...(data.secondaryDepartments ?? []).filter((held) => !departments.some((department) => department.id === held.id && department.status === "active")),
+  ];
+  const departmentName = (departmentId: number) => departments.find((department) => department.id === departmentId)?.name ?? data.secondaryDepartments?.find((department) => department.id === departmentId)?.name ?? `#${departmentId}`;
 
   return (
-    <div className="page">
+    <div className="page employee-page">
       <button type="button" className="back-link" onClick={() => navigate("/angajati")}>{m.back}</button>
       <PageHeader title={data.displayName} description={`${data.username} · ${data.positionTitle ?? m.noPosition} · ${data.department.name}`}
         actions={<div className="header-badges">{data.isRoot && <RootBadge />}<StatusBadge status={data.status} />{data.mustChangePassword && <Badge tone="warning">{t.common.temporaryPassword}</Badge>}</div>} />
@@ -162,6 +174,24 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
             <dt>{m.lastLogin}</dt><dd>{dateTime(data.lastLoginAt)}</dd>
             <dt>{m.authorizationVersion}</dt><dd>{data.authorizationVersion}</dd>
           </dl>
+          {data.secondaryDepartments && <section className="secondary-list" data-secondary-departments>
+            <h3 className="small">{m.secondaryDepartments}</h3>
+            <p className="muted small">{m.secondaryHint}</p>
+            {allowed("employees.update") && departments.length > 0 ? <>
+              <div className="check-list">
+                {secondaryOptions.map((department) => (
+                  <label key={department.id} className="check">
+                    <input type="checkbox" checked={secondaryIds.includes(department.id)} onChange={() => setSecondaryIds(toggle(secondaryIds, department.id))} />
+                    {department.name}
+                  </label>
+                ))}
+              </div>
+              <button type="button" className="button button-secondary" disabled={busy || sameSet(secondaryIds, savedSecondary)}
+                onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.secondaryTitle, confirmLabel: tr.common.save,
+                  body: change(tr, savedSecondary.map(departmentName), secondaryIds.map(departmentName), tr.employee.secondaryApply) }),
+                  run: () => api.setSecondaryDepartments(id, [...secondaryIds].sort((a, b) => a - b)) })}>{m.reviewSecondary}</button>
+            </> : <p>{data.secondaryDepartments.length ? data.secondaryDepartments.map((department) => department.name).join(", ") : <span className="muted">{m.noSecondaryDepartments}</span>}</p>}
+          </section>}
         </Card>
 
         <Card title={m.access} description={m.accessHint}
@@ -240,6 +270,10 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
               {managers.filter((manager) => manager.id !== data.id).map((manager) => <option key={manager.id} value={manager.id}>{manager.displayName}</option>)}
             </select>}</Field>
           ) : <dl className="facts"><dt>{m.manager}</dt><dd>{data.manager?.displayName ?? "—"}</dd></dl>}
+          <h3 className="small">{m.directReports(reports.length)}</h3>
+          {reports.length ? <span className="name-list" data-direct-reports>{reports.map((report) => (
+            <a key={report.id} href={`/angajati/${report.id}`} onClick={(event) => { event.preventDefault(); navigate(`/angajati/${report.id}`); }}>{report.displayName}</a>
+          ))}</span> : <p className="muted small">{m.noDirectReports}</p>}
         </Card>
 
         <Card title={m.security}>
@@ -320,34 +354,43 @@ export function DocumentScopesCard({ data, scopes, editable, busy, onChange, onP
 }
 
 /**
- * Account-side pilot checklist (docs/pilot-readiness.md) from fields the API already returns. It exposes only
- * booleans and counts: never a password, hash or session. Phone login, claim and stage completion are verified
- * in Staff afterwards.
+ * Account-side readiness checklist (docs/pilot-readiness.md), contextual to the applications this identity was
+ * granted (see readiness.ts). It exposes only booleans and counts: never a password, hash or session. Phone
+ * login, claim and stage completion are verified in Staff afterwards.
  */
 export function PilotReadiness({ data }: { data: EmployeeDetail }) {
-  const { t } = useI18n();
+  const { t, application } = useI18n();
   const p = t.employee.pilot;
-  const active = data.status === "active";
-  const staff = data.applications.includes("staff");
-  const stages = data.stageIds.length > 0;
-  const passwordChanged = !data.mustChangePassword;
-  const verdict = active && staff && stages ? (passwordChanged ? "ready" : "pending") : "not_ready";
-  const items: Array<{ key: string; ok: boolean; label: string; soft?: boolean }> = [
-    { key: "active", ok: active, label: p.active },
-    { key: "staff", ok: staff, label: p.staff },
-    { key: "stages", ok: stages, label: stages ? p.stages(data.stageIds.length) : p.noStages },
-    { key: "password", ok: passwordChanged, label: passwordChanged ? p.passwordChanged : p.passwordTemporary, soft: true },
-    { key: "login", ok: data.lastLoginAt !== null, label: data.lastLoginAt !== null ? p.firstLogin : p.noLogin, soft: true },
-  ];
+  const result = readiness(data);
+  const names = data.applications.map((key) => application(key)).join(", ");
+  const capability = (key: "operate" | "approve") => key === "operate" ? t.employee.scopeOperate : t.employee.scopeApprove;
+  const label = (check: ReadinessCheck): string => {
+    switch (check.key) {
+      case "active": return check.ok ? p.active : p.inactive;
+      case "applications": return check.ok ? p.applications(names) : p.noApplications;
+      case "staff-stages": return check.ok ? p.stages(check.count) : p.noStages;
+      case "stages-without-staff": return p.stagesWithoutStaff(check.count);
+      case "dashboard-roles": return p.roles(application("dashboard"), check.count);
+      case "b2b-roles": return p.roles(application("b2b"), check.count);
+      case "document-scopes": return p.documentScopes(check.capabilities.map(capability).join(", "));
+      case "password": return check.ok ? p.passwordChanged : p.passwordTemporary;
+      case "login": return check.ok ? p.firstLogin : p.noLogin;
+    }
+  };
+  const summary = result.verdict === "ready" ? p.readyFor(names) : result.verdict === "password_pending" ? p.pendingFor(names) : null;
   return (
     <Card title={p.title} description={p.hint} className="pilot-card section-gap"
-      actions={<span data-pilot={verdict}><Badge tone={verdict === "ready" ? "success" : verdict === "pending" ? "warning" : "neutral"}>{verdict === "ready" ? p.ready : verdict === "pending" ? p.pending : p.notReady}</Badge></span>}>
+      actions={<span data-pilot={result.verdict}><Badge tone={readinessTone(result.verdict)}>{p.verdict[result.verdict]}</Badge></span>}>
+      {summary && <p className="small">{summary}</p>}
       <ul className="pilot-list">
-        {items.map((item) => (
-          <li key={item.key} data-check={item.key} data-ok={item.ok ? "true" : "false"} className={item.ok ? "is-ok" : item.soft ? "is-pending" : "is-missing"}>
-            <span aria-hidden="true">{item.ok ? "✓" : item.soft ? "…" : "✕"}</span> {item.label}
-          </li>
-        ))}
+        {result.checks.map((check) => {
+          const soft = "soft" in check && check.soft;
+          return (
+            <li key={check.key} data-check={check.key} data-ok={check.ok ? "true" : "false"} className={check.ok ? "is-ok" : soft ? "is-pending" : "is-missing"}>
+              <span aria-hidden="true">{check.ok ? "✓" : soft ? "…" : "✕"}</span> {label(check)}
+            </li>
+          );
+        })}
       </ul>
     </Card>
   );

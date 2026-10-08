@@ -170,6 +170,8 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     /** Root only: the order sources this identity's document permissions reach. */
     setDocumentScopes: (id: string, scopes: DocumentScopes) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/document-scopes`, { method: "PUT", body: scopes }),
     setManager: (id: string, managerId: string | null) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/manager`, { method: "PUT", body: { managerId } }),
+    /** Additional organisational functions; membership only, never a permission. */
+    setSecondaryDepartments: (id: string, departmentIds: number[]) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/secondary-departments`, { method: "PUT", body: { departmentIds } }),
     applications: () => request<{ items: Application[] }>("/management/applications"),
     permissions: () => request<{ items: Permission[] }>("/management/permissions"),
     roles: () => request<{ items: Role[] }>("/management/roles"),

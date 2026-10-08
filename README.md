@@ -1,5 +1,15 @@
 # Arasya Dashboard
 
+Dashboard **0.12.0** makes employee administration ready for the factory pilot. No API change; works with Operations API 2.22 and later.
+
+- **Pregătire operațională.** The readiness card on the employee page now depends on the applications the person actually has. A Dashboard-only manager or a B2B finance user is no longer shown as "not ready" for lacking Staff stages. The statuses are: inactive, no application, incomplete configuration (Staff without a stage, Dashboard or B2B without a role, stages without Staff), waiting for the password change, ready. A document permission without a source is shown for information only.
+- **Pregătire column.** The employee list shows the same status in a new column.
+- **Acoperire etape** (`/angajati/etape`). For each of the 14 stages it shows who is ready, who is waiting for the password change, and who is assigned but blocked (inactive or without Staff access). It also lists active Staff accounts without a stage.
+- **Secondary departments.** The employee page shows them and lets an administrator edit them through the existing audited endpoint.
+- **Direct reports.** The *Ierarhie* card lists them. Manager choices are no longer limited to the first 100 active identities.
+
+Everything is derived from server data; nothing is inferred from a job title or department. See the API repository's `docs/factory-pilot-rollout.md`.
+
 Dashboard **0.11.0** makes the first login unmistakable and safer to use: the forced change is titled *Setează parola personală* and states that a personal password is required before any company information; every password field (login, current, new, confirmation) has its own Show/Hide control with a distinct accessible name and `aria-pressed`; Romanian (and Turkish) checks run before the request (all fields, 12 characters, different from the current password, no username, matching confirmation) while the API stays the authority. A voluntary *Schimbă parola* in the account area keeps one central password for every application. Works with Operations API 2.22 and later; API 2.23 adds the rate limit on password changes. See the API repository's `docs/employee-onboarding.md`.
 
 Dashboard **0.10.0** / Operations API **2.22.0** adds the root-only *Surse pentru documente* card on the employee page: which order sources (Trendhome, OutletPerdele, Trendyol, B2B) an identity's production document permissions reach, separately for operating and approving. A document permission without a scope reaches nothing; a scope grants no permission by itself. Every other viewer, the CEO included, sees the scopes read-only, and the API refuses their changes with `ROOT_ONLY`. Changes go through the usual review dialog and are audited (`employee.document_scopes_changed`). Against an API older than 2.22 the card is hidden. See the API repository's `docs/organization-iam.md`.

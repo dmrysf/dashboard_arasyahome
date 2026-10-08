@@ -233,15 +233,15 @@ test("IAM audit renders ownership interventions from stable keys in both languag
   assert.equal(tr.permission("production.manage_owner"), "Üretim Sorumlusuna Müdahale");
 });
 
-test("the pilot readiness card summarises the account from booleans only", () => {
+test("the readiness card summarises the account from booleans only", () => {
   const ready = wrap("ro", <PilotReadiness data={employee({ stageIds: ["waiting", "material-preparation"], lastLoginAt: "2026-10-04T08:00:00.000Z" })} />);
   assert.match(ready, /data-pilot="ready"/);
-  assert.ok(text(ready).includes("Contul poate lucra în Staff") && text(ready).includes("2 etape Staff atribuite") && text(ready).includes("Parola temporară a fost schimbată"));
+  assert.ok(text(ready).includes("Poate lucra în: Staff") && text(ready).includes("Staff: 2 etape de producție atribuite") && text(ready).includes("Parola temporară a fost schimbată"));
   const pending = wrap("ro", <PilotReadiness data={employee({ mustChangePassword: true })} />);
-  assert.match(pending, /data-pilot="pending"/);
+  assert.match(pending, /data-pilot="password_pending"/);
   const missing = wrap("ro", <PilotReadiness data={employee({ applications: ["dashboard"], stageIds: [], status: "inactive" })} />);
-  assert.match(missing, /data-pilot="not_ready"/);
-  assert.deepEqual([...missing.matchAll(/data-check="([^"]+)" data-ok="(true|false)"/g)].map((match) => `${match[1]}:${match[2]}`), ["active:false", "staff:false", "stages:false", "password:true", "login:false"]);
+  assert.match(missing, /data-pilot="inactive"/);
+  assert.deepEqual([...missing.matchAll(/data-check="([^"]+)" data-ok="(true|false)"/g)].map((match) => `${match[1]}:${match[2]}`), ["active:false", "applications:true", "dashboard-roles:true", "password:true", "login:false"]);
   assert.ok(!/hash|token|session|password_hash/i.test(missing.replace(/data-check="password"/g, "")), "no credential material");
-  assert.ok(text(wrap("tr", <PilotReadiness data={employee({ stageIds: ["waiting"] })} />)).includes("Pilot Hazırlığı"));
+  assert.ok(text(wrap("tr", <PilotReadiness data={employee({ stageIds: ["waiting"] })} />)).includes("Operasyonel Hazırlık"));
 });

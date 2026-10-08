@@ -3,6 +3,15 @@ import { useDashboard } from "../app/context";
 import { useLoader } from "../app/useLoader";
 import { Badge, EmptyState, ErrorBanner, Loading, PageHeader, RootBadge, StatusBadge } from "../components/ui";
 import { useI18n } from "../i18n/context";
+import type { EmployeeSummary } from "../api/types";
+import { readiness, readinessTone } from "./readiness";
+
+/** Compact readiness of one row, contextual to its granted applications (see readiness.ts). */
+export function ReadinessBadge({ employee }: { employee: EmployeeSummary }) {
+  const { t } = useI18n();
+  const { verdict } = readiness(employee);
+  return <span data-readiness={verdict}><Badge tone={readinessTone(verdict)}>{t.employee.pilot.verdict[verdict]}</Badge></span>;
+}
 
 export function EmployeesPage() {
   const { api, can, navigate } = useDashboard();
@@ -20,7 +29,10 @@ export function EmployeesPage() {
   return (
     <div className="page">
       <PageHeader title={e.title} description={e.description}
-        actions={can("employees.create") ? <button type="button" className="button button-primary" onClick={() => navigate("/angajati/nou")}>{e.create}</button> : undefined} />
+        actions={<div className="button-row">
+          <button type="button" className="button button-secondary" onClick={() => navigate("/angajati/etape")}>{e.stageCoverage}</button>
+          {can("employees.create") && <button type="button" className="button button-primary" onClick={() => navigate("/angajati/nou")}>{e.create}</button>}
+        </div>} />
       <form className="filters" role="search" onSubmit={(event) => { event.preventDefault(); update("search", search.trim()); }}>
         <input aria-label={e.searchPlaceholder} placeholder={e.searchPlaceholder} value={search} onChange={(event) => setSearch(event.target.value)} />
         <select aria-label={e.status} value={query.status ?? ""} onChange={(event) => update("status", event.target.value)}>
@@ -45,7 +57,7 @@ export function EmployeesPage() {
       {page.data && (page.data.items.length === 0 ? <EmptyState title={e.emptyTitle}>{e.emptyHint}</EmptyState> : <>
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>{e.name}</th><th>{e.username}</th><th>{e.department}</th><th>{e.position}</th><th>{e.manager}</th><th>{e.applications}</th><th>{e.roles}</th><th>{e.status}</th></tr></thead>
+            <thead><tr><th>{e.name}</th><th>{e.username}</th><th>{e.department}</th><th>{e.position}</th><th>{e.manager}</th><th>{e.applications}</th><th>{e.roles}</th><th>{e.status}</th><th>{e.readiness}</th></tr></thead>
             <tbody>
               {page.data.items.map((employee) => (
                 <tr key={employee.id} className={employee.isRoot ? "row-root" : ""} onClick={() => navigate(`/angajati/${employee.id}`)}>
@@ -57,6 +69,7 @@ export function EmployeesPage() {
                   <td data-label={e.applications}>{employee.applications.length ? employee.applications.map((key) => <Badge key={key} tone="accent">{application(key)}</Badge>) : "—"}</td>
                   <td data-label={e.roles}>{employee.isRoot ? t.root.allRights : employee.roles.map((role) => role.name).join(", ") || "—"}</td>
                   <td data-label={e.status}><StatusBadge status={employee.status} /></td>
+                  <td data-label={e.readiness}>{employee.isRoot ? "—" : <ReadinessBadge employee={employee} />}</td>
                 </tr>
               ))}
             </tbody>
