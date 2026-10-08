@@ -21,6 +21,7 @@ const fixture = JSON.parse(readFileSync(path.join(import.meta.dirname, ".real-ap
 const API = "http://127.0.0.1:8788";
 const ROOT_PASSWORD = "root e2e permanent passphrase 2026";
 const EMPLOYEE_PASSWORD = "angajat e2e passphrase 2026";
+const EMPLOYEE_SECOND_PASSWORD = "angajat e2e a doua parolă 2026";
 const EMPLOYEE = { name: "Test Angajat IAM", username: "test.angajat.iam" };
 
 test.describe.configure({ mode: "serial" });
@@ -39,7 +40,7 @@ async function login(page: Page, username: string, password: string) {
 }
 
 async function changePassword(page: Page, current: string, next: string) {
-  await expect(page.getByRole("heading", { name: "Schimbă parola" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Setează parola personală" })).toBeVisible();
   await page.getByLabel("Parola actuală").fill(current);
   await page.getByLabel("Parola nouă", { exact: true }).fill(next);
   await page.getByLabel("Confirmă parola nouă").fill(next);
@@ -429,7 +430,31 @@ test("13-14 granting Dashboard access applies on the next authorization request 
   await review(root, "Revizuiește accesul", "Aplică accesul");
   await employee.reload();
   await expect(employee.getByRole("heading", { name: /^Bună, Test\./ })).toBeVisible();
-  await expect(employee.getByRole("heading", { name: "Schimbă parola" })).toHaveCount(0);
+  await expect(employee.getByRole("heading", { name: "Setează parola personală" })).toHaveCount(0);
+});
+
+test("voluntary password change from the account area keeps one central password", async () => {
+  if (!(await employee.getByRole("button", { name: "Schimbă parola" }).isVisible())) await employee.getByRole("button", { name: "Meniu" }).click();
+  await employee.getByRole("button", { name: "Schimbă parola" }).click();
+  await expect(employee.getByRole("heading", { name: "Schimbă parola" })).toBeVisible();
+  await expect(employee.getByRole("note")).toHaveCount(0);
+  await employee.getByLabel("Parola actuală").fill("nu este parola curentă");
+  await employee.getByLabel("Parola nouă", { exact: true }).fill(EMPLOYEE_SECOND_PASSWORD);
+  await employee.getByLabel("Confirmă parola nouă").fill(EMPLOYEE_SECOND_PASSWORD);
+  await employee.getByRole("button", { name: "Afișează parola curentă" }).click();
+  await expect(employee.getByLabel("Parola actuală")).toHaveAttribute("type", "text");
+  await employee.getByRole("button", { name: "Salvează parola" }).click();
+  await expect(employee.getByText("Parola actuală nu este corectă.")).toBeVisible();
+  await employee.getByLabel("Parola actuală").fill(EMPLOYEE_PASSWORD);
+  await employee.getByRole("button", { name: "Salvează parola" }).click();
+  await expect(employee.getByRole("heading", { name: /^Bună, Test\./ })).toBeVisible();
+  const oldPassword = await employee.evaluate(async ({ api, username, password }) => (await fetch(`${api}/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username, password }) })).status, { api: API, username: EMPLOYEE.username, password: EMPLOYEE_PASSWORD });
+  expect(oldPassword).toBe(401);
+  if (!(await employee.getByRole("button", { name: "Ieși din cont" }).isVisible())) await employee.getByRole("button", { name: "Meniu" }).click();
+  await employee.getByRole("button", { name: "Ieși din cont" }).click();
+  await expect(employee.getByRole("heading", { name: "Autentificare" })).toBeVisible();
+  await login(employee, EMPLOYEE.username, EMPLOYEE_SECOND_PASSWORD);
+  await expect(employee.getByRole("heading", { name: /^Bună, Test\./ })).toBeVisible();
 });
 
 test("15-16 removing Dashboard access denies the next protected request again", async () => {
@@ -451,7 +476,7 @@ test("17-18 deactivating the user rejects its existing session", async () => {
   expect(status).toBe(401);
   await employee.reload();
   await expect(employee.getByRole("heading", { name: "Autentificare" })).toBeVisible();
-  await login(employee, EMPLOYEE.username, EMPLOYEE_PASSWORD);
+  await login(employee, EMPLOYEE.username, EMPLOYEE_SECOND_PASSWORD);
   await expect(employee.getByRole("alert")).toBeVisible();
   await expect(employee.getByRole("heading", { name: /^Bună/ })).toHaveCount(0);
 });

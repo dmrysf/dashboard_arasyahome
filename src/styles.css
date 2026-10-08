@@ -56,6 +56,15 @@ button, input, select { font: inherit; color: inherit; }
 .auth-form .button-block { margin-top: 12px; }
 .auth-footnote { text-align: center; color: var(--muted); font-size: 12px; }
 .hint { color: var(--muted); font-size: 12px; }
+.password-input { position: relative; }
+.password-input input { height: 44px; padding-right: 92px; }
+.password-toggle { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); min-width: 80px; height: 36px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--canvas); font-size: 12px; font-weight: 600; cursor: pointer; }
+.password-toggle:hover { border-color: var(--accent); }
+.password-toggle:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(185, 133, 58, 0.25); }
+.password-toggle[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+.password-required { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid #f2dcb3; border-radius: var(--radius-sm); background: var(--warning-soft); color: #6f4300; font-size: 13px; line-height: 1.45; }
+.password-required strong { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.password-changed { margin: 0 0 8px; font-size: 12px; color: #9fe0bd; }
 
 /* Inputs and buttons */
 input, select { width: 100%; height: 38px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }

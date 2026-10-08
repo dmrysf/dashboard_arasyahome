@@ -199,8 +199,10 @@ test("9-14: departments, applications, audit, system, login and password change 
   }
   const login = text(renderToStaticMarkup(<I18nProvider locale="tr"><LoginPage notice={new ApiError("SESSION_EXPIRED", 401)} onLogin={async () => undefined} /></I18nProvider>));
   for (const label of ["Giriş", "Kullanıcı adı", "Şifre", "Giriş yap", "Oturumunuzun süresi doldu"]) assert.match(login, new RegExp(label), label);
-  const change = text(renderToStaticMarkup(<I18nProvider locale="tr"><ChangePasswordPage displayName="Ion" onChange={async () => undefined} onLogout={() => undefined} /></I18nProvider>));
-  for (const label of ["Şifreyi değiştir", "Mevcut şifre", "Yeni şifre", "Yeni şifreyi doğrula", "Şifreyi kaydet", "Çıkış yap"]) assert.match(change, new RegExp(label), label);
+  const change = text(renderToStaticMarkup(<I18nProvider locale="tr"><ChangePasswordPage displayName="Ion" username="ion" onChange={async () => undefined} onLogout={() => undefined} /></I18nProvider>));
+  for (const label of ["Kişisel şifrenizi belirleyin", "Zorunlu adım", "Mevcut şifre \\(geçici\\)", "Yeni şifre", "Yeni şifreyi doğrula", "Göster", "Şifreyi kaydet", "Çıkış yap"]) assert.match(change, new RegExp(label), label);
+  const changeMarkup = renderToStaticMarkup(<I18nProvider locale="tr"><ChangePasswordPage displayName="Ion" username="ion" onChange={async () => undefined} onLogout={() => undefined} /></I18nProvider>);
+  for (const name of ["Geçerli parolayı göster", "Yeni parolayı göster", "Parola doğrulamasını göster"]) assert.match(changeMarkup, new RegExp(`aria-label="${name}"`), name);
   const denied = text(renderToStaticMarkup(<I18nProvider locale="tr"><NoAccessPage displayName="Ion" onLogout={() => undefined} /></I18nProvider>));
   assert.match(denied, /Yönetim Paneline erişim yetkiniz yok\./);
   for (const html of [login, change, denied]) assert.doesNotMatch(html, ROMANIAN_UI);
