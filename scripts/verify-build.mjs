@@ -7,7 +7,7 @@ const repositoryRoot = path.resolve(import.meta.dirname, "..");
 const dist = path.join(repositoryRoot, process.argv[2] ?? "dist");
 const fail = (message) => { throw new Error(`Build Dashboard invalid: ${message}`); };
 
-for (const file of ["index.html", ".htaccess", "robots.txt", "favicon.svg"]) {
+for (const file of ["index.html", ".htaccess", "robots.txt", "favicon.svg", "favicon.ico", "apple-touch-icon.png"]) {
   try { await access(path.join(dist, file)); } catch { fail(`lipsește ${file}`); }
 }
 const assets = await readdir(path.join(dist, "assets")).catch(() => fail("lipsește directorul assets"));

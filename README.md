@@ -1,5 +1,7 @@
 # Arasya Dashboard
 
+Dashboard **0.12.2**: the browser tab icon is now the Arasya "A" taken from the company wordmark, black on a white tile so it reads on light and dark tab bars (`favicon.svg`, a 16/32/48 px `favicon.ico` and a 180 px `apple-touch-icon.png`). Same icon as Staff 2.20.1 and B2B 0.8.2.
+
 Dashboard **0.12.1** lets long buttons on the employee page wrap on a 360 px phone instead of widening the screen (the *Salvează departamentele suplimentare* button overflowed on Linux Chromium fonts).
 
 Dashboard **0.12.0** makes employee administration ready for the factory pilot. No API change; works with Operations API 2.22 and later.
