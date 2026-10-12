@@ -1,6 +1,6 @@
 import type {
   DocumentLookupItem, OrderDocuments, RevisionRequest,
-  Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
+  Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, RestoreRecipient, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
 } from "./types";
 import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
 import type { AnalyticsPolicy } from "./analytics";
@@ -188,7 +188,8 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     exceptions: (view: "pending" | "waiting" | "mine", signal?: AbortSignal) => request<{ items: ExceptionSummary[] }>("/management/production-exceptions", { query: { view }, signal }),
     exception: (id: string, signal?: AbortSignal) => request<ExceptionDetail>(`/management/production-exceptions/${encodeURIComponent(id)}`, { signal }),
     decideException: (id: string, body: { expectedVersion: number; decision: "approve" | "reject"; comment?: string; attribution?: "cutter" | "none" }, idempotencyKey: string) => request<ExceptionDetail>(`/management/production-exceptions/${encodeURIComponent(id)}/decision`, { method: "POST", body, idempotencyKey }),
-    cancelException: (id: string, body: { expectedVersion: number; reason: string }, idempotencyKey: string) => request<ExceptionDetail>(`/management/production-exceptions/${encodeURIComponent(id)}/cancel`, { method: "POST", body, idempotencyKey }),
+    cancelException: (id: string, body: { expectedVersion: number; reason: string; recipientEmployeeId?: string }, idempotencyKey: string) => request<ExceptionDetail>(`/management/production-exceptions/${encodeURIComponent(id)}/cancel`, { method: "POST", body, idempotencyKey }),
+    restoreRecipients: (id: string, signal?: AbortSignal) => request<{ items: RestoreRecipient[] }>(`/management/production-exceptions/${encodeURIComponent(id)}/restore-recipients`, { signal }),
     lookupOrders: (number: string) => request<{ items: LookupMatch[] }>("/management/order-lookup", { query: { number } }),
     lookupOrder: (globalOrderId: string, signal?: AbortSignal) => request<LookupDetail>(`/management/order-lookup/${encodeURIComponent(globalOrderId)}`, { signal }),
     organization: () => request<Organization>("/management/organization"),
