@@ -121,6 +121,16 @@ foreach (['denisa.ops.e2e' => 'Denisa Voican', 'hikmet.ops.e2e' => 'Hikmet Yerli
 $container->employeeAdmin()->create('Crama Florin', 'crama.cut.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, ['material-preparation'], 'e2e');
 $container->employeeAdmin()->create('Andrea Tăiere', 'andrea.cut.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, ['material-preparation'], 'e2e');
 $container->employeeAdmin()->create('Oprea Doina', 'oprea.intake.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, ['workshop-receiving'], 'e2e');
+// Tailoring quality supervision (API 2.28): a CEO principal who appoints the supervisor in the Organization
+// screen during the spec, the supervisor, and a tailor for stages 3-12. Orders are created by that spec.
+$ceo = $container->employeeAdmin()->create('Mesut CEO', 'ceo.sup.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, [], 'e2e');
+$pdo->prepare('DELETE FROM employee_application_access WHERE employee_uuid = ?')->execute([$ceo->employeeUuid]);
+$pdo->prepare("INSERT INTO employee_application_access (employee_uuid, application_key, granted_at) VALUES (?, 'dashboard', UTC_TIMESTAMP(6))")->execute([$ceo->employeeUuid]);
+$pdo->prepare("INSERT INTO employee_role_assignments (employee_uuid, role_id, assigned_at) SELECT ?, role_id, UTC_TIMESTAMP(6) FROM roles WHERE role_key = 'ceo'")->execute([$ceo->employeeUuid]);
+$pdo->prepare("INSERT INTO organization_principals (principal_key, employee_uuid, assigned_at, assigned_by_employee_uuid) VALUES ('ceo', ?, UTC_TIMESTAMP(6), NULL)")->execute([$ceo->employeeUuid]);
+$tailoringStages = ['workshop-receiving', 'labeling', 'material-straightening', 'bottom-hem', 'side-hem', 'ironing', 'height', 'header-tape', 'sewing-finishing', 'quality-control'];
+$container->employeeAdmin()->create('Elena Croitorie', 'tailor.sup.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, $tailoringStages, 'e2e');
+$container->employeeAdmin()->create('VASILOAIA IULIANA', 'chief.sup.e2e', null, 'pregatire-material', 'employee', $exceptionPassword, $tailoringStages, 'e2e');
 // The cutting-fault orders are created by the approvals spec itself (it runs last), so the production
 // overview figures asserted by the earlier specs stay unchanged.
 
@@ -171,6 +181,7 @@ echo json_encode([
         'cutter' => 'crama.cut.e2e',
         'intake' => 'oprea.intake.e2e',
     ],
+    'supervision' => ['ceo' => 'ceo.sup.e2e', 'chief' => 'chief.sup.e2e', 'chiefName' => 'VASILOAIA IULIANA', 'tailor' => 'tailor.sup.e2e'],
     'production' => [
         'summary' => ['active' => 5, 'waiting' => 3, 'inWork' => 2, 'unassigned' => 4, 'completedToday' => 1],
         'stages' => ['waiting' => 3, 'labeling' => 1, 'quality-control' => 1, 'ironing' => 0, 'delivery' => 0],

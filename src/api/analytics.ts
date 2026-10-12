@@ -9,6 +9,8 @@ export type EmployeeAnalytics = {
   id: string; name: string; positionTitle: string | null; status: string; department: { id: number; key: string; name: string };
   completedOrders: number; completedLines: number; completedMeters: string; averageMetersPerOrder: string | null; missingMeterSamples: number; missingLineSamples: number;
   faultOrders: number; faultLines: number; faultMeters: string; detectedOrders: number; detectedLines: number; detectedMeters: string; reworkCycles: number; repeatedCycles: number;
+  /** Fault lines whose meters the source never sent (API 2.28); faultMeters / detectedMeters sum the measured lines only. */
+  faultUnmeasuredLines?: number; detectedUnmeasuredLines?: number;
   initiatedTransfers: number; outgoingTransfers: number; incomingTransfers: number; activeHandling: Duration; completedHandling: Record<ClockKind, Distribution>;
   cuttingActiveHandling: Duration; stageHandling: Record<string, Duration>; repeatedOrders: number; repeatedMeters: string; onlineSubmissions: number;
   faultMeterRate: Rate; faultOrderRate: Rate; faultLineRate: Rate; stageCompletions: Record<string, number>; daily: Record<string, Trend> | []; weekly: Record<string, Trend> | [];
@@ -19,7 +21,7 @@ export type AnalyticsOrder = { id: string; globalOrderId: string; number: string
 export type OrderPage = { items: AnalyticsOrder[]; total: number; nextCursor: string | null };
 export type EmployeeReport = AnalyticsMeta & { items: EmployeeAnalytics[]; total: number; nextCursor: string | null };
 export type EmployeeDetailReport = AnalyticsMeta & { employee: EmployeeAnalytics; orders: OrderPage; longestIntervals: Interval[] };
-export type DepartmentReport = AnalyticsMeta & { items: { department: EmployeeAnalytics["department"]; metricSet: string; employees: number; completedOrders: number; completedLines: number; completedMeters: string; faultLines: number; faultMeters: string; detectedLines: number; detectedMeters: string; activeHandling: Duration; stageCompletions: Record<string, number>; reworkCycles: number; repeatedCycles: number; onlineSubmissions: number; managerWaitingForRelatedOrders: Duration }[] };
+export type DepartmentReport = AnalyticsMeta & { items: { department: EmployeeAnalytics["department"]; metricSet: string; employees: number; completedOrders: number; completedLines: number; completedMeters: string; faultLines: number; faultMeters: string; faultUnmeasuredLines?: number; detectedLines: number; detectedMeters: string; detectedUnmeasuredLines?: number; activeHandling: Duration; stageCompletions: Record<string, number>; reworkCycles: number; repeatedCycles: number; onlineSubmissions: number; managerWaitingForRelatedOrders: Duration }[] };
 export type ManagerReport = AnalyticsMeta & {
   items: { id: string; name: string | null; received: number | null; knownEligibleReceived: number; approved: number; rejected: number; decisions: number; backupDecisions: number; rereviewsAfterRejection: number; pendingEligible: number; pendingElapsed: Duration; byType: Record<"exception" | "transfer", { approved: number; rejected: number }>; wallResponse: Distribution; businessResponse: Distribution }[];
   requests: { id: string; type: "exception" | "transfer"; orderId: string; status: string; attempt: number; previousDecisionId: string | null; openedAt: string; decidedAt: string | null; decidedBy: string | null; via: string | null; response: Duration; isPending: boolean; eligibilityCaptured: boolean }[];

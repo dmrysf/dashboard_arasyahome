@@ -4,7 +4,7 @@ import { useDashboard } from "../app/context";
 import { Badge, Card, EmptyState, ErrorBanner, ErrorText, Field, Loading, PageHeader } from "../components/ui";
 import { toProblem, type Problem } from "../i18n";
 import { useI18n } from "../i18n/context";
-import { meters } from "./ApprovalsPage";
+import { faultScope, meters } from "./ApprovalsPage";
 import { useLoaderWithSignal } from "./useLoaderWithSignal";
 
 /** Exact order search: one typed number, exact matches only, never a list of orders. */
@@ -87,7 +87,7 @@ export function OrderLookupDetailPage({ id }: { id: string }) {
       </div>
       <Card title={l.exceptions}>
         {data.exceptions.length === 0 ? <p className="muted">{l.noExceptions}</p> : <ul className="history-list">{data.exceptions.map((item) => <li key={item.id}>
-          <button type="button" className="link-button" onClick={() => navigate(`/aprobari/cerere/${item.id}`)}>{item.number} · {item.reason.label} · {meters(item.faultMeters)} · {x.responsible}: {item.responsible.displayName}</button>
+          <button type="button" className="link-button" onClick={() => navigate(`/aprobari/cerere/${item.id}`)}>{item.number} · {item.reason.label} · {faultScope(x, item)} · {x.responsible}: {item.responsible.displayName}</button>
           <Badge tone={item.status === "approved" ? "success" : "neutral"}>{x.status[item.status]}</Badge></li>)}</ul>}
       </Card>
     </div>

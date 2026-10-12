@@ -63,32 +63,46 @@ export type OrderDocuments = {
 };
 export type DocumentLookupItem = { orderId: string; orderNumber: string; source: string; documentStatus: string; revisionNumber: number | null };
 
-export type ExceptionStatus = "awaiting_acknowledgment" | "awaiting_approval" | "approved" | "rejected" | "cancelled";
+export type ExceptionStatus = "awaiting_acknowledgment" | "awaiting_approval" | "approved" | "rejected" | "cancelled"
+  | "awaiting_supervisor_review" | "dismissed" | "in_supervisor_custody" | "return_rejected" | "restored" | "awaiting_restore_receipt";
 
 export type ExceptionDecision = {
   attempt: number; status: "pending" | "approved" | "rejected" | "cancelled"; openedReason: "acknowledged" | "rereview"; openedBy: string; openedComment: string | null;
   openedAt: string; decidedAt: string | null; decidedBy: string | null; decidedById: string | null; decidedVia: string | null; comment: string | null; waitSeconds: number | null;
 };
 
-/** A cutting fault return request as managers see it. Meters are exact decimal strings ("17.000"). */
+/**
+ * A production exception as managers see it: the original cutting fault, or a tailoring defect verified by the
+ * tailoring quality supervisor (managers decide only its final return to cutting). Meters are exact decimals of the
+ * measured lines only: `faultMeters` is null when no line was measured and `unmeasuredLineCount` counts the lines
+ * whose meters the source never sent (API 2.28). Unknown meters are never a measured zero.
+ */
 export type ExceptionSummary = {
-  id: string; number: string; type: "cutting_fault"; status: ExceptionStatus; version: number;
+  id: string; number: string; type: "cutting_fault" | "tailoring_defect"; status: ExceptionStatus; version: number;
   order: { id: string; orderNumber: string; source: string; sourceName: string };
-  reason: { key: string; label: string }; lineCount: number; faultMeters: string; arrivalNumber: number; reworkCycle: number | null; repeatedError: boolean;
+  reason: { key: string; label: string }; lineCount: number; faultMeters: string | null; unmeasuredLineCount?: number; arrivalNumber: number; reworkCycle: number | null; repeatedError: boolean;
   detector: { displayName: string }; responsible: { displayName: string };
   reportedAt: string; acknowledgedAt: string | null; resolvedAt: string | null; pendingSince: string | null; attempts: number;
+  detectedStage?: { id: string; label: string | null };
+  confirmedReason?: { key: string; label: string; cuttingAttributable: boolean } | null;
+  supervisor?: { displayName: string } | null; receiver?: { displayName: string } | null; physicalCustodian?: { displayName: string } | null;
+  responsibilityPosition?: "accepted" | "disputed" | "not_stated" | null; attribution?: "cutter" | "none" | null;
+  restoreRecipient?: { displayName: string } | null; restoreRequestedAt?: string | null; restoreReceivedAt?: string | null; cancelledByRoot?: boolean;
   myDecisions?: { attempt: number; status: string; decidedAt: string; comment: string | null }[];
   decisions?: ExceptionDecision[];
 };
 
 export type ExceptionDetail = ExceptionSummary & {
   detectorComment: string | null; acknowledgmentComment: string | null; qrVerifiedAt: string | null; cancelReason: string | null;
-  lines: { itemId: string; lineNumber: number; name: string; code: string | null; variant: string | null; color: string | null; quantity: number; meters: string }[];
+  lines: { itemId: string; lineNumber: number; name: string; code: string | null; variant: string | null; color: string | null; quantity: number; meters: string | null }[];
   decisions: ExceptionDecision[];
   timeline: { action: string; actor: string; at: string; version: number; details: Record<string, unknown> | null }[];
   orderHistory: ExceptionSummary[];
-  actions: { canDecide: boolean; canCancel: boolean; involved: boolean };
+  /** cancelNeedsRecipient: the product left the reporting worker, so root cancel is a recovery that names who receives it back. */
+  actions: { canDecide: boolean; canCancel: boolean; involved: boolean; requiresAttribution?: boolean; canAttributeToCutter?: boolean; cancelNeedsRecipient?: boolean };
 };
+
+export type RestoreRecipient = { id: string; displayName: string; original: boolean };
 
 export type LookupMatch = { id: string; orderNumber: string; source: string; sourceName: string; stage: { id: string; label: string }; completed: boolean; unavailable: boolean; blockedByException: boolean };
 
@@ -105,7 +119,7 @@ export type LookupDetail = {
 export type WorkingDay = { weekday: number; isOpen: boolean; opensAt: string | null; closesAt: string | null };
 
 export type Responsibility = {
-  id: string; responsibility: "tailoring_intake_responsible" | "operations_backup_approver" | "document_revision_backup_approver"; employee: { id: string; displayName: string };
+  id: string; responsibility: "tailoring_intake_responsible" | "operations_backup_approver" | "document_revision_backup_approver" | "tailoring_quality_supervisor"; employee: { id: string; displayName: string };
   startsAt: string; endsAt: string | null; note: string | null; createdAt: string; createdBy: string; revokedAt: string | null; revokedBy: string | null; revokeReason: string | null;
   state: "active" | "scheduled" | "ended" | "revoked";
 };
