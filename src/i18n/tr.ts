@@ -771,6 +771,7 @@ export const tr: Messages = {
     INVALID_CURSOR: "İstenen sayfa artık geçerli değil. Listeyi yenileyin.",
     INVALID_LIMIT: "Gönderilen veriler geçerli değil.",
     ORDER_CHANGED: "Sipariş bu arada değişti. Verileri yeniden yükleyip tekrar deneyin.",
+    AVANS_NEVALIDAT: "Sipariş üretime giremez. Gerekli avans onaylanmadı.",
     PRODUCTION_COMPLETED: "Üretim tamamlandı; sorumlu artık değiştirilemez.",
     ORDER_UNAVAILABLE: "Sipariş kaynakta iptal edildi ve üretime uygun değil.",
     ORDER_NOT_CLAIMED: "Siparişin serbest bırakılacak bir sorumlusu yok.",
