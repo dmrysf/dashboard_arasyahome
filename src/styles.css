@@ -456,3 +456,7 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .order-documents-page .inline-form, .document-revision-detail .facts dd { min-width: 0; overflow-wrap: anywhere; }
 .document-scopes .data-table tbody tr { cursor: default; }
 .document-scopes .data-table tbody tr:hover { background: transparent; }
+
+/* Tailoring defect approval: the manager states whether cutting responsibility is established. */
+.attribution-choice { display: grid; gap: 8px; margin: 12px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.attribution-choice legend { padding: 0 4px; font-weight: 600; }

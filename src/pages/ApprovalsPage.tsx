@@ -37,8 +37,8 @@ export function ApprovalsPage({ view }: { view: ApprovalView }) {
       {data && data.items.length > 0 && <ul className="exception-list">
         {data.items.map((item: ExceptionSummary) => <li key={item.id}>
           <button type="button" className="exception-item" onClick={() => navigate(`/aprobari/cerere/${item.id}`)}>
-            <span className="exception-main"><strong>{x.order} {item.order.orderNumber}</strong><small>{item.order.sourceName} · {item.number}</small></span>
-            <span className="exception-facts"><span>{item.reason.label}</span><span>{x.lines(item.lineCount)} · <b>{meters(item.faultMeters)}</b></span>
+            <span className="exception-main"><strong>{x.order} {item.order.orderNumber}</strong><small>{item.order.sourceName} · {item.number}{item.type === "tailoring_defect" ? ` · ${x.tailoring.badge}` : ""}</small></span>
+            <span className="exception-facts"><span>{(item.confirmedReason ?? item.reason).label}</span><span>{x.lines(item.lineCount)} · <b>{meters(item.faultMeters)}</b></span>
               <span className="muted small">{x.responsible}: {item.responsible.displayName}</span></span>
             <span className="exception-side">
               <Badge tone={item.status === "approved" ? "success" : item.status === "awaiting_approval" ? "accent" : item.status === "awaiting_acknowledgment" ? "warning" : "neutral"}>{x.status[item.status]}</Badge>
@@ -65,6 +65,7 @@ export function ApprovalDetailPage({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Problem | null>(null);
   const [key, setKey] = useState<string | null>(null);
+  const [attribution, setAttribution] = useState<"cutter" | "none" | null>(null);
   if (!me.capabilities?.approveExceptions) return <PageHeader title={x.pendingTitle} description={x.noAccess} />;
   if (error && !data) return <div className="page"><ErrorBanner error={error} onRetry={reload} /></div>;
   if (!data) return <div className="page"><Loading /></div>;
@@ -78,9 +79,10 @@ export function ApprovalDetailPage({ id }: { id: string }) {
     setFailure(null);
     try {
       if (kind === "cancel") await api.cancelException(data.id, { expectedVersion: data.version, reason: comment.trim() }, idempotencyKey);
-      else await api.decideException(data.id, { expectedVersion: data.version, decision: kind, ...(comment.trim() ? { comment: comment.trim() } : {}) }, idempotencyKey);
+      else await api.decideException(data.id, { expectedVersion: data.version, decision: kind, ...(comment.trim() ? { comment: comment.trim() } : {}), ...(kind === "approve" && data.actions.requiresAttribution && attribution ? { attribution } : {}) }, idempotencyKey);
       setDialog(null);
       setComment("");
+      setAttribution(null);
       setKey(null);
       reload();
     } catch (caught) {
@@ -97,6 +99,8 @@ export function ApprovalDetailPage({ id }: { id: string }) {
   }
 
   const decidedBy = data.decisions.filter((decision) => decision.decidedBy).at(-1)?.decidedBy;
+  const tailoring = data.type === "tailoring_defect";
+  const needsAttribution = dialog === "approve" && Boolean(data.actions.requiresAttribution);
   return (
     <div className="page approval-detail">
       <button type="button" className="back-link" onClick={() => navigate("/aprobari")}>{x.back}</button>
@@ -120,9 +124,16 @@ export function ApprovalDetailPage({ id }: { id: string }) {
         <Card title={x.reason}>
           <dl className="facts">
             <dt>{x.reason}</dt><dd>{data.reason.label}</dd>
+            {data.confirmedReason && <><dt>{x.tailoring.confirmedReason}</dt><dd>{data.confirmedReason.label}</dd></>}
+            {tailoring && data.detectedStage && <><dt>{x.tailoring.detectedStage}</dt><dd>{data.detectedStage.label ?? data.detectedStage.id}</dd></>}
+            {data.supervisor && <><dt>{x.tailoring.supervisor}</dt><dd>{data.supervisor.displayName}</dd></>}
             {data.detectorComment && <><dt>{x.detectorComment}</dt><dd>{data.detectorComment}</dd></>}
             <dt>{x.detector}</dt><dd>{data.detector.displayName}</dd>
             <dt>{x.responsible}</dt><dd>{data.responsible.displayName}</dd>
+            {data.receiver && <><dt>{x.tailoring.receiver}</dt><dd>{data.receiver.displayName}</dd></>}
+            {tailoring && data.physicalCustodian && <><dt>{x.tailoring.custodian}</dt><dd>{data.physicalCustodian.displayName}</dd></>}
+            {data.responsibilityPosition && <><dt>{x.tailoring.position}</dt><dd>{x.tailoring.positions[data.responsibilityPosition]}</dd></>}
+            {data.attribution && <><dt>{x.tailoring.attribution}</dt><dd>{x.tailoring.decided[data.attribution]}</dd></>}
             {data.acknowledgmentComment && <><dt>{x.ackComment}</dt><dd>{data.acknowledgmentComment}</dd></>}
             <dt>{x.reported}</dt><dd>{dateTime(data.reportedAt)}</dd>
             <dt>{x.qrVerified}</dt><dd>{dateTime(data.qrVerifiedAt)}</dd>
@@ -150,9 +161,19 @@ export function ApprovalDetailPage({ id }: { id: string }) {
         title={dialog === "approve" ? x.confirmApproveTitle : dialog === "reject" ? x.confirmRejectTitle : x.cancelTitle}
         confirmLabel={dialog === "approve" ? x.approve : dialog === "reject" ? x.reject : x.cancel}
         tone={dialog === "approve" ? "primary" : "danger"} busy={busy}
-        onCancel={() => { setDialog(null); setKey(null); }}
-        onConfirm={() => { if (dialog !== "approve" && comment.trim().length < 3) { setFailure(new ApiError("COMMENT_REQUIRED", 422)); return; } void submit(dialog); }}>
-        <p>{dialog === "approve" ? x.confirmApproveBody(data.order.orderNumber, meters(data.faultMeters)) : dialog === "reject" ? x.confirmRejectBody : x.cancelBody}</p>
+        onCancel={() => { setDialog(null); setKey(null); setAttribution(null); }}
+        onConfirm={() => {
+          if (dialog !== "approve" && comment.trim().length < 3) { setFailure(new ApiError("COMMENT_REQUIRED", 422)); return; }
+          if (needsAttribution && !attribution) { setFailure(new ApiError("ATTRIBUTION_REQUIRED", 422)); return; }
+          void submit(dialog);
+        }}>
+        <p>{dialog === "approve" ? (tailoring ? `${x.tailoring.confirmApproveBody(data.order.orderNumber, meters(data.faultMeters))} ${x.tailoring.assignedTo(data.receiver?.displayName ?? data.responsible.displayName)}` : x.confirmApproveBody(data.order.orderNumber, meters(data.faultMeters)))
+          : dialog === "reject" ? (tailoring ? x.tailoring.confirmRejectBody : x.confirmRejectBody) : x.cancelBody}</p>
+        {needsAttribution && <fieldset className="attribution-choice" data-testid="attribution-choice"><legend>{x.tailoring.attribution}</legend>
+          <label className="checkbox"><input type="radio" name="attribution" checked={attribution === "cutter"} disabled={!data.actions.canAttributeToCutter} onChange={() => { setAttribution("cutter"); setKey(null); }} /> <span>{x.tailoring.attributionCutter}</span></label>
+          <label className="checkbox"><input type="radio" name="attribution" checked={attribution === "none"} onChange={() => { setAttribution("none"); setKey(null); }} /> <span>{x.tailoring.attributionNone}</span></label>
+          {!data.actions.canAttributeToCutter && <small className="muted">{x.tailoring.attributionMaterial}</small>}
+        </fieldset>}
         <Field label={dialog === "approve" ? x.comment : dialog === "reject" ? x.rejectReason : x.cancelReason}>{(fieldId) => <textarea id={fieldId} rows={3} maxLength={1000} value={comment} onChange={(event) => { setComment(event.target.value); setKey(null); }} />}</Field>
         {failure && <ErrorText error={failure} />}
       </ConfirmDialog>}
