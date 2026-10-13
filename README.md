@@ -36,6 +36,18 @@ Central management console (`https://dashboard.arasyahome.ro`) for the Arasya id
 - Screens: Panou de control, Comenzi, Angajați, Roluri și permisiuni, Departamente, Aplicații, Audit, Sistem.
 - Authorization changes are reviewed in a confirmation dialog before anything is written. The protected root identity (`arasya.root.owner`) is read-only in the UI; the API enforces this independently (`ROOT_PROTECTED`).
 
+## Factory simulation build
+
+`pnpm build:simulation` builds the separate factory-simulation Dashboard for `https://dashboard.sim.arasyahome.ro` into
+`dist-simulation/`. It talks only to `https://api.sim.arasyahome.ro` (fixed at build time; a production build refuses
+that origin), its CSP allows only that API, it links to the simulation Staff, and it shows an always-visible
+`MEDIU DE SIMULARE — Date de test` / `SİMÜLASYON ORTAMI — Test Verileri` banner and a `SIMULARE ·` title. The banner
+comes only from the build mode; no URL, storage or server answer can switch it. `scripts/verify-simulation-build.mjs`
+gates the artifact (simulation API and banner present; no production host, loopback address, link, source map or
+secret name). `simulation-e2e` is the same interface against a loopback simulation API for the browser rehearsal.
+The production build (`pnpm build`) is unchanged and its verifier fails if the banner marker appears. Packaging and
+publication belong to the Staff repository's simulation tooling (`docs/factory-simulation-center.md`).
+
 ## Production approvals (0.6.0)
 
 Operations API 2.13.0 / additive migration 014 ([design](https://github.com/dmrysf/staff_arasyahome/blob/main/docs/production-exceptions.md)). Operations managers ("Manager operațional", one shared role) see only Aprobări, În așteptare, Aprobările mele and Caută comandă (exact number, no list). One decision approves or rejects a cutting fault return; the other manager's screen closes live. A temporary backup approver appointed by the CEO decides through the same screens. Root and the CEO principal manage Organizație (CEO, Responsabil Primire Croitorie, backup approver, working hours); root alone manages Setări producție (approval mode, fault reasons, stage display labels). Live updates use the authenticated `/live/events` stream; no page refresh is needed.

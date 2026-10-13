@@ -8,6 +8,7 @@ export const tr: Messages = {
   documents: documentsTr,
   locale: { short: "TR", name: "Türkçe", switcher: "Arayüz dili" },
   brand: { product: "Yönetim Paneli", title: "Arasya · Yönetim Paneli", notConfigured: "Yönetim Paneli yapılandırılmamış." },
+  simulation: { environment: "SİMÜLASYON ORTAMI", testData: "Test Verileri", title: "SİMÜLASYON" },
   common: {
     retry: "Tekrar Dene",
     loading: "Yükleniyor…",

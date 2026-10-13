@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { SIMULATION_BUILD } from "../environment";
 import { createTranslator, initialLocale, saveLocale, type Locale, type Translator } from "./index";
 
 export type I18nValue = Translator & { setLocale: (locale: Locale) => void };
@@ -15,7 +16,7 @@ export function I18nProvider({ children, locale: fixed }: { children: ReactNode;
   const value = useMemo<I18nValue>(() => ({ ...createTranslator(locale), setLocale }), [locale, setLocale]);
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.title = value.t.brand.title;
+    document.title = SIMULATION_BUILD ? `${value.t.simulation.title} · ${value.t.brand.title}` : value.t.brand.title;
   }, [locale, value]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

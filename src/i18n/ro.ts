@@ -10,6 +10,7 @@ export const ro = {
   documents: documentsRo,
   locale: { short: "RO", name: "Română", switcher: "Limba interfeței" },
   brand: { product: "Panou de control", title: "Arasya · Panou de control", notConfigured: "Panoul de control nu este configurat." },
+  simulation: { environment: "MEDIU DE SIMULARE", testData: "Date de test", title: "SIMULARE" },
   common: {
     retry: "Reîncearcă",
     loading: "Se încarcă…",
