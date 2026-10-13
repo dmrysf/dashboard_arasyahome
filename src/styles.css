@@ -460,3 +460,22 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 /* Tailoring defect approval: the manager states whether cutting responsibility is established. */
 .attribution-choice { display: grid; gap: 8px; margin: 12px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
 .attribution-choice legend { padding: 0 4px; font-weight: 600; }
+
+/* Factory simulation builds only (html[data-arasya-environment="simulation"] is set from the build mode). The banner
+   stays in the page flow at the top; every sticky or fixed layer starts below it, so it never covers navigation,
+   controls or decisions. Dialogs open in the top layer above it. Production rules above are untouched. */
+.simulation-banner { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; justify-content: center; gap: 8px; height: var(--simulation-banner-height); margin: 0; padding: 0 12px; overflow: hidden; background: var(--danger); color: #fff; border-bottom: 3px solid var(--accent); font-size: 13px; line-height: 1; letter-spacing: 0.03em; white-space: nowrap; text-overflow: ellipsis; }
+.simulation-banner strong { font-weight: 800; }
+.simulation-banner span:last-child { font-weight: 600; }
+html[data-arasya-environment="simulation"] { --simulation-banner-height: 36px; }
+html[data-arasya-environment="simulation"] .sidebar { top: var(--simulation-banner-height); height: calc(100vh - var(--simulation-banner-height)); }
+html[data-arasya-environment="simulation"] .shell,
+html[data-arasya-environment="simulation"] .auth-page,
+html[data-arasya-environment="simulation"] .boot { min-height: calc(100vh - var(--simulation-banner-height)); }
+@media (max-width: 820px) {
+  html[data-arasya-environment="simulation"] .sidebar { inset: var(--simulation-banner-height) auto 0 0; height: auto; }
+  html[data-arasya-environment="simulation"] .topbar { top: var(--simulation-banner-height); }
+}
+@media (max-width: 380px) {
+  html[data-arasya-environment="simulation"] .simulation-banner { gap: 6px; padding: 0 8px; font-size: 12px; letter-spacing: 0.01em; }
+}

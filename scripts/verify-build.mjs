@@ -32,7 +32,7 @@ if (!htaccess.includes('Cache-Control "no-store, max-age=0"')) fail("regula no-s
 for (const file of assets.filter((name) => name.endsWith(".js"))) {
   const source = await readFile(path.join(dist, "assets", file), "utf8");
   if (!source.includes(expectedApi)) fail(`bundle-ul ${file} nu folosește API-ul de producție`);
-  for (const forbidden of ["127.0.0.1", "localhost:", "__DASHBOARD_E2E_LOOPBACK_HOST__", "@vite/client", "ARASYA_APP_SECRET", "ARASYA_DB_PASSWORD", "ARASYA_SOURCE_SECRET", "secrets.json", "BEGIN OPENSSH PRIVATE KEY"]) {
+  for (const forbidden of ["127.0.0.1", "localhost:", "__DASHBOARD_E2E_LOOPBACK_HOST__", "__DASHBOARD_SIMULATION__", "data-arasya-simulation", "https://sim.arasyahome.ro", "https://dashboard.sim.arasyahome.ro", "@vite/client", "ARASYA_APP_SECRET", "ARASYA_DB_PASSWORD", "ARASYA_SOURCE_SECRET", "secrets.json", "BEGIN OPENSSH PRIVATE KEY"]) {
     if (source.includes(forbidden)) fail(`bundle-ul ${file} conține „${forbidden}”`);
   }
 }

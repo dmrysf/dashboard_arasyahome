@@ -27,5 +27,8 @@ export async function generateDashboardHtaccess(environment = process.env, outpu
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await generateDashboardHtaccess();
+  // An optional build directory (relative to the repository) for the separate simulation artifact.
+  const directory = process.argv[2] ?? "dist";
+  if (!/^dist(?:-simulation)?$/.test(directory)) throw new Error("The .htaccess goes only into dist or dist-simulation.");
+  await generateDashboardHtaccess(process.env, path.join(repositoryRoot, directory));
 }
