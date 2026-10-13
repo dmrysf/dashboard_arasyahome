@@ -1,6 +1,6 @@
 # Arasya Dashboard
 
-Dashboard **0.13.1**: Romanian and Turkish copy for the advance payment gate refusal (`AVANS_NEVALIDAT`, Operations API 2.29.0). Dashboard 0.13.0: approvals show tailoring defects handled by the tailoring quality supervisor (Operations API 2.28.0). Managers decide only the final return from tailoring intake to cutting and must state whether cutting responsibility is established; a material defect can never be attributed to the cutter. Organisation controls can appoint the tailoring quality supervisor (one at a time).
+Dashboard **0.13.1**: Romanian and Turkish copy for the advance payment gate refusal (`AVANS_NEVALIDAT`, Operations API 2.29.0): an unconfirmed advance or an unverified order payment. Dashboard 0.13.0: approvals show tailoring defects handled by the tailoring quality supervisor (Operations API 2.28.0). Managers decide only the final return from tailoring intake to cutting and must state whether cutting responsibility is established; a material defect can never be attributed to the cutter. Organisation controls can appoint the tailoring quality supervisor (one at a time).
 
 Dashboard 0.12.2: the browser tab icon is now the Arasya "A" taken from the company wordmark, black on a white tile so it reads on light and dark tab bars (`favicon.svg`, a 16/32/48 px `favicon.ico` and a 180 px `apple-touch-icon.png`). Same icon as Staff 2.20.1 and B2B 0.8.2.
 

@@ -773,7 +773,7 @@ export const ro = {
     INVALID_CURSOR: "Pagina cerută nu mai este validă. Reîncarcă lista.",
     INVALID_LIMIT: "Datele trimise nu sunt valide.",
     ORDER_CHANGED: "Comanda s-a schimbat între timp. Reîncarcă datele și încearcă din nou.",
-    AVANS_NEVALIDAT: "Comanda nu poate intra în producție. Avansul necesar nu a fost confirmat.",
+    AVANS_NEVALIDAT: "Comanda nu poate intra în producție. Avansul necesar sau plata comenzii nu a fost confirmată.",
     PRODUCTION_COMPLETED: "Producția este finalizată; responsabilul nu se mai poate schimba.",
     ORDER_UNAVAILABLE: "Comanda este anulată în sursă și nu este disponibilă pentru producție.",
     ORDER_NOT_CLAIMED: "Comanda nu are un responsabil care să poată fi eliberat.",
