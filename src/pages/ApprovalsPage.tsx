@@ -28,6 +28,28 @@ export function faultScope(x: { unmeasuredLines: (count: number) => string; noMe
   return known ? `${known} + ${x.unmeasuredLines(unknown)}` : x.unmeasuredLines(unknown);
 }
 
+type PieceWords = { partial: (affected: number, healthy: number) => string; whole: (moving: number) => string; wholeLegacy: (moving: number) => string; scope: (affected: number, total: number) => string; onlySelected: string; wholeOrder: string };
+
+/**
+ * What an approval really moves, in words, from the server's scope: only the selected pieces (they travel on their own
+ * track), or the whole order. Null when the server sent no scope (older API) or nothing beyond the affected pieces moves.
+ */
+export function scopeNotice(p: PieceWords, item: Pick<ExceptionSummary, "orderScope">): { tone: "info" | "warning"; text: string } | null {
+  const scope = item.orderScope;
+  if (!scope) return null;
+  if (scope.partial) return { tone: "info", text: p.partial(scope.affectedQuantity, scope.unaffectedQuantity ?? Math.max(0, scope.orderQuantity - scope.affectedQuantity)) };
+  const moving = scope.movingQuantity ?? scope.orderQuantity;
+  if (!scope.wholeOrderMoves || moving <= scope.affectedQuantity) return null;
+  return { tone: "warning", text: scope.piecesRecorded ? p.whole(moving) : p.wholeLegacy(moving) };
+}
+
+/** Short list label: "1 din 2 buc. · Doar bucata selectată" or "· Întreaga comandă". */
+export function scopeLabel(p: PieceWords, item: Pick<ExceptionSummary, "orderScope">): string | null {
+  const scope = item.orderScope;
+  if (!scope) return null;
+  return `${p.scope(scope.affectedQuantity, scope.orderQuantity)} · ${scope.partial ? p.onlySelected : p.wholeOrder}`;
+}
+
 export function ApprovalsPage({ view }: { view: ApprovalView }) {
   const { api, me, navigate } = useDashboard();
   const { t, dateTime } = useI18n();
@@ -50,6 +72,7 @@ export function ApprovalsPage({ view }: { view: ApprovalView }) {
           <button type="button" className="exception-item" onClick={() => navigate(`/aprobari/cerere/${item.id}`)}>
             <span className="exception-main"><strong>{x.order} {item.order.orderNumber}</strong><small>{item.order.sourceName} · {item.number}{item.type === "tailoring_defect" ? ` · ${x.tailoring.badge}` : ""}</small></span>
             <span className="exception-facts"><span>{(item.confirmedReason ?? item.reason).label}</span><span>{x.lines(item.lineCount)} · <b>{faultScope(x, item)}</b></span>
+              {scopeLabel(x.pieces, item) && <span className="small" data-testid="approval-scope"><b>{scopeLabel(x.pieces, item)}</b></span>}
               <span className="muted small">{x.responsible}: {item.responsible.displayName}</span></span>
             <span className="exception-side">
               <Badge tone={item.status === "approved" ? "success" : item.status === "awaiting_approval" ? "accent" : item.status === "awaiting_acknowledgment" ? "warning" : "neutral"}>{x.status[item.status]}</Badge>
@@ -125,6 +148,7 @@ export function ApprovalDetailPage({ id }: { id: string }) {
   const decidedBy = data.decisions.filter((decision) => decision.decidedBy).at(-1)?.decidedBy;
   const tailoring = data.type === "tailoring_defect";
   const needsAttribution = dialog === "approve" && Boolean(data.actions.requiresAttribution);
+  const notice = scopeNotice(x.pieces, data);
   return (
     <div className="page approval-detail">
       <button type="button" className="back-link" onClick={() => navigate("/aprobari")}>{x.back}</button>
@@ -135,6 +159,7 @@ export function ApprovalDetailPage({ id }: { id: string }) {
       {data.repeatedError && <Notice tone="warning">{x.repeated} · {x.arrival(data.arrivalNumber)}</Notice>}
       {data.actions.involved && data.status === "awaiting_approval" && <Notice tone="warning">{x.involved}</Notice>}
       {data.status === "awaiting_restore_receipt" && data.restoreRecipient && <Notice tone="warning">{x.tailoring.restorePending(data.restoreRecipient.displayName)}</Notice>}
+      {notice && <Notice tone={notice.tone === "warning" ? "warning" : "info"}><span data-testid="approval-scope-notice">{notice.text}</span></Notice>}
       {(data.actions.canDecide || data.actions.canCancel) && <div className="decision-bar">
         {data.actions.canDecide && <button type="button" className="button button-primary" onClick={() => { setFailure(null); setComment(""); setDialog("approve"); }}>{x.approve}</button>}
         {data.actions.canDecide && <button type="button" className="button button-danger" onClick={() => { setFailure(null); setComment(""); setDialog("reject"); }}>{x.reject}</button>}
@@ -143,8 +168,10 @@ export function ApprovalDetailPage({ id }: { id: string }) {
       <div className="grid-2">
         <Card title={x.linesTitle} description={`${x.lines(data.lineCount)} · ${faultScope(x, data)}`}>
           <table className="table compact-table"><tbody>
-            {data.lines.map((line) => <tr key={line.itemId}><td>{line.lineNumber}</td><td><strong>{line.name}</strong><br /><small className="muted">{[line.code, line.color, line.variant].filter(Boolean).join(" · ")}</small></td><td className="num">{line.meters === null ? x.unmeasured : meters(line.meters)}</td></tr>)}
+            {data.lines.map((line) => <tr key={line.itemId}><td>{line.lineNumber}</td><td><strong>{line.name}</strong><br /><small className="muted">{[line.code, line.color, line.variant, line.affectedQuantity !== undefined ? x.pieces.lineAffected(line.affectedQuantity, line.quantity) : null].filter(Boolean).join(" · ")}</small></td><td className="num">{line.meters === null ? x.unmeasured : meters(line.meters)}</td></tr>)}
           </tbody></table>
+          {data.affectedPieces && data.affectedPieces.length > 0 && <div data-testid="affected-pieces"><strong>{x.pieces.title}</strong>
+            <ul className="history-list">{data.affectedPieces.map((piece) => <li key={piece.unitId}><span>{x.pieces.piece(piece.index, piece.count)} · {[piece.code, piece.color].filter(Boolean).join(" · ")}</span></li>)}</ul></div>}
         </Card>
         <Card title={x.reason}>
           <dl className="facts">
@@ -197,6 +224,7 @@ export function ApprovalDetailPage({ id }: { id: string }) {
           if (needsAttribution && !attribution) { setFailure(new ApiError("ATTRIBUTION_REQUIRED", 422)); return; }
           void submit(dialog);
         }}>
+        {dialog === "approve" && notice && <p data-testid="approve-scope"><strong>{notice.text}</strong></p>}
         <p>{dialog === "approve" ? (tailoring ? `${x.tailoring.confirmApproveBody(data.order.orderNumber, faultScope(x, data))} ${x.tailoring.assignedTo(data.receiver?.displayName ?? data.responsible.displayName)}` : x.confirmApproveBody(data.order.orderNumber, faultScope(x, data)))
           : dialog === "reject" ? (tailoring ? x.tailoring.confirmRejectBody : x.confirmRejectBody) : data.actions.cancelNeedsRecipient ? x.recoveryBody : x.cancelBody}</p>
         {dialog === "cancel" && data.actions.cancelNeedsRecipient && (recipients === null ? <Loading /> : recipients.length === 0 ? <Notice tone="warning">{x.recoveryNone}</Notice>

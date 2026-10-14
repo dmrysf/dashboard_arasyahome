@@ -90,11 +90,22 @@ export type ExceptionSummary = {
   restoreRecipient?: { displayName: string } | null; restoreRequestedAt?: string | null; restoreReceivedAt?: string | null; cancelledByRoot?: boolean;
   myDecisions?: { attempt: number; status: string; decidedAt: string; comment: string | null }[];
   decisions?: ExceptionDecision[];
+  /** What an approval moves (API 2.30.2+; the piece fields from API 2.31.0). */
+  orderScope?: ExceptionScope;
 };
+
+export type ExceptionScope = {
+  orderLineCount: number; orderQuantity: number; affectedLineCount: number; affectedQuantity: number; wholeOrderMoves: boolean;
+  movingQuantity?: number; unaffectedQuantity?: number; partial?: boolean; piecesRecorded?: boolean; carrier?: "order" | "track"; trackId?: string | null;
+};
+
+export type AffectedPiece = { unitId: string; itemId: string; piece: string; index: number; count: number; lineNumber: number | null; name: string | null; code: string | null; color: string | null; reworkCycleAtReport: number };
 
 export type ExceptionDetail = ExceptionSummary & {
   detectorComment: string | null; acknowledgmentComment: string | null; qrVerifiedAt: string | null; cancelReason: string | null;
-  lines: { itemId: string; lineNumber: number; name: string; code: string | null; variant: string | null; color: string | null; quantity: number; meters: string | null }[];
+  lines: { itemId: string; lineNumber: number; name: string; code: string | null; variant: string | null; color: string | null; quantity: number; meters: string | null; affectedQuantity?: number }[];
+  /** The exact pieces the report named (API 2.31.0); absent for line reports. */
+  affectedPieces?: AffectedPiece[];
   decisions: ExceptionDecision[];
   timeline: { action: string; actor: string; at: string; version: number; details: Record<string, unknown> | null }[];
   orderHistory: ExceptionSummary[];
