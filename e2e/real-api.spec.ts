@@ -433,7 +433,7 @@ test("10b readiness, secondary departments and stage coverage use the server sta
 });
 
 test("11 the IAM audit records the management changes in Romanian", async () => {
-  await root.getByRole("navigation").getByRole("link", { name: "Audit" }).click();
+  await root.goto("/audit");
   await expect(root.getByText(`Administrator principal a creat contul ${EMPLOYEE.name}.`)).toBeVisible();
   await expect(root.getByText(`${EMPLOYEE.name} a primit acces la Staff.`)).toBeVisible();
   await expect(root.getByText(`Administrator principal a modificat rolurile utilizatorului ${EMPLOYEE.name}.`)).toBeVisible();
