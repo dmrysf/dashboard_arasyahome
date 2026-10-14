@@ -8,7 +8,7 @@ use Arasya\Operations\Tests\OperationsTestSupport as T;
 require dirname(__DIR__) . '/operations-api/bootstrap.php';
 require dirname(__DIR__) . '/operations-api/tests/OperationsTestSupport.php';
 $dbName = (string) getenv('ARASYA_E2E_DB_NAME');
-if (!str_contains($dbName, 'roi36_') || !str_contains($dbName, 'e2e') || !str_contains($dbName, 'test')) throw new RuntimeException('Dedicated ROI-36 E2E test database required.');
+if (preg_match('/^[a-z0-9_]*e2e[a-z0-9_]*test[a-z0-9_]*$|^[a-z0-9_]*test[a-z0-9_]*e2e[a-z0-9_]*$/D', $dbName) !== 1) throw new RuntimeException('Dedicated E2E test database required.');
 $config = T::config($dbName, ['http://127.0.0.1:4174', 'http://127.0.0.1:4175', T::ORIGIN]);
 $pdo = Connection::create($config);
 $kernel = (new Container($config, $pdo))->kernel();
