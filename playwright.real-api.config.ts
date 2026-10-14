@@ -18,7 +18,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: process.env.CI ? "line" : "list",
-  use: { baseURL: `http://127.0.0.1:${webPort}`, trace: "retain-on-failure", ...devices["Desktop Chrome"] },
+  use: { baseURL: `http://127.0.0.1:${webPort}`, trace: "retain-on-failure", launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }, ...devices["Desktop Chrome"] },
   webServer: [
     {
       command: `php -S 127.0.0.1:${apiPort} operations-api/public/index.php`,

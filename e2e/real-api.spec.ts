@@ -342,7 +342,7 @@ test("production control V2: supervisor reassigns and releases ownership; stage 
   await root.getByRole("button", { name: "RO — Română" }).click();
 
   // 15: the IAM audit holds both privileged interventions under stable keys.
-  await root.getByRole("navigation").getByRole("link", { name: "Audit" }).click();
+  await root.goto("/audit");
   await root.getByLabel("Tip țintă").selectOption("order");
   await expect(root.getByText("Administrator principal a schimbat responsabilul de producție al comenzii 90002 · trendhome.")).toBeVisible();
   await expect(root.getByText("Administrator principal a eliberat responsabilul de producție al comenzii 90002 · trendhome.")).toBeVisible();

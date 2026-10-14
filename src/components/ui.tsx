@@ -70,8 +70,8 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 /** Review-then-confirm dialog for high-impact changes. */
-export function ConfirmDialog({ title, children, confirmLabel, tone = "primary", busy, onConfirm, onCancel }: {
-  title: string; children: ReactNode; confirmLabel: string; tone?: "primary" | "danger"; busy?: boolean; onConfirm: () => void; onCancel: () => void;
+export function ConfirmDialog({ title, children, confirmLabel, tone = "primary", busy, confirmDisabled, onConfirm, onCancel }: {
+  title: string; children: ReactNode; confirmLabel: string; tone?: "primary" | "danger"; busy?: boolean; confirmDisabled?: boolean; onConfirm: () => void; onCancel: () => void;
 }) {
   const { t } = useI18n();
   const ref = useRef<HTMLDialogElement>(null);
@@ -86,7 +86,7 @@ export function ConfirmDialog({ title, children, confirmLabel, tone = "primary",
       <div className="dialog-body">{children}</div>
       <div className="dialog-actions">
         <button type="button" className="button button-secondary" onClick={onCancel} disabled={busy}>{t.common.cancel}</button>
-        <button type="button" className={`button ${tone === "danger" ? "button-danger" : "button-primary"}`} onClick={onConfirm} disabled={busy}>{busy ? t.common.saving : confirmLabel}</button>
+        <button type="button" className={`button ${tone === "danger" ? "button-danger" : "button-primary"}`} onClick={onConfirm} disabled={busy || confirmDisabled}>{busy ? t.common.saving : confirmLabel}</button>
       </div>
     </dialog>
   );

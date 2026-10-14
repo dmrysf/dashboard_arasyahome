@@ -1,4 +1,6 @@
-import { useCallback, useState } from "react";
+import { ManufacturingPanel } from "../components/ManufacturingPanel";
+import { useMemo } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useLoaderWithSignal } from "./useLoaderWithSignal";
 import { ApiError, newIdempotencyKey } from "../api/client";
 import type { ExceptionDetail, ExceptionSummary, RestoreRecipient } from "../api/types";
@@ -37,6 +39,7 @@ type PieceWords = { partial: (affected: number, healthy: number) => string; whol
 export function scopeNotice(p: PieceWords, item: Pick<ExceptionSummary, "orderScope">): { tone: "info" | "warning"; text: string } | null {
   const scope = item.orderScope;
   if (!scope) return null;
+  if (scope.piecesRecorded !== true) return { tone: "warning", text: p.wholeLegacy(scope.movingQuantity ?? scope.orderQuantity) };
   if (scope.partial) return { tone: "info", text: p.partial(scope.affectedQuantity, scope.unaffectedQuantity ?? Math.max(0, scope.orderQuantity - scope.affectedQuantity)) };
   const moving = scope.movingQuantity ?? scope.orderQuantity;
   if (!scope.wholeOrderMoves || moving <= scope.affectedQuantity) return null;
@@ -47,6 +50,7 @@ export function scopeNotice(p: PieceWords, item: Pick<ExceptionSummary, "orderSc
 export function scopeLabel(p: PieceWords, item: Pick<ExceptionSummary, "orderScope">): string | null {
   const scope = item.orderScope;
   if (!scope) return null;
+  if (scope.piecesRecorded !== true) return p.wholeLegacy(scope.movingQuantity ?? scope.orderQuantity);
   return `${p.scope(scope.affectedQuantity, scope.orderQuantity)} · ${scope.partial ? p.onlySelected : p.wholeOrder}`;
 }
 
@@ -94,6 +98,10 @@ export function ApprovalDetailPage({ id }: { id: string }) {
   const { last } = useLive();
   const load = useCallback((signal: AbortSignal) => api.exception(id, signal), [api, id]);
   const { data, error, reload } = useLoaderWithSignal<ExceptionDetail>(load, id);
+  const [snapshot, setSnapshot] = useState<ExceptionDetail | null>(null);
+  const inFlight = useRef(false);
+  const submitted = useRef<{ kind: "approve" | "reject" | "cancel"; body: { expectedVersion: number; decision: "approve" | "reject"; comment?: string; attribution?: "cutter" | "none" }; reason: string; recipient: string } | null>(null);
+  const [scopeConfirmed, setScopeConfirmed] = useState(false);
   const [dialog, setDialog] = useState<null | "approve" | "reject" | "cancel">(null);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
@@ -108,14 +116,19 @@ export function ApprovalDetailPage({ id }: { id: string }) {
 
   const resolvedLive = last?.type === "exception.resolved" && last.exceptionId === id && data.status !== "awaiting_approval";
   async function submit(kind: "approve" | "reject" | "cancel") {
-    if (busy || !data) return;
+    if (inFlight.current || !snapshot || (kind === "approve" && !scopeConfirmed)) return;
+    inFlight.current = true;
     const idempotencyKey = key ?? newIdempotencyKey();
     setKey(idempotencyKey);
     setBusy(true);
     setFailure(null);
+    submitted.current ??= { kind, body: { expectedVersion: snapshot.version, decision: kind === "reject" ? "reject" : "approve", ...(comment.trim() ? { comment: comment.trim() } : {}), ...(kind === "approve" && snapshot.actions.requiresAttribution && attribution ? { attribution } : {}) }, reason: comment.trim(), recipient: recipientId };
+    const command = submitted.current;
     try {
-      if (kind === "cancel") await api.cancelException(data.id, { expectedVersion: data.version, reason: comment.trim(), ...(data.actions.cancelNeedsRecipient ? { recipientEmployeeId: recipientId } : {}) }, idempotencyKey);
-      else await api.decideException(data.id, { expectedVersion: data.version, decision: kind, ...(comment.trim() ? { comment: comment.trim() } : {}), ...(kind === "approve" && data.actions.requiresAttribution && attribution ? { attribution } : {}) }, idempotencyKey);
+      if (command.kind === "cancel") await api.cancelException(snapshot.id, { expectedVersion: command.body.expectedVersion, reason: command.reason, ...(snapshot.actions.cancelNeedsRecipient ? { recipientEmployeeId: command.recipient } : {}) }, idempotencyKey);
+      else await api.decideException(snapshot.id, command.body, idempotencyKey);
+      submitted.current = null;
+      setSnapshot(null);
       setDialog(null);
       setComment("");
       setAttribution(null);
@@ -125,22 +138,28 @@ export function ApprovalDetailPage({ id }: { id: string }) {
       const problem = toProblem(caught);
       // The request changed or another manager decided first: drop the key, close and show fresh data.
       if (problem instanceof ApiError && ["EXCEPTION_ALREADY_RESOLVED", "EXCEPTION_CHANGED", "EXCEPTION_STATE_INVALID", "ORDER_CHANGED", "IDEMPOTENCY_CONFLICT"].includes(problem.code)) {
+        submitted.current = null;
         setKey(null);
         setDialog(null);
         reload();
       }
-      if (!(problem instanceof ApiError) || problem.status < 500) setKey(null);
+      if (problem instanceof ApiError && problem.status > 0 && problem.status < 500) { setKey(null); submitted.current = null; }
       // The chosen recipient can no longer receive the product: refresh who can, the order stays blocked.
       if (problem instanceof ApiError && ["RESTORE_RECIPIENT_UNAVAILABLE", "RECIPIENT_INVALID", "RECIPIENT_NOT_ALLOWED"].includes(problem.code)) { setRecipientId(""); loadRecipients(); }
       setFailure(problem);
-    } finally { setBusy(false); }
+    } finally { inFlight.current = false; setBusy(false); }
   }
 
   function loadRecipients() {
     setRecipients(null);
     api.restoreRecipients(id).then((answer) => setRecipients(answer.items)).catch((caught) => { setRecipients([]); setFailure(toProblem(caught)); });
   }
+  function openDecision(kind: "approve" | "reject") {
+    setSnapshot(data); setScopeConfirmed(false); setAttribution(null); setKey(null); submitted.current = null;
+    setFailure(null); setComment(""); setDialog(kind);
+  }
   function openCancel() {
+    setSnapshot(data); setKey(null); submitted.current = null;
     setFailure(null); setComment(""); setRecipientId(""); setDialog("cancel");
     if (data?.actions.cancelNeedsRecipient) loadRecipients();
   }
@@ -156,19 +175,20 @@ export function ApprovalDetailPage({ id }: { id: string }) {
         actions={<Badge tone={data.status === "approved" ? "success" : data.status === "awaiting_approval" ? "accent" : "warning"}>{x.status[data.status]}</Badge>} />
       {resolvedLive && decidedBy && <Notice tone="warning">{x.resolvedBy(decidedBy)}</Notice>}
       {failure && <ErrorBanner error={failure} />}
+      <button type="button" className="button button-secondary" onClick={() => { setDialog(null); setSnapshot(null); setKey(null); submitted.current = null; reload(); }}>Reîncarcă starea salvată</button>
       {data.repeatedError && <Notice tone="warning">{x.repeated} · {x.arrival(data.arrivalNumber)}</Notice>}
       {data.actions.involved && data.status === "awaiting_approval" && <Notice tone="warning">{x.involved}</Notice>}
       {data.status === "awaiting_restore_receipt" && data.restoreRecipient && <Notice tone="warning">{x.tailoring.restorePending(data.restoreRecipient.displayName)}</Notice>}
       {notice && <Notice tone={notice.tone === "warning" ? "warning" : "info"}><span data-testid="approval-scope-notice">{notice.text}</span></Notice>}
       {(data.actions.canDecide || data.actions.canCancel) && <div className="decision-bar">
-        {data.actions.canDecide && <button type="button" className="button button-primary" onClick={() => { setFailure(null); setComment(""); setDialog("approve"); }}>{x.approve}</button>}
-        {data.actions.canDecide && <button type="button" className="button button-danger" onClick={() => { setFailure(null); setComment(""); setDialog("reject"); }}>{x.reject}</button>}
+        {data.actions.canDecide && <button type="button" className="button button-primary" onClick={() => openDecision("approve")}>{x.approve}</button>}
+        {data.actions.canDecide && <button type="button" className="button button-danger" onClick={() => openDecision("reject")}>{x.reject}</button>}
         {data.actions.canCancel && <button type="button" className="button button-secondary" onClick={openCancel}>{x.cancel}</button>}
       </div>}
       <div className="grid-2">
         <Card title={x.linesTitle} description={`${x.lines(data.lineCount)} · ${faultScope(x, data)}`}>
           <table className="table compact-table"><tbody>
-            {data.lines.map((line) => <tr key={line.itemId}><td>{line.lineNumber}</td><td><strong>{line.name}</strong><br /><small className="muted">{[line.code, line.color, line.variant, line.affectedQuantity !== undefined ? x.pieces.lineAffected(line.affectedQuantity, line.quantity) : null].filter(Boolean).join(" · ")}</small></td><td className="num">{line.meters === null ? x.unmeasured : meters(line.meters)}</td></tr>)}
+            {data.lines.map((line) => <tr key={line.itemId}><td>{line.lineNumber}</td><td><strong>{line.name}</strong><br /><small className="muted">{[line.code, line.color, line.variant, line.affectedQuantity !== undefined && data.affectedPieces?.some(piece => piece.itemId === line.itemId) ? x.pieces.lineAffected(line.affectedQuantity, data.affectedPieces.find(piece => piece.itemId === line.itemId)!.count) : null].filter(Boolean).join(" · ")}</small></td><td className="num">{line.meters === null ? x.unmeasured : meters(line.meters)}</td></tr>)}
           </tbody></table>
           {data.affectedPieces && data.affectedPieces.length > 0 && <div data-testid="affected-pieces"><strong>{x.pieces.title}</strong>
             <ul className="history-list">{data.affectedPieces.map((piece) => <li key={piece.unitId}><span>{x.pieces.piece(piece.index, piece.count)} · {[piece.code, piece.color].filter(Boolean).join(" · ")}</span></li>)}</ul></div>}
@@ -197,6 +217,7 @@ export function ApprovalDetailPage({ id }: { id: string }) {
           </dl>
         </Card>
       </div>
+      <ApprovalPhysicalFacts orderId={data.order.id} revision={data.version} />
       <Card title={x.decisions}>
         <ol className="decision-history">{data.decisions.map((decision) => <li key={decision.attempt}>
           <strong>{x.attempt(decision.attempt)} · {x.status[decision.status === "pending" ? "awaiting_approval" : decision.status] ?? decision.status}</strong>
@@ -213,31 +234,40 @@ export function ApprovalDetailPage({ id }: { id: string }) {
           <ul className="history-list">{data.orderHistory.map((item) => <li key={item.id}><span>{item.number} · {item.reason.label} · {faultScope(x, item)}</span><Badge tone={item.status === "approved" ? "success" : "neutral"}>{x.status[item.status]}</Badge></li>)}</ul>
         </Card>
       </div>
-      {dialog && <ConfirmDialog
+      {dialog && snapshot && <ConfirmDialog
         title={dialog === "approve" ? x.confirmApproveTitle : dialog === "reject" ? x.confirmRejectTitle : x.cancelTitle}
         confirmLabel={dialog === "approve" ? x.approve : dialog === "reject" ? x.reject : x.cancel}
-        tone={dialog === "approve" ? "primary" : "danger"} busy={busy}
+        tone={dialog === "approve" ? "primary" : "danger"} busy={busy} confirmDisabled={dialog === "approve" && !scopeConfirmed}
         onCancel={() => { setDialog(null); setKey(null); setAttribution(null); }}
         onConfirm={() => {
           if (dialog !== "approve" && comment.trim().length < 3) { setFailure(new ApiError("COMMENT_REQUIRED", 422)); return; }
-          if (dialog === "cancel" && data.actions.cancelNeedsRecipient && !recipientId) { setFailure(new ApiError("RECIPIENT_REQUIRED", 422)); return; }
+          if (dialog === "cancel" && snapshot.actions.cancelNeedsRecipient && !recipientId) { setFailure(new ApiError("RECIPIENT_REQUIRED", 422)); return; }
           if (needsAttribution && !attribution) { setFailure(new ApiError("ATTRIBUTION_REQUIRED", 422)); return; }
           void submit(dialog);
         }}>
-        {dialog === "approve" && notice && <p data-testid="approve-scope"><strong>{notice.text}</strong></p>}
-        <p>{dialog === "approve" ? (tailoring ? `${x.tailoring.confirmApproveBody(data.order.orderNumber, faultScope(x, data))} ${x.tailoring.assignedTo(data.receiver?.displayName ?? data.responsible.displayName)}` : x.confirmApproveBody(data.order.orderNumber, faultScope(x, data)))
-          : dialog === "reject" ? (tailoring ? x.tailoring.confirmRejectBody : x.confirmRejectBody) : data.actions.cancelNeedsRecipient ? x.recoveryBody : x.cancelBody}</p>
-        {dialog === "cancel" && data.actions.cancelNeedsRecipient && (recipients === null ? <Loading /> : recipients.length === 0 ? <Notice tone="warning">{x.recoveryNone}</Notice>
-          : <Field label={x.recoveryRecipient}>{(fieldId) => <select id={fieldId} data-testid="recovery-recipient" value={recipientId} onChange={(event) => { setRecipientId(event.target.value); setKey(null); }}>
+        {dialog === "approve" && snapshot.affectedPieces && <ul data-testid="confirm-affected-pieces">{snapshot.affectedPieces.map(piece => <li key={piece.unitId}>{x.pieces.piece(piece.index, piece.count)} · {[piece.code, piece.color].filter(Boolean).join(" · ")}</li>)}</ul>}
+        {dialog === "approve" && scopeNotice(x.pieces, snapshot) && <p data-testid="approve-scope"><strong>{scopeNotice(x.pieces, snapshot)?.text}</strong></p>}
+        <p>{dialog === "approve" ? (tailoring ? `${x.tailoring.confirmApproveBody(snapshot.order.orderNumber, faultScope(x, snapshot))} ${x.tailoring.assignedTo(snapshot.receiver?.displayName ?? snapshot.responsible.displayName)}` : x.confirmApproveBody(snapshot.order.orderNumber, faultScope(x, snapshot)))
+          : dialog === "reject" ? (tailoring ? x.tailoring.confirmRejectBody : x.confirmRejectBody) : snapshot.actions.cancelNeedsRecipient ? x.recoveryBody : x.cancelBody}</p>
+        {dialog === "cancel" && snapshot.actions.cancelNeedsRecipient && (recipients === null ? <Loading /> : recipients.length === 0 ? <Notice tone="warning">{x.recoveryNone}</Notice>
+          : <Field label={x.recoveryRecipient}>{(fieldId) => <select disabled={busy || key !== null} id={fieldId} data-testid="recovery-recipient" value={recipientId} onChange={(event) => { setRecipientId(event.target.value); setKey(null); }}>
             <option value="">{x.recoveryChoose}</option>{recipients.map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>)}</select>}</Field>)}
-        {needsAttribution && <fieldset className="attribution-choice" data-testid="attribution-choice"><legend>{x.tailoring.attribution}</legend>
-          <label className="checkbox"><input type="radio" name="attribution" checked={attribution === "cutter"} disabled={!data.actions.canAttributeToCutter} onChange={() => { setAttribution("cutter"); setKey(null); }} /> <span>{x.tailoring.attributionCutter}</span></label>
+        {needsAttribution && <fieldset disabled={busy || key !== null} className="attribution-choice" data-testid="attribution-choice"><legend>{x.tailoring.attribution}</legend>
+          <label className="checkbox"><input type="radio" name="attribution" checked={attribution === "cutter"} disabled={!snapshot.actions.canAttributeToCutter} onChange={() => { setAttribution("cutter"); setKey(null); }} /> <span>{x.tailoring.attributionCutter}</span></label>
           <label className="checkbox"><input type="radio" name="attribution" checked={attribution === "none"} onChange={() => { setAttribution("none"); setKey(null); }} /> <span>{x.tailoring.attributionNone}</span></label>
-          {!data.actions.canAttributeToCutter && <small className="muted">{x.tailoring.attributionMaterial}</small>}
+          {!snapshot.actions.canAttributeToCutter && <small className="muted">{x.tailoring.attributionMaterial}</small>}
         </fieldset>}
-        <Field label={dialog === "approve" ? x.comment : dialog === "reject" ? x.rejectReason : x.cancelReason}>{(fieldId) => <textarea id={fieldId} rows={3} maxLength={1000} value={comment} onChange={(event) => { setComment(event.target.value); setKey(null); }} />}</Field>
+        <Field label={dialog === "approve" ? x.comment : dialog === "reject" ? x.rejectReason : x.cancelReason}>{(fieldId) => <textarea disabled={busy || key !== null} id={fieldId} rows={3} maxLength={1000} value={comment} onChange={(event) => { setComment(event.target.value); setKey(null); }} />}</Field>
+        {dialog === "approve" && <label className="field"><input type="checkbox" checked={scopeConfirmed} disabled={busy || key !== null} onChange={e => setScopeConfirmed(e.target.checked)} />Am verificat liniile, bucățile și cantitatea care se întorc la tăiere.</label>}
         {failure && <ErrorText error={failure} />}
       </ConfirmDialog>}
     </div>
   );
+}
+
+function ApprovalPhysicalFacts({ orderId, revision }: { orderId: string; revision: number }) {
+  const { api } = useDashboard();
+  const { stage } = useI18n();
+  const physical = useMemo(() => ({ plan: api.manufacturingPlan, confirmPlan: api.confirmManufacturingPlan, history: api.pieceHistory }), [api]);
+  return <ManufacturingPanel orderId={orderId} revision={revision} service={physical} newKey={newIdempotencyKey} stageName={stage} onChanged={() => undefined} />;
 }

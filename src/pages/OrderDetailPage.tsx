@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { ManufacturingPanel } from "../components/ManufacturingPanel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, newIdempotencyKey } from "../api/client";
 import type { EligibleOwners, OrderDetail, OrderItem } from "../api/types";
@@ -21,7 +23,9 @@ function OrderDetailWorkspace({ id, onBack }: { id: string; onBack: () => void }
   const { api } = useDashboard();
   const load = useCallback((signal: AbortSignal) => api.order(id, signal), [api, id]);
   const polling = usePolling(load, id);
-  return <OrderDetailView {...polling} onBack={onBack} />;
+  const { stage } = useI18n();
+  const physical = useMemo(() => ({ plan: api.manufacturingPlan, confirmPlan: api.confirmManufacturingPlan, history: api.pieceHistory }), [api]);
+  return <><OrderDetailView {...polling} onBack={onBack} /><ManufacturingPanel orderId={id} service={physical} revision={polling.updatedAt ?? 0} newKey={newIdempotencyKey} stageName={stage} onChanged={polling.refresh} /></>;
 }
 
 export type OrderDetailViewProps = { data: OrderDetail | null; error: unknown; updatedAt: number | null; refreshing: boolean; refresh: () => void; onBack: () => void };
@@ -84,11 +88,11 @@ export function OrderDetailContent({ data, referenceTime, toolbar, onChanged }: 
 
 function StageProgress({ ordinal, state }: { ordinal: number; state: OrderDetail["production"]["state"] }) {
   const { t } = useI18n();
-  const done = state === "completed" ? STAGE_COUNT : ordinal - 1;
+  // The ordinal is a position, not evidence of completed physical work on earlier stages.
   return (
     <ol className="stage-progress" aria-label={t.orders.stageProgress(String(ordinal))}>
       {Array.from({ length: STAGE_COUNT }, (_, index) => (
-        <li key={index} className={index < done ? "is-done" : index === ordinal - 1 && state === "active" ? "is-current" : ""} />
+        <li key={index} className={index === ordinal - 1 && state === "active" ? "is-current" : ""} />
       ))}
     </ol>
   );

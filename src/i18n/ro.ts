@@ -861,7 +861,7 @@ export const ro = {
       scope: (affected: number, total: number) => `${affected} din ${total} buc.`,
       partial: (affected: number, healthy: number) => `La aprobare se întoarce la tăiere doar ${affected === 1 ? "bucata selectată (1 buc.)" : `bucățile selectate (${affected} buc.)`}. Restul comenzii (${healthy} buc.) rămâne la etapa ei, fără refacere.`,
       whole: (moving: number) => `La aprobare se întoarce la tăiere întreaga comandă (${moving} buc.).`,
-      wholeLegacy: (moving: number) => `Raport făcut pe linii: la aprobare se întoarce la tăiere întreaga comandă (${moving} buc.), nu doar produsul afectat.`,
+      wholeLegacy: (moving: number) => `Raport pe linii: aprobarea întoarce întreaga comandă. Cantitate comercială: ${moving}. Număr fizic neconfirmat.`,
       onlySelected: "Doar bucata selectată",
       wholeOrder: "Întreaga comandă",
       lineAffected: (affected: number, quantity: number) => `${affected} din ${quantity} buc.`,

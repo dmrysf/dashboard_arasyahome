@@ -159,7 +159,7 @@ test("order detail separates the store section from the Arasya production sectio
   assert.ok(text(commerce).includes("Acțiunile de producție Arasya nu modifică statusul magazinului."));
   assert.ok(production.includes("Producție Arasya") && production.includes("Control calitate") && !production.includes("Se procesează"));
   assert.ok(text(production).includes("Etapa 12 din 14") && text(production).includes("Mehmet Yılmaz"));
-  assert.equal((html.match(/class="is-done"/g) ?? []).length, 11);
+  assert.equal((html.match(/class="is-done"/g) ?? []).length, 0, "an ordinal does not prove earlier physical completions");
   assert.equal((html.match(/class="is-current"/g) ?? []).length, 1);
   const tr = text(view("tr"));
   assert.ok(tr.includes("Mağaza (kaynak)") && tr.includes("Arasya Üretimi") && tr.includes("Aşama 12 / 14") && tr.includes("Kalite Kontrol"));
@@ -208,7 +208,7 @@ test("completed production is explicitly not a completed or shipped store order"
   const ro = text(view("ro", done));
   assert.ok(ro.includes("Finalizarea producției Arasya nu finalizează și nu expediază comanda în magazin."));
   assert.ok(ro.includes("Se procesează"), "the store status stays whatever the source last sent");
-  assert.equal((view("ro", done).match(/class="is-done"/g) ?? []).length, 14);
+  assert.equal((view("ro", done).match(/class="is-done"/g) ?? []).length, 0, "aggregate completion is not a per-piece stage ledger");
 });
 
 test("the order detail has no stage control: no stage selector, no claim or override; a viewer gets only back and refresh", () => {

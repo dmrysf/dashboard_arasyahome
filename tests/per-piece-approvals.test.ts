@@ -21,7 +21,7 @@ test("one defective curtain of two: only that piece moves, said in Romanian and 
 test("whole-order returns are stated as such; an older API without a scope shows nothing new", () => {
   const ro = MESSAGES.ro.exceptions.pieces;
   const legacy = { orderLineCount: 3, orderQuantity: 5, affectedLineCount: 1, affectedQuantity: 2, wholeOrderMoves: true };
-  assert.deepEqual(scopeNotice(ro, { orderScope: legacy }), { tone: "warning", text: "Raport făcut pe linii: la aprobare se întoarce la tăiere întreaga comandă (5 buc.), nu doar produsul afectat." });
+  assert.deepEqual(scopeNotice(ro, { orderScope: legacy }), { tone: "warning", text: "Raport pe linii: aprobarea întoarce întreaga comandă. Cantitate comercială: 5. Număr fizic neconfirmat." });
   const all = { ...partial, affectedQuantity: 2, movingQuantity: 2, unaffectedQuantity: 0, wholeOrderMoves: true, partial: false, carrier: "order" as const, trackId: null };
   assert.equal(scopeNotice(ro, { orderScope: all }), null, "every piece named: nothing beyond them moves");
   assert.equal(scopeNotice(ro, {}), null);
@@ -32,5 +32,5 @@ test("the approval list, detail and confirmation show the pieces", () => {
   const page = readFileSync(path.join(root, "src/pages/ApprovalsPage.tsx"), "utf8");
   assert.match(page, /data-testid="approval-scope"/);
   assert.match(page, /data-testid="affected-pieces"/);
-  assert.match(page, /dialog === "approve" && notice && <p data-testid="approve-scope">/, "the confirmation repeats what moves");
+  assert.match(page, /dialog === "approve" && scopeNotice\(x.pieces, snapshot\) && <p data-testid="approve-scope">/, "the confirmation repeats what moves");
 });

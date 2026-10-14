@@ -856,7 +856,7 @@ export const tr: Messages = {
       scope: (affected: number, total: number) => `${total} adetten ${affected}`,
       partial: (affected: number, healthy: number) => `Onaylanırsa kesime yalnız seçilen ${affected === 1 ? "parça (1 adet)" : `parçalar (${affected} adet)`} döner. Siparişin geri kalanı (${healthy} adet) kendi aşamasında kalır, yeniden işlenmez.`,
       whole: (moving: number) => `Onaylanırsa siparişin tamamı (${moving} adet) kesime döner.`,
-      wholeLegacy: (moving: number) => `Satır bazlı bildirim: onaylanırsa yalnız etkilenen ürün değil, siparişin tamamı (${moving} adet) kesime döner.`,
+      wholeLegacy: (moving: number) => `Satır raporu: onay tüm siparişi geri gönderir. Ticari adet: ${moving}. Fiziksel sayı doğrulanmadı.`,
       onlySelected: "Yalnız seçilen parça",
       wholeOrder: "Siparişin tamamı",
       lineAffected: (affected: number, quantity: number) => `${quantity} adetten ${affected}`,
