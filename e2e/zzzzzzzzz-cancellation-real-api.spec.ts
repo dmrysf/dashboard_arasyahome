@@ -81,12 +81,12 @@ test("cancellation control: verify, release, local stop, overview and mobile lay
   await expect(card.locator(`[data-cancelled-order="${created.stopped.number}"]`)).toHaveAttribute("data-category", "released");
   await expect(card.locator(`[data-cancelled-order="${created.local.number}"]`)).toHaveAttribute("data-next-action", "physical_reconciliation");
 
-  for (const width of [320, 390, 1280]) {
+  for (const [width, order] of [[320, created.local.order], [320, created.stopped.order], [390, created.local.order], [1280, created.stopped.order]] as const) {
     await page.setViewportSize({ width, height: 844 });
-    await page.goto(`/comenzi/${encodeURIComponent(created.local.order)}`);
+    await page.goto(`/comenzi/${encodeURIComponent(order)}`);
     await expect(page.locator('[data-section="cancellation"]')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
-    await page.screenshot({ path: `e2e/.runtime/dashboard-cancellation-${width}.png`, fullPage: true });
+    await page.screenshot({ path: `e2e/.runtime/dashboard-cancellation-${width}-${order.slice(-4)}.png`, fullPage: true });
   }
   expect(errors).toEqual([]);
 });

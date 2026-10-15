@@ -185,8 +185,9 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .ordinal { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; background: #eef0f3; font-size: 11px; font-weight: 700; color: var(--ink-soft); flex: none; }
 .permission-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; align-items: start; }
 .permissions-detail summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
-.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
-.facts dt { color: var(--muted); }
+.facts { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 6px 16px; margin: 0; }
+.facts dt { color: var(--muted); min-width: 0; overflow-wrap: anywhere; }
+.order-states > .card { min-width: 0; }
 .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .form-grid .facts { grid-column: 1 / -1; }
 
@@ -471,3 +472,16 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 [data-testid="physical-operations"] select, [data-testid="physical-operations"] textarea, [data-testid="piece-outcomes"] select { max-width: 100%; min-width: 0; }
 .confirmation-card { max-height: calc(100dvh - 36px); overflow-y: auto; }
 .manufacturing-panel .button { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box; }
+
+/* API 2.35.0 cancellation control card: long Romanian labels and actions wrap at 320 px instead of widening the page. */
+.cancellation-card { min-width: 0; }
+.cancellation-card .card-header { flex-wrap: wrap; gap: 8px; }
+.cancellation-facts { grid-template-columns: minmax(0, 40%) minmax(0, 1fr); }
+.cancellation-facts dt { overflow-wrap: anywhere; }
+.cancellation-actions .button { white-space: normal; height: auto; min-height: 36px; text-align: center; }
+.cancellation-events li { overflow-wrap: anywhere; }
+.state-cell { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.order-states .card-header { flex-wrap: wrap; gap: 8px; min-width: 0; }
+.order-states .card-header > div { min-width: 0; }
+.order-states .card-header p { overflow-wrap: anywhere; }
+.stop-badge .badge { white-space: normal; text-align: left; }
