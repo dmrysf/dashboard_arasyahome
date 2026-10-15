@@ -5,7 +5,7 @@ import { orderPath } from "../app/router";
 import { usePolling } from "../app/usePolling";
 import { EmptyState, ErrorBanner, Loading, PageHeader, RefreshBar } from "../components/ui";
 import { useI18n } from "../i18n/context";
-import { AttentionBadge, CommerceChip, OwnerName, ProductionStateBadge, StageChip, TimeInStage } from "./orderParts";
+import { AttentionBadge, CommerceChip, OwnerName, ProductionStateBadge, StageChip, StopBadge, TimeInStage } from "./orderParts";
 
 export type OrderFilters = { search: string; source: string; stage: string; commerceStatus: string; ownerId: string; assignment: string; state: string; limit: string };
 export const DEFAULT_ORDER_FILTERS: OrderFilters = { search: "", source: "", stage: "", commerceStatus: "", ownerId: "", assignment: "", state: "active", limit: "50" };
@@ -137,7 +137,7 @@ function OrderFilterBar({ filters, facets, onChange }: { filters: OrderFilters; 
       </select>
       <select aria-label={o.state} value={filters.state} onChange={(event) => set("state", event.target.value)}>
         <option value="">{o.anyState}</option>
-        {(["active", "completed", "cancelled"] as const).map((state) => <option key={state} value={state}>{o.states[state]}</option>)}
+        {(["active", "stopped", "cancelled", "completed"] as const).map((state) => <option key={state} value={state}>{o.states[state]}</option>)}
       </select>
       <select aria-label={o.pageSize} value={filters.limit} onChange={(event) => set("limit", event.target.value)}>
         {["25", "50", "100"].map((size) => <option key={size} value={size}>{size}</option>)}
@@ -169,7 +169,7 @@ export function OrdersTable({ items, referenceTime }: { items: OrderSummary[]; r
               <td data-label={o.owner}><span className="owner-cell"><OwnerName owner={order.production.owner} />{order.production.attention && order.production.attention !== "unassigned" && <AttentionBadge attention={order.production.attention} />}</span></td>
               <td data-label={o.timeInStage}><TimeInStage order={order} referenceTime={referenceTime} /></td>
               <td data-label={o.importedAt}>{dateTime(order.importedAt)}</td>
-              <td data-label={o.state}><ProductionStateBadge state={order.production.state} /></td>
+              <td data-label={o.state}><span className="state-cell"><ProductionStateBadge state={order.production.state} /><StopBadge stop={order.production.stop} /></span></td>
             </tr>
           ))}
         </tbody>

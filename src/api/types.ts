@@ -40,6 +40,9 @@ export type Capabilities = {
   documentRevisionViaBackup?: boolean;
   viewDocumentHistory?: boolean;
   revokeDocuments?: boolean;
+  /** API 2.35.0: production.cancellation.manage / production.cancellation.release (granted to no role by default). */
+  manageCancellations?: boolean;
+  releaseCancellations?: boolean;
 };
 
 export type DocumentChange = { field: string; line: number | null; before: string | null; after: string | null };
@@ -279,11 +282,57 @@ export type ProductionOverview = {
     counts: { performed: number; notPerformed: number; unmarked: number };
     items: Array<{ orderId: string; orderNumber: string; unitId: string; lineNumber: number | null; name: string | null; code: string | null; piece: number; reworkCycle: number; stageId: string; status: "performed" | "not_performed" | "unmarked"; markedBy: string | null; markedAt: string | null }>;
   } | null;
+  /** API 2.35.0: stopped orders and recent releases. Absent on older APIs, null without orders.view_all. */
+  cancellations?: OverviewCancellations | null;
 };
 export type BlockerAction = "manager_decision" | "physical_receipt" | "supervisor_review" | "employee_work" | "plan_review";
+export type OverviewCancellations = {
+  counts: Record<CancellationCategory, number>;
+  stopped: number;
+  physicalPending: number;
+  nextActions: Record<Exclude<CancellationNextAction, "none">, number>;
+  items: Array<{ globalOrderId: string; orderNumber: string; source: { key: string; name: string }; stage: { id: string; label: string }; category: CancellationCategory; nextAction: CancellationNextAction;
+    origin: "source" | "local"; reason: string; physical: PhysicalStatus; physicalOutcome: PhysicalOutcome | null; productionCompleted: boolean; heldAt: string; releasedAt: string | null }>;
+  more: boolean;
+  releasedWindowDays: number;
+};
 
 /** GET /management/orders and /management/orders/{globalOrderId} (Operations API 2.6.0). */
-export type ProductionState = "active" | "completed" | "cancelled";
+export type ProductionState = "active" | "completed" | "cancelled" | "stopped";
+
+/** API 2.35.0 cancellation control: one category per order, so nothing is counted twice. */
+export type CancellationCategory = "completed_then_cancelled" | "source_cancelled" | "pending_source_confirmation" | "reactivated_awaiting_release" | "stopped" | "released";
+export type CancellationNextAction = "physical_reconciliation" | "source_confirmation" | "release_decision" | "none";
+export type PhysicalStatus = "not_required" | "pending" | "verified";
+export type PhysicalOutcome = "secured" | "nothing_produced" | "left_factory";
+export type OrderStopSummary = { state: "stopped" | "released"; category: CancellationCategory; nextAction: CancellationNextAction; physical: PhysicalStatus; version: number; heldAt: string; releasedAt: string | null };
+export type CancellationControlView = {
+  state: "stopped" | "released";
+  category: CancellationCategory;
+  nextAction: CancellationNextAction;
+  origin: "source" | "local";
+  reason: "source_cancelled" | "marketplace_cancelled" | "manager_stop" | "legacy_source_cancellation";
+  reasonNote: string | null;
+  source: { status: "cancelled" | "reactivated" | "not_reported"; statusCode: string | null; statusLabel: string | null; changedAt: string | null; cancellationReceivedAt: string | null; evidenceAt: string | null;
+    request: "not_requested" | "pending" | "confirmed" | "withdrawn"; requestedAt: string | null; outbound: "not_sent" };
+  atStop: { phase: "not_started" | "in_progress" | "completed"; stageId: string; owner: OwnerRef | null; exceptionId: string | null; productionVersion: number; completedAt: string | null; cuttingStartedAt: string | null;
+    tracks: Array<{ trackId: string; number: number; stageId: string; ownerId: string | null; exceptionId: string | null }> };
+  physical: { status: PhysicalStatus; outcome: PhysicalOutcome | null; note: string | null; scan: "order_qr" | "unit_label" | null; verifiedBy: OwnerRef | null; verifiedAt: string | null };
+  heldAt: string;
+  heldBy: OwnerRef | null;
+  releasedAt: string | null;
+  releasedBy: OwnerRef | null;
+  releaseReason: string | null;
+  release: { possible: boolean; refusal: string | null };
+  version: number;
+};
+export type CancellationEvent = { id: string; sequence: number; type: string; controlVersion: number | null; actor: OwnerRef | null; sourceEventRef: string | null; stageId: string; productionVersion: number; details: Record<string, unknown> | null; occurredAt: string };
+/** GET /management/orders/{id}/cancellation and the result of every cancellation command. */
+export type OrderCancellation = {
+  orderId: string; orderNumber: string; source: string; stage: { id: string }; productionVersion: number; productionCompleted: boolean; sourceAvailability: "active" | "cancelled";
+  cancellation: CancellationControlView | null; events: CancellationEvent[]; eventsTruncated: boolean;
+  capabilities: { stop: boolean; recordPhysical: boolean; release: boolean };
+};
 /** Neutral, objective attention for active production. There is no SLA, so time never produces attention. */
 export type OrderAttention = "unassigned" | "owner_inactive" | "owner_no_staff_access" | "owner_stage_not_allowed";
 export type OrderSummary = {
@@ -301,6 +350,8 @@ export type OrderSummary = {
     stageEnteredAt: string;
     completedAt: string | null;
     attention: OrderAttention | null;
+    /** API 2.35.0: the cancellation control of the order; null or absent when it never had one. */
+    stop?: OrderStopSummary | null;
   };
   importedAt: string;
   acceptedAt: string | null;
@@ -331,7 +382,7 @@ export type OrderDetail = Omit<OrderSummary, "commerce" | "production"> & {
     version: number;
     notes: string | null;
     /** Whether the viewer holds production.manage_owner, and why this order cannot take an owner intervention. */
-    control: { canManageOwner: boolean; blockedReason: "production_completed" | "order_unavailable" | null };
+    control: { canManageOwner: boolean; blockedReason: "production_completed" | "order_unavailable" | "production_stopped" | "exception_pending" | "document_revision_pending" | null };
   };
   items: OrderItem[];
   activity: OrderActivity[] | null;

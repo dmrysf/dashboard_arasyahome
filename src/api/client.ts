@@ -2,7 +2,7 @@ import { mapManufacturingPlan, mapPhysicalHistory } from "./physical";
 import type { ManufacturingPlan, PhysicalHistory, PlanConfirmation } from "./physical";
 import type {
   DocumentLookupItem, OrderDocuments, RevisionRequest,
-  Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, RestoreRecipient, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
+  Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderCancellation, OrderDetail, OrderPage, Organization, OwnerChange, PhysicalOutcome, Overview, Permission, ProductionOverview, ProductionSettings, RestoreRecipient, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
 } from "./types";
 import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
 import type { AnalyticsPolicy } from "./analytics";
@@ -154,6 +154,11 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     /** Owner interventions change internal production ownership only. The key makes a browser retry safe. */
     releaseOwner: (globalOrderId: string, expectedVersion: number, idempotencyKey: string) => request<OwnerChange>(`/management/orders/${encodeURIComponent(globalOrderId)}/release-owner`, { method: "POST", body: { expectedVersion }, idempotencyKey }),
     reassignOwner: (globalOrderId: string, employeeId: string, expectedVersion: number, idempotencyKey: string) => request<OwnerChange>(`/management/orders/${encodeURIComponent(globalOrderId)}/owner`, { method: "PUT", body: { employeeId, expectedVersion }, idempotencyKey }),
+    /** API 2.35.0 cancellation control. Nothing here writes to a source; a pending source request is only recorded. */
+    orderCancellation: (globalOrderId: string, signal?: AbortSignal) => request<OrderCancellation>(`/management/orders/${encodeURIComponent(globalOrderId)}/cancellation`, { signal }),
+    stopProduction: (globalOrderId: string, body: { reason: string; requestSourceCancellation: boolean }, idempotencyKey: string) => request<OrderCancellation>(`/management/orders/${encodeURIComponent(globalOrderId)}/cancellation/stop`, { method: "POST", body, idempotencyKey }),
+    recordPhysical: (globalOrderId: string, body: { expectedVersion: number; outcome: PhysicalOutcome; note: string; qrToken?: string }, idempotencyKey: string) => request<OrderCancellation>(`/management/orders/${encodeURIComponent(globalOrderId)}/cancellation/physical`, { method: "POST", body, idempotencyKey }),
+    releaseStop: (globalOrderId: string, body: { expectedVersion: number; reason: string }, idempotencyKey: string) => request<OrderCancellation>(`/management/orders/${encodeURIComponent(globalOrderId)}/cancellation/release`, { method: "POST", body, idempotencyKey }),
     productionOverview: (source: string | undefined, signal?: AbortSignal) => request<ProductionOverview>("/management/production-overview", { query: { source }, signal }),
     system: () => request<SystemStatus>("/management/system"),
     workflow: () => request<Workflow>("/production/workflow"),

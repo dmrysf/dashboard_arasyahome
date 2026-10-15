@@ -8,7 +8,8 @@ import { usePolling } from "../app/usePolling";
 import { Card, ConfirmDialog, ErrorBanner, ErrorText, Loading, Notice, PageHeader, RefreshBar } from "../components/ui";
 import { toProblem, type Problem } from "../i18n";
 import { useI18n } from "../i18n/context";
-import { AttentionBadge, CommerceChip, OwnerName, ProductionStateBadge, StageChip, TimeInStage } from "./orderParts";
+import { AttentionBadge, CommerceChip, OwnerName, ProductionStateBadge, StageChip, StopBadge, TimeInStage } from "./orderParts";
+import { CancellationPanel } from "./CancellationPanel";
 
 const STAGE_COUNT = 14;
 
@@ -64,7 +65,7 @@ export function OrderDetailContent({ data, referenceTime, toolbar, onChanged }: 
           </dl>
         </section>
         <section className="card state-card state-production" data-section="production">
-          <div className="card-header"><div><h2>{o.productionTitle}</h2><p>{o.productionHint}</p></div><ProductionStateBadge state={production.state} /></div>
+          <div className="card-header"><div><h2>{o.productionTitle}</h2><p>{o.productionHint}</p></div><span className="state-cell"><ProductionStateBadge state={production.state} /><StopBadge stop={production.stop} /></span></div>
           <StageProgress ordinal={production.stage.ordinal} state={production.state} />
           <dl className="facts">
             <dt>{o.stage}</dt><dd><StageChip stage={production.stage} /> <span className="muted small">{o.stageProgress(String(production.stage.ordinal))}</span></dd>
@@ -79,6 +80,7 @@ export function OrderDetailContent({ data, referenceTime, toolbar, onChanged }: 
           {production.completedAt && <p className="muted small">{o.completionNote}</p>}
         </section>
       </div>
+      <CancellationPanel orderId={data.globalOrderId} revision={referenceTime} onChanged={onChanged} />
       <ProductionControl data={data} onChanged={onChanged} />
       <Items items={data.items} notes={production.notes} />
       <Timeline data={data} />
@@ -92,7 +94,7 @@ function StageProgress({ ordinal, state }: { ordinal: number; state: OrderDetail
   return (
     <ol className="stage-progress" aria-label={t.orders.stageProgress(String(ordinal))}>
       {Array.from({ length: STAGE_COUNT }, (_, index) => (
-        <li key={index} className={index === ordinal - 1 && state === "active" ? "is-current" : ""} />
+        <li key={index} className={index === ordinal - 1 && (state === "active" || state === "stopped") ? "is-current" : ""} />
       ))}
     </ol>
   );
