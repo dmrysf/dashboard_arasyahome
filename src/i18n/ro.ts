@@ -854,6 +854,18 @@ export const ro = {
     } as Record<string, string>,
     // Defects found at stages 3-12 by tailoring, verified by the tailoring quality supervisor. Managers decide
     // only the final return from Primire Croitorie to Tăiere.
+    // Per-piece rework (API 2.31.0): exactly which physical pieces an approval moves.
+    pieces: {
+      title: "Bucăți afectate",
+      piece: (index: number, count: number) => `Bucata ${index}/${count}`,
+      scope: (affected: number, total: number) => `${affected} din ${total} buc.`,
+      partial: (affected: number, healthy: number) => `La aprobare se întoarce la tăiere doar ${affected === 1 ? "bucata selectată (1 buc.)" : `bucățile selectate (${affected} buc.)`}. Restul comenzii (${healthy} buc.) rămâne la etapa ei, fără refacere.`,
+      whole: (moving: number) => `La aprobare se întoarce la tăiere întreaga comandă (${moving} buc.).`,
+      wholeLegacy: (moving: number) => `Raport făcut pe linii: la aprobare se întoarce la tăiere întreaga comandă (${moving} buc.), nu doar produsul afectat.`,
+      onlySelected: "Doar bucata selectată",
+      wholeOrder: "Întreaga comandă",
+      lineAffected: (affected: number, quantity: number) => `${affected} din ${quantity} buc.`,
+    },
     tailoring: {
       badge: "Problemă din croitorie",
       detectedStage: "Etapa în care a fost găsită",
