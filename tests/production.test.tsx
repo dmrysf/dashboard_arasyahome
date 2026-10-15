@@ -374,3 +374,12 @@ test("API 2.34.0: genuine blockers name who must act; PERDEA status is separate 
   const older = text(panel("ro", { data: overview() }));
   assert.doesNotMatch(older, /Ce oprește producția|Verificări informative perdea/);
 });
+
+test("a truncated blocker list states how many blockers exist in total", () => {
+  const item = (n: number) => ({ globalOrderId: `trendyol:${n}`, orderNumber: `T-${n}`, source: { key: "trendyol", name: "Trendyol" }, stage: { id: "ironing", label: "Călcare" }, reason: "exception_awaiting_approval", action: "manager_decision" as const, exception: { number: `EX-${String(n).padStart(6, "0")}`, status: "awaiting_approval" }, since: "2026-10-04T10:00:00Z" });
+  const data = overview({ blockers: { counts: { manager_decision: 130, physical_receipt: 12, supervisor_review: 0, employee_work: 0, plan_review: 0 }, more: true, items: Array.from({ length: 100 }, (_, i) => item(i + 1)) } });
+  assert.match(text(panel("ro", { data })), /Se afișează primele 100 din 142 blocaje\./);
+  assert.match(text(panel("tr", { data })), /142 engelin ilk 100 tanesi gösteriliyor\./);
+  const complete = overview({ blockers: { counts: { manager_decision: 1, physical_receipt: 0, supervisor_review: 0, employee_work: 0, plan_review: 0 }, more: false, items: [item(1)] } });
+  assert.doesNotMatch(text(panel("ro", { data: complete })), /Se afișează primele/);
+});

@@ -177,7 +177,7 @@ export const tr: Messages = {
     blockers: "Üretimi durduranlar",
     blockersHint: "Sunucunun hesapladığı gerçek nedenler ve kimin harekete geçmesi gerektiği. Bilgi amaçlı PERDEA durumu burada görünmez.",
     blockersNone: "Bloke aktif sipariş yok.",
-    blockersMore: "İlk 100 gösteriliyor.",
+    blockersMore: (shown = "100", total = "100") => `${total} engelin ilk ${shown} tanesi gösteriliyor. Diğerleri de bekliyor; önce en eskileri çözün.`,
     blockerAction: (value: string): string => ({ manager_decision: "Yönetici kararı", physical_receipt: "Fiziksel teslim alma", supervisor_review: "Terzilik şefi", employee_work: "Üretim işi", plan_review: "Plan / kanıt incelemesi" } as Record<string, string>)[value] ?? value,
     blockerReason: (value: string): string => ({ exception_awaiting_approval: "Yönetici kararını bekliyor", exception_awaiting_acknowledgment: "İade edilen parça kesimde teslim alınmayı bekliyor", exception_awaiting_restore_receipt: "Geri verilen parça teslim alınmayı bekliyor", exception_awaiting_supervisor_review: "Kusur bildirildi, terzilik şefini bekliyor", exception_in_supervisor_custody: "Terzilik şefinde, iade gönderilmedi", exception_return_rejected: "İade reddedildi, şefin kararı gerekli", pieces_in_rework: "Onaylı yeniden işlemede parça", pieces_awaiting_reunion: "Ayrı rotada parçalar, birleşmeyi bekliyor", defect_unresolved: "Kusur giderimi onaylanmadı", pieces_held: "Fiziksel olarak bekletilen parça", plan_confirmation_required: "Üretim planı onaylanmadı", pieces_incomplete: "Eksik veya incelenecek parçalar", route_incomplete: "Rota kanıtı eksik" } as Record<string, string>)[value] ?? value,
     reason: "Neden", who: "Kim harekete geçer",
