@@ -13,7 +13,10 @@ export type EmployeeAnalytics = {
   faultUnmeasuredLines?: number; detectedUnmeasuredLines?: number;
   initiatedTransfers: number; outgoingTransfers: number; incomingTransfers: number; activeHandling: Duration; completedHandling: Record<ClockKind, Distribution>;
   cuttingActiveHandling: Duration; stageHandling: Record<string, Duration>; repeatedOrders: number; repeatedMeters: string; onlineSubmissions: number;
-  faultMeterRate: Rate; faultOrderRate: Rate; faultLineRate: Rate; stageCompletions: Record<string, number>; daily: Record<string, Trend> | []; weekly: Record<string, Trend> | [];
+  faultMeterRate: Rate; faultOrderRate: Rate; faultLineRate: Rate; stageCompletions: Record<string, number>;
+  /** API 2.33.0: independent track work and physical pieces completed, apart from commercial order-level completions. Absent on older APIs. */
+  trackStageCompletions?: Record<string, Partial<Record<"rework" | "route", number>>> | []; pieceWork?: { order: number; route: number; rework: number };
+  daily: Record<string, Trend> | []; weekly: Record<string, Trend> | [];
 };
 export type Interval = { employeeId: string; stageId: string; start: string; end: string | null; duration: Duration; orderId?: string; orderNumber?: string };
 export type Lifecycle = { isComplete: boolean; closedByCancellation: boolean; measuredUntil: string; qrToCompletion: Duration | null; claimToCompletion: Duration | null; elapsedFromQr: Duration | null; firstClaimDelay: Duration | null; cuttingWaiting: Duration | null; cuttingActive: Duration | null; activeHandling: Duration; completedCuttingHandling: Duration | null; managerWaiting: Duration; transferWaiting: Duration; exceptionBlocked: Duration; blockedUnion: Duration; nonWorker: Duration | null; intervals?: Interval[] };

@@ -110,6 +110,15 @@ function StageActivity({ stages }: { stages: Record<string, number> }) {
   const { t, stage, number } = useI18n();
   return <div><h3>{t.analytics.stageActivity}</h3><dl className="analytics-stats">{Object.entries(stages).map(([id, count]) => <Stat key={id} label={stage(id)} value={number(count)} />)}</dl>{Object.keys(stages).length === 0 && <p className="muted">{t.analytics.noData}</p>}</div>;
 }
+/** Physical piece work (API 2.33.0) is shown apart from commercial completions; rework is never added to them. */
+function PieceWork({ employee: r }: { employee: EmployeeAnalytics }) {
+  const { t, stage, number } = useI18n(); const a = t.analytics;
+  if (!r.pieceWork || r.pieceWork.order + r.pieceWork.route + r.pieceWork.rework === 0) return null;
+  const tracks = Array.isArray(r.trackStageCompletions) ? {} : r.trackStageCompletions ?? {};
+  return <div data-testid="analytics-piece-work"><h3>{a.pieceWork}</h3><dl className="analytics-stats"><Stat label={a.pieceOrder} value={number(r.pieceWork.order)} /><Stat label={a.pieceRoute} value={number(r.pieceWork.route)} /><Stat label={a.pieceRework} value={number(r.pieceWork.rework)} /></dl>
+    {Object.keys(tracks).length > 0 && <><h3>{a.trackStages}</h3><dl className="analytics-stats">{Object.entries(tracks).map(([id, kinds]) => <Stat key={id} label={stage(id)} value={`${number(kinds.route ?? 0)} / ${number(kinds.rework ?? 0)}`} />)}</dl></>}
+    <p className="muted">{a.pieceWorkHint}</p></div>;
+}
 function EmployeeCard({ employee: r, clock, linked = true }: { employee: EmployeeAnalytics; clock: ClockKind; linked?: boolean }) {
   const { t, number } = useI18n(); const a = t.analytics;
   const cutting = ["pregatire-material", "taiere"].includes(r.department.key) || r.completedOrders > 0 || r.faultOrders > 0;
@@ -122,6 +131,7 @@ function EmployeeCard({ employee: r, clock, linked = true }: { employee: Employe
     </>}
     {cutting && <dl className="analytics-stats"><Stat label={a.repeatedOrders} value={r.repeatedOrders} /><Stat label={a.repeatedMeters} value={r.repeatedMeters} /></dl>}
     {!cutting && <StageActivity stages={r.stageCompletions} />}
+    <PieceWork employee={r} />
     {(r.department.key === "vanzari-online" || r.onlineSubmissions > 0) && <dl className="analytics-stats"><Stat label={a.onlineSubmitted} value={r.onlineSubmissions} /></dl>}
     {!cutting && r.detectedOrders > 0 && <dl className="analytics-stats"><Stat label={a.detectedOrders} value={r.detectedOrders} /><Stat label={a.detectedLines} value={r.detectedLines} /><Stat label={a.detectedMeters} value={r.detectedMeters} /></dl>}
     <dl className="analytics-stats"><Stat label={a.active} value={<DurationText seconds={(cutting ? r.cuttingActiveHandling : r.activeHandling)[clock]} />} /><Stat label={a.initiated} value={r.initiatedTransfers} /><Stat label={a.outgoing} value={r.outgoingTransfers} /><Stat label={a.incoming} value={r.incomingTransfers} /></dl>
