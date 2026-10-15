@@ -460,3 +460,14 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 /* Tailoring defect approval: the manager states whether cutting responsibility is established. */
 .attribution-choice { display: grid; gap: 8px; margin: 12px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
 .attribution-choice legend { padding: 0 4px; font-weight: 600; }
+
+/* Physical-plan forms remain usable on narrow phones and with long source evidence. */
+.manufacturing-panel, .manufacturing-panel article { min-width: 0; overflow-wrap: anywhere; }
+.manufacturing-panel dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.manufacturing-panel dd { margin: 0; }
+.manufacturing-panel fieldset, [data-testid="physical-operations"] fieldset, [data-testid="piece-outcomes"] fieldset { min-width: 0; margin: 12px 0; padding: 12px; }
+.manufacturing-panel label, [data-testid="physical-operations"] label, [data-testid="piece-outcomes"] label { display: block; margin: 10px 0; }
+.manufacturing-panel input, .manufacturing-panel select, .manufacturing-panel textarea,
+[data-testid="physical-operations"] select, [data-testid="physical-operations"] textarea, [data-testid="piece-outcomes"] select { max-width: 100%; min-width: 0; }
+.confirmation-card { max-height: calc(100dvh - 36px); overflow-y: auto; }
+.manufacturing-panel .button { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box; }

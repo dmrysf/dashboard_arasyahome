@@ -43,7 +43,7 @@ test("Romanian and Turkish describe every supervised status, actor and the super
 
 test("the approval dialog requires an explicit attribution and never offers the cutter for a material defect", () => {
   const page = readFileSync(path.join(root, "src/pages/ApprovalsPage.tsx"), "utf8");
-  assert.match(page, /disabled=\{!data\.actions\.canAttributeToCutter\}/);
+  assert.match(page, /disabled=\{!snapshot\.actions\.canAttributeToCutter\}/);
   assert.match(page, /needsAttribution && !attribution/);
   assert.match(page, /data-testid="attribution-choice"/);
 });
@@ -59,7 +59,7 @@ test("root cancel after custody is a recovery: it names who receives the product
     ["POST", "/management/production-exceptions/11111111-1111-4111-8111-111111111111/cancel", { expectedVersion: 4, reason: "Produsul revine la tiv", recipientEmployeeId: "22222222-2222-4222-8222-222222222222" }],
   ]);
   const page = readFileSync(path.join(root, "src/pages/ApprovalsPage.tsx"), "utf8");
-  assert.match(page, /data\.actions\.cancelNeedsRecipient && !recipientId/);
+  assert.match(page, /snapshot\.actions\.cancelNeedsRecipient && !recipientId/);
   assert.match(page, /data-testid="recovery-recipient"/);
   assert.match(MESSAGES.ro.exceptions.recoveryBody, /rămâne blocată/);
 });

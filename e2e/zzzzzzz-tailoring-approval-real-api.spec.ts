@@ -113,10 +113,12 @@ test("the CEO appoints the supervisor; the internal 7 -> 3 return never reaches 
   await denisa.page.getByRole("button", { name: "Aprobă returnarea la tăiere" }).click();
   const dialog = denisa.page.getByRole("dialog");
   await expect(dialog.getByTestId("attribution-choice")).toBeVisible();
+  await dialog.getByRole("checkbox", { name: /Am verificat liniile/ }).check();
   await dialog.getByRole("button", { name: "Aprobă returnarea la tăiere" }).click();
   await expect(dialog.getByText("Alege dacă eroarea de tăiere este stabilită.")).toBeVisible();
   for (const width of [360, 390]) { await denisa.page.setViewportSize({ width, height: 800 }); expect(await overflow(denisa.page), `dialog at ${width}`).toBeLessThanOrEqual(0); }
   await dialog.getByRole("radio", { name: /Eroare de tăiere stabilită/ }).check();
+  await dialog.getByRole("checkbox", { name: /Am verificat liniile/ }).check();
   await dialog.getByRole("button", { name: "Aprobă returnarea la tăiere" }).click();
   await expect(denisa.page.getByText("Eroare de tăiere atribuită")).toBeVisible();
   const after = await tailor.get(`/production-exceptions/${reported.id}`);

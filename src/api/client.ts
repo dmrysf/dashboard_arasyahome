@@ -1,3 +1,5 @@
+import { mapManufacturingPlan, mapPhysicalHistory } from "./physical";
+import type { ManufacturingPlan, PhysicalHistory, PlanConfirmation } from "./physical";
 import type {
   DocumentLookupItem, OrderDocuments, RevisionRequest,
   Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, RestoreRecipient, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
@@ -187,6 +189,9 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     // Production exceptions (approvals). Every decision carries the version the manager saw and an idempotency key.
     exceptions: (view: "pending" | "waiting" | "mine", signal?: AbortSignal) => request<{ items: ExceptionSummary[] }>("/management/production-exceptions", { query: { view }, signal }),
     exception: (id: string, signal?: AbortSignal) => request<ExceptionDetail>(`/management/production-exceptions/${encodeURIComponent(id)}`, { signal }),
+    manufacturingPlan: (id: string, signal?: AbortSignal) => request<ManufacturingPlan>(`/orders/${encodeURIComponent(id)}/manufacturing-plan`, { signal }).then(mapManufacturingPlan),
+    confirmManufacturingPlan: (id: string, lineId: string, body: PlanConfirmation, key: string) => request<ManufacturingPlan>(`/orders/${encodeURIComponent(id)}/manufacturing-plan/lines/${encodeURIComponent(lineId)}/confirm`, { method: "POST", body, idempotencyKey: key }).then(mapManufacturingPlan),
+    pieceHistory: (id: string, signal?: AbortSignal) => request<PhysicalHistory>(`/production-units/${encodeURIComponent(id)}/history`, { signal }).then(mapPhysicalHistory),
     decideException: (id: string, body: { expectedVersion: number; decision: "approve" | "reject"; comment?: string; attribution?: "cutter" | "none" }, idempotencyKey: string) => request<ExceptionDetail>(`/management/production-exceptions/${encodeURIComponent(id)}/decision`, { method: "POST", body, idempotencyKey }),
     cancelException: (id: string, body: { expectedVersion: number; reason: string; recipientEmployeeId?: string }, idempotencyKey: string) => request<ExceptionDetail>(`/management/production-exceptions/${encodeURIComponent(id)}/cancel`, { method: "POST", body, idempotencyKey }),
     restoreRecipients: (id: string, signal?: AbortSignal) => request<{ items: RestoreRecipient[] }>(`/management/production-exceptions/${encodeURIComponent(id)}/restore-recipients`, { signal }),

@@ -94,9 +94,10 @@ test("operations managers: narrow navigation, one approval wins, the other scree
   await denisa.page.getByRole("button", { name: /Comanda 91001/ }).click();
   await hikmet.page.getByRole("button", { name: /Comanda 91001/ }).click();
   await expect(hikmet.page.getByRole("button", { name: "Aprobă returnarea la tăiere" })).toBeVisible();
-  await expect(denisa.page.getByText("Draperie D")).toBeVisible();
+  await expect(denisa.page.getByText("Draperie D", { exact: true })).toBeVisible();
 
   await denisa.page.getByRole("button", { name: "Aprobă returnarea la tăiere" }).click();
+  await denisa.page.getByRole("dialog").getByRole("checkbox", { name: /Am verificat liniile/ }).check();
   await denisa.page.getByRole("dialog").getByRole("button", { name: "Aprobă returnarea la tăiere" }).click();
   await expect(denisa.page.getByText("Aprobată").first()).toBeVisible();
 
