@@ -87,6 +87,7 @@ function ProductionContent({ data }: { data: Overview }) {
         ))}
       </div>
       <Pipeline data={data} />
+      {data.cancellations != null && <Cancellations cancellations={data.cancellations} />}
       {data.blockers != null && <Blockers blockers={data.blockers} />}
       {data.perdeaInformation != null && <PerdeaInformation info={data.perdeaInformation} />}
       <div className="grid-2 production-detail">
@@ -155,6 +156,48 @@ function Blockers({ blockers }: { blockers: NonNullable<Overview["blockers"]> })
         </div>
       )}
       {blockers.more && <p className="notice small" role="note" data-testid="blockers-more">{p.blockersMore(number(blockers.items.length), number(Object.values(blockers.counts).reduce((sum, count) => sum + count, 0)))}</p>}
+    </section>
+  );
+}
+
+/**
+ * API 2.35.0: stopped and cancelled orders, one category per order, with the party that acts next. Stopped orders are not
+ * active production (the summary above excludes them) and a completion followed by a cancellation keeps its completion.
+ */
+function Cancellations({ cancellations }: { cancellations: NonNullable<Overview["cancellations"]> }) {
+  const { navigate } = useDashboard();
+  const { t, number, dateTime, stage: stageName } = useI18n();
+  const p = t.production;
+  const c = t.orders.cancellation;
+  const shown = Object.entries(cancellations.counts).filter(([, count]) => count > 0);
+  return (
+    <section className="card" data-testid="production-cancellations">
+      <div className="card-header"><div><h2>{p.cancellations}</h2><p>{p.cancellationsHint}</p></div></div>
+      <p className="muted" data-testid="cancellations-summary">{p.cancellationsSummary(number(cancellations.stopped), number(cancellations.physicalPending))}</p>
+      {shown.length > 0 && (
+        <div className="metric-grid" role="list">
+          {shown.map(([category, count]) => <div className="metric metric-static" role="listitem" key={category} data-category={category}><span>{c.category[category] ?? category}</span><strong>{number(count)}</strong></div>)}
+        </div>
+      )}
+      {cancellations.items.length === 0 ? <p className="muted">{p.cancellationsNone}</p> : (
+        <div className="table-scroll">
+          <table className="data-table compact-table">
+            <thead><tr><th>{p.order}</th><th>{p.stage}</th><th>{p.category}</th><th>{p.nextAction}</th></tr></thead>
+            <tbody>
+              {cancellations.items.map((item) => (
+                <tr key={item.globalOrderId} data-cancelled-order={item.orderNumber} data-category={item.category} data-next-action={item.nextAction}>
+                  <td data-label={p.order}><a className="mono order-link" href={orderPath(item.globalOrderId)} onClick={(event) => { event.preventDefault(); navigate(orderPath(item.globalOrderId)); }}>{item.orderNumber}</a><small className="cell-sub">{item.source.name}</small></td>
+                  <td data-label={p.stage}>{stageName(item.stage.id, item.stage.label)}<small className="cell-sub">{dateTime(item.releasedAt ?? item.heldAt)}</small></td>
+                  <td data-label={p.category}>{c.category[item.category] ?? item.category}</td>
+                  <td data-label={p.nextAction}><Badge tone={item.nextAction === "none" ? "neutral" : "warning"}>{c.nextAction[item.nextAction] ?? item.nextAction}</Badge></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="muted small">{p.cancellationsReleased(number(cancellations.releasedWindowDays))}</p>
+      {cancellations.more && <p className="notice small" role="note">{p.cancellationsMore}</p>}
     </section>
   );
 }

@@ -27,11 +27,22 @@ export function StageChip({ stage }: { stage: OrderSummary["production"]["stage"
   );
 }
 
-const STATE_TONE: Record<ProductionState, "accent" | "success" | "neutral"> = { active: "accent", completed: "success", cancelled: "neutral" };
+const STATE_TONE: Record<ProductionState, "accent" | "success" | "neutral" | "warning"> = { active: "accent", completed: "success", cancelled: "neutral", stopped: "warning" };
 
 export function ProductionStateBadge({ state }: { state: ProductionState }) {
   const { t } = useI18n();
   return <span data-production-state={state}><Badge tone={STATE_TONE[state] ?? "neutral"}>{t.orders.states[state] ?? state}</Badge></span>;
+}
+
+/**
+ * API 2.35.0: the cancellation category of an order that has a cancellation control (a stopped order, a completed order
+ * cancelled afterwards, or a recent release). Rendered next to the production state, never instead of it.
+ */
+export function StopBadge({ stop }: { stop: OrderSummary["production"]["stop"] }) {
+  const { t } = useI18n();
+  if (!stop) return null;
+  const tone = stop.state === "released" ? "neutral" : stop.category === "completed_then_cancelled" || stop.category === "source_cancelled" ? "danger" : "warning";
+  return <span className="stop-badge" data-stop-category={stop.category} data-next-action={stop.nextAction}><Badge tone={tone}>{t.orders.cancellation.category[stop.category] ?? stop.category}</Badge></span>;
 }
 
 export function OwnerName({ owner }: { owner: OrderSummary["production"]["owner"] }) {
