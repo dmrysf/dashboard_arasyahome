@@ -25,7 +25,7 @@ function OrderDetailWorkspace({ id, onBack }: { id: string; onBack: () => void }
   const polling = usePolling(load, id);
   const { stage } = useI18n();
   const physical = useMemo(() => ({ plan: api.manufacturingPlan, confirmPlan: api.confirmManufacturingPlan, history: api.pieceHistory }), [api]);
-  return <><OrderDetailView {...polling} onBack={onBack} /><ManufacturingPanel orderId={id} service={physical} revision={polling.updatedAt ?? 0} newKey={newIdempotencyKey} stageName={stage} onChanged={polling.refresh} /></>;
+  return <><OrderDetailView {...polling} onBack={onBack} />{polling.data && <ManufacturingPanel orderId={id} service={physical} revision={polling.updatedAt ?? 0} newKey={newIdempotencyKey} stageName={stage} onChanged={polling.refresh} />}</>;
 }
 
 export type OrderDetailViewProps = { data: OrderDetail | null; error: unknown; updatedAt: number | null; refreshing: boolean; refresh: () => void; onBack: () => void };

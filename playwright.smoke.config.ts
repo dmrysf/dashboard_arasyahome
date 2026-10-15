@@ -15,7 +15,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: process.env.CI ? "line" : "list",
-  use: { baseURL: `http://127.0.0.1:${webPort}`, trace: "retain-on-failure", ...devices["Desktop Chrome"] },
+  use: { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }, baseURL: `http://127.0.0.1:${webPort}`, trace: "retain-on-failure", ...devices["Desktop Chrome"] },
   webServer: {
     command: `pnpm exec vite preview --host 127.0.0.1 --port ${webPort} --strictPort`,
     url: `http://127.0.0.1:${webPort}/`,
