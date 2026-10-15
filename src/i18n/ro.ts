@@ -179,7 +179,7 @@ export const ro = {
     blockers: "Ce oprește producția",
     blockersHint: "Motive reale, calculate de server, și cine trebuie să acționeze. Starea informativă PERDEA nu apare aici.",
     blockersNone: "Nicio comandă activă nu este blocată.",
-    blockersMore: "Se afișează primele 100.",
+    blockersMore: (shown = "100", total = "100") => `Se afișează primele ${shown} din ${total} blocaje. Restul rămân în așteptare; rezolvați-le pe cele mai vechi întâi.`,
     blockerAction: (value: string): string => ({ manager_decision: "Decizie managerială", physical_receipt: "Primire fizică", supervisor_review: "Șeful de croitorie", employee_work: "Lucru de producție", plan_review: "Verificare plan / dovezi" } as Record<string, string>)[value] ?? value,
     blockerReason: (value: string): string => ({ exception_awaiting_approval: "Așteaptă decizia managerului", exception_awaiting_acknowledgment: "Bucata returnată așteaptă primirea la tăiere", exception_awaiting_restore_receipt: "Bucata restituită așteaptă primirea", exception_awaiting_supervisor_review: "Defect raportat, așteaptă șeful de croitorie", exception_in_supervisor_custody: "La șeful de croitorie, retur netrimis", exception_return_rejected: "Retur refuzat, necesită decizia șefului", pieces_in_rework: "Bucată în refacere aprobată", pieces_awaiting_reunion: "Bucăți pe traseu separat, așteaptă reunirea", defect_unresolved: "Remedierea defectului neconfirmată", pieces_held: "Bucată reținută fizic", plan_confirmation_required: "Plan de producție neconfirmat", pieces_incomplete: "Bucăți lipsă sau de verificat", route_incomplete: "Dovezi de traseu incomplete" } as Record<string, string>)[value] ?? value,
     reason: "Motiv", who: "Cine acționează",

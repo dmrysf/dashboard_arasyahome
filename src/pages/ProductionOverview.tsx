@@ -154,7 +154,7 @@ function Blockers({ blockers }: { blockers: NonNullable<Overview["blockers"]> })
           </table>
         </div>
       )}
-      {blockers.more && <p className="muted small">{p.blockersMore}</p>}
+      {blockers.more && <p className="notice small" role="note" data-testid="blockers-more">{p.blockersMore(number(blockers.items.length), number(Object.values(blockers.counts).reduce((sum, count) => sum + count, 0)))}</p>}
     </section>
   );
 }
