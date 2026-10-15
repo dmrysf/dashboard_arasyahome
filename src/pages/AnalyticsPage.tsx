@@ -119,12 +119,12 @@ function PieceWork({ employee: r }: { employee: EmployeeAnalytics }) {
     {Object.keys(tracks).length > 0 && <><h3>{a.trackStages}</h3><dl className="analytics-stats">{Object.entries(tracks).map(([id, kinds]) => <Stat key={id} label={stage(id)} value={`${number(kinds.route ?? 0)} / ${number(kinds.rework ?? 0)}`} />)}</dl></>}
     <p className="muted">{a.pieceWorkHint}</p></div>;
 }
-/** Assisted PERDEA checks (API 2.34.0) apart from manufacturing; absent on older APIs and hidden when nothing happened. */
+/** Informational PERDEA marks (API 2.34.0) apart from manufacturing; absent on older APIs and hidden when nothing happened. */
 function AssistedChecks({ employee: r }: { employee: EmployeeAnalytics }) {
   const { t, number } = useI18n(); const a = t.analytics; const c = r.assistedCheckpoints;
-  if (!c || c.verified + c.notPerformed + c.helperWork + c.stageTransitions === 0) return null;
-  return <div data-testid="analytics-assisted-checks"><h3>{a.assisted}</h3><dl className="analytics-stats"><Stat label={a.assistedVerified} value={number(c.verified)} /><Stat label={a.assistedNotPerformed} value={number(c.notPerformed)} />
-    <Stat label={a.assistedHelper} value={number(c.helperWork)} /><Stat label={a.assistedTransitions} value={number(c.stageTransitions)} /></dl><p className="muted">{a.assistedHint}</p></div>;
+  if (!c || c.performed + c.notPerformed + c.stageTransitions === 0) return null;
+  return <div data-testid="analytics-assisted-checks"><h3>{a.assisted}</h3><dl className="analytics-stats"><Stat label={a.assistedVerified} value={number(c.performed)} /><Stat label={a.assistedNotPerformed} value={number(c.notPerformed)} />
+    <Stat label={a.assistedTransitions} value={number(c.stageTransitions)} /></dl><p className="muted">{a.assistedHint}</p></div>;
 }
 function EmployeeCard({ employee: r, clock, linked = true }: { employee: EmployeeAnalytics; clock: ClockKind; linked?: boolean }) {
   const { t, number } = useI18n(); const a = t.analytics;

@@ -16,8 +16,8 @@ export type EmployeeAnalytics = {
   faultMeterRate: Rate; faultOrderRate: Rate; faultLineRate: Rate; stageCompletions: Record<string, number>;
   /** API 2.33.0: independent track work and physical pieces completed, apart from commercial order-level completions. Absent on older APIs. */
   trackStageCompletions?: Record<string, Partial<Record<"rework" | "route", number>>> | []; pieceWork?: { order: number; route: number; rework: number };
-  /** API 2.34.0: assisted PERDEA checks at stages 6/7. Verifications are not manufacturing; helper work counts only once a stage employee verified it. Absent on older APIs. */
-  assistedCheckpoints?: { verified: number; notPerformed: number; helperWork: number; stageTransitions: number };
+  /** API 2.34.0: informational PERDEA auxiliary-work marks at stages 6/7 (never manufacturing, never a gate). Absent on older APIs. */
+  assistedCheckpoints?: { performed: number; notPerformed: number; stageTransitions: number };
   daily: Record<string, Trend> | []; weekly: Record<string, Trend> | [];
 };
 export type Interval = { employeeId: string; stageId: string; start: string; end: string | null; duration: Duration; orderId?: string; orderNumber?: string };

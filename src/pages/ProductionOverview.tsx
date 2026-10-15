@@ -87,6 +87,8 @@ function ProductionContent({ data }: { data: Overview }) {
         ))}
       </div>
       <Pipeline data={data} />
+      {data.blockers != null && <Blockers blockers={data.blockers} />}
+      {data.perdeaInformation != null && <PerdeaInformation info={data.perdeaInformation} />}
       <div className="grid-2 production-detail">
         <OldestOrders data={data} />
         <Activity data={data} />
@@ -120,6 +122,69 @@ function Pipeline({ data }: { data: Overview }) {
           );
         })}
       </ol>
+    </section>
+  );
+}
+
+/** Genuine server-defined blockers, grouped by who must act (API 2.34.0). Read-only; the Dashboard decides nothing here. */
+function Blockers({ blockers }: { blockers: NonNullable<Overview["blockers"]> }) {
+  const { navigate } = useDashboard();
+  const { t, number, dateTime, stage: stageName } = useI18n();
+  const p = t.production;
+  return (
+    <section className="card" data-testid="production-blockers">
+      <div className="card-header"><div><h2>{p.blockers}</h2><p>{p.blockersHint}</p></div></div>
+      <div className="metric-grid" role="list">
+        {Object.entries(blockers.counts).map(([action, count]) => <div className="metric metric-static" role="listitem" key={action} data-blocker={action}><span>{p.blockerAction(action)}</span><strong>{number(count)}</strong></div>)}
+      </div>
+      {blockers.items.length === 0 ? <p className="muted">{p.blockersNone}</p> : (
+        <div className="table-scroll">
+          <table className="data-table compact-table">
+            <thead><tr><th>{p.order}</th><th>{p.stage}</th><th>{p.reason}</th><th>{p.who}</th></tr></thead>
+            <tbody>
+              {blockers.items.map((item, index) => (
+                <tr key={`${item.globalOrderId}-${item.reason}-${index}`} data-order={item.orderNumber} data-action={item.action}>
+                  <td data-label={p.order}><a className="mono order-link" href={orderPath(item.globalOrderId)} onClick={(event) => { event.preventDefault(); navigate(orderPath(item.globalOrderId)); }}>{item.orderNumber}</a><small className="cell-sub">{item.source.name}</small></td>
+                  <td data-label={p.stage}>{stageName(item.stage.id, item.stage.label)}<small className="cell-sub">{dateTime(item.since)}</small></td>
+                  <td data-label={p.reason}>{p.blockerReason(item.reason)}{item.exception && <small className="cell-sub mono">{item.exception.number}</small>}</td>
+                  <td data-label={p.who}><Badge tone={item.action === "manager_decision" ? "warning" : "neutral"}>{p.blockerAction(item.action)}</Badge></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {blockers.more && <p className="muted small">{p.blockersMore}</p>}
+    </section>
+  );
+}
+
+/** PERDEA auxiliary-work status at stages 6/7: information only, never presented as a blocker. */
+function PerdeaInformation({ info }: { info: NonNullable<Overview["perdeaInformation"]> }) {
+  const { t, number, dateTime, stage: stageName } = useI18n();
+  const p = t.production;
+  return (
+    <section className="card" data-testid="perdea-information">
+      <div className="card-header"><div><h2>{p.perdea}</h2><p>{p.perdeaHint}</p></div></div>
+      <p className="muted">{p.perdeaSummary(number(info.counts.performed), number(info.counts.notPerformed), number(info.counts.unmarked))}</p>
+      {info.items.length === 0 ? <p className="muted">{p.perdeaNone}</p> : (
+        <div className="table-scroll">
+          <table className="data-table compact-table">
+            <thead><tr><th>{p.order}</th><th>{p.piece}</th><th>{p.stage}</th><th>{p.status}</th><th>{p.markedBy}</th></tr></thead>
+            <tbody>
+              {info.items.map((item) => (
+                <tr key={`${item.unitId}-${item.reworkCycle}-${item.stageId}`} data-status={item.status}>
+                  <td data-label={p.order}><span className="mono">{item.orderNumber}</span><small className="cell-sub">{item.code ?? item.name ?? ""}</small></td>
+                  <td data-label={p.piece}>{p.piece} {item.piece} · {p.cycle} {item.reworkCycle}</td>
+                  <td data-label={p.stage}>{stageName(item.stageId)}</td>
+                  <td data-label={p.status}>{p.perdeaStatus(item.status)}</td>
+                  <td data-label={p.markedBy}>{item.markedBy ?? "—"}{item.markedAt && <small className="cell-sub">{dateTime(item.markedAt)}</small>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

@@ -267,7 +267,20 @@ export type ProductionOverview = {
     newOwner?: OwnerRef | null;
   }> | null;
   sources: Array<{ key: string; name: string; type: string; health: SourceHealth; lastContactAt: string | null; lastEventAt: string | null; activeOrders: number }> | null;
+  /** API 2.34.0: genuine server-defined blockers and who must act. Absent on older APIs, null without orders.view_all. */
+  blockers?: {
+    counts: Record<BlockerAction, number>;
+    items: Array<{ globalOrderId: string; orderNumber: string; source: { key: string; name: string }; stage: { id: string; label: string }; reason: string; action: BlockerAction; exception: { number: string; status: string } | null; since: string }>;
+    more: boolean;
+  } | null;
+  /** API 2.34.0: informational PERDEA auxiliary-work status at stages 6/7. Never a blocker. */
+  perdeaInformation?: {
+    informational: true;
+    counts: { performed: number; notPerformed: number; unmarked: number };
+    items: Array<{ orderId: string; orderNumber: string; unitId: string; lineNumber: number | null; name: string | null; code: string | null; piece: number; reworkCycle: number; stageId: string; status: "performed" | "not_performed" | "unmarked"; markedBy: string | null; markedAt: string | null }>;
+  } | null;
 };
+export type BlockerAction = "manager_decision" | "physical_receipt" | "supervisor_review" | "employee_work" | "plan_review";
 
 /** GET /management/orders and /management/orders/{globalOrderId} (Operations API 2.6.0). */
 export type ProductionState = "active" | "completed" | "cancelled";
