@@ -348,3 +348,29 @@ test("production numbers come only from the API response, never from constants i
   const component = readFileSync(join(import.meta.dirname, "..", "src", "pages", "ProductionOverview.tsx"), "utf8");
   assert.ok(!/active:\s*\d|waiting:\s*\d|completedToday:\s*\d/.test(component), "no hard-coded metric values in the overview component");
 });
+
+test("API 2.34.0: genuine blockers name who must act; PERDEA status is separate information, never a blocker", () => {
+  const data = overview({
+    blockers: { counts: { manager_decision: 1, physical_receipt: 0, supervisor_review: 1, employee_work: 0, plan_review: 0 }, more: false, items: [
+      { globalOrderId: "trendyol:1", orderNumber: "T-1", source: { key: "trendyol", name: "Trendyol" }, stage: { id: "ironing", label: "Călcare" }, reason: "exception_awaiting_approval", action: "manager_decision", exception: { number: "EX-000002", status: "awaiting_approval" }, since: "2026-10-04T10:00:00Z" },
+      { globalOrderId: "trendyol:2", orderNumber: "T-2", source: { key: "trendyol", name: "Trendyol" }, stage: { id: "packing", label: "Ambalare" }, reason: "pieces_held", action: "supervisor_review", exception: null, since: "2026-10-04T11:00:00Z" },
+    ] },
+    perdeaInformation: { informational: true, counts: { performed: 1, notPerformed: 1, unmarked: 2 }, items: [
+      { orderId: "trendyol:3", orderNumber: "T-3", unitId: "u", lineNumber: 1, name: "Perdea", code: "P-1", piece: 1, reworkCycle: 1, stageId: "bottom-hem", status: "not_performed", markedBy: "Synthetic Hemmer", markedAt: "2026-10-04T11:30:00Z" },
+    ] },
+  });
+  const ro = text(panel("ro", { data }));
+  assert.match(ro, /Ce oprește producția/);
+  assert.match(ro, /Așteaptă decizia managerului/);
+  assert.match(ro, /Decizie managerială/);
+  assert.match(ro, /EX-000002/);
+  assert.match(ro, /Bucată reținută fizic/);
+  assert.match(ro, /Verificări informative perdea — Etapele 6 și 7/);
+  assert.match(ro, /Doar informație: nu blochează producția, ambalarea sau livrarea\./);
+  assert.match(ro, /Efectuată: 1 · Neefectuată: 1 · Neconfirmată: 2/);
+  const tr = text(panel("tr", { data }));
+  assert.match(tr, /Yönetici kararı/);
+  assert.match(tr, /Bilgi amaçlı perde kontrolleri/);
+  const older = text(panel("ro", { data: overview() }));
+  assert.doesNotMatch(older, /Ce oprește producția|Verificări informative perdea/);
+});

@@ -119,6 +119,13 @@ function PieceWork({ employee: r }: { employee: EmployeeAnalytics }) {
     {Object.keys(tracks).length > 0 && <><h3>{a.trackStages}</h3><dl className="analytics-stats">{Object.entries(tracks).map(([id, kinds]) => <Stat key={id} label={stage(id)} value={`${number(kinds.route ?? 0)} / ${number(kinds.rework ?? 0)}`} />)}</dl></>}
     <p className="muted">{a.pieceWorkHint}</p></div>;
 }
+/** Informational PERDEA marks (API 2.34.0) apart from manufacturing; absent on older APIs and hidden when nothing happened. */
+function AssistedChecks({ employee: r }: { employee: EmployeeAnalytics }) {
+  const { t, number } = useI18n(); const a = t.analytics; const c = r.assistedCheckpoints;
+  if (!c || c.performed + c.notPerformed + c.stageTransitions === 0) return null;
+  return <div data-testid="analytics-assisted-checks"><h3>{a.assisted}</h3><dl className="analytics-stats"><Stat label={a.assistedVerified} value={number(c.performed)} /><Stat label={a.assistedNotPerformed} value={number(c.notPerformed)} />
+    <Stat label={a.assistedTransitions} value={number(c.stageTransitions)} /></dl><p className="muted">{a.assistedHint}</p></div>;
+}
 function EmployeeCard({ employee: r, clock, linked = true }: { employee: EmployeeAnalytics; clock: ClockKind; linked?: boolean }) {
   const { t, number } = useI18n(); const a = t.analytics;
   const cutting = ["pregatire-material", "taiere"].includes(r.department.key) || r.completedOrders > 0 || r.faultOrders > 0;
@@ -132,6 +139,7 @@ function EmployeeCard({ employee: r, clock, linked = true }: { employee: Employe
     {cutting && <dl className="analytics-stats"><Stat label={a.repeatedOrders} value={r.repeatedOrders} /><Stat label={a.repeatedMeters} value={r.repeatedMeters} /></dl>}
     {!cutting && <StageActivity stages={r.stageCompletions} />}
     <PieceWork employee={r} />
+    <AssistedChecks employee={r} />
     {(r.department.key === "vanzari-online" || r.onlineSubmissions > 0) && <dl className="analytics-stats"><Stat label={a.onlineSubmitted} value={r.onlineSubmissions} /></dl>}
     {!cutting && r.detectedOrders > 0 && <dl className="analytics-stats"><Stat label={a.detectedOrders} value={r.detectedOrders} /><Stat label={a.detectedLines} value={r.detectedLines} /><Stat label={a.detectedMeters} value={r.detectedMeters} /></dl>}
     <dl className="analytics-stats"><Stat label={a.active} value={<DurationText seconds={(cutting ? r.cuttingActiveHandling : r.activeHandling)[clock]} />} /><Stat label={a.initiated} value={r.initiatedTransfers} /><Stat label={a.outgoing} value={r.outgoingTransfers} /><Stat label={a.incoming} value={r.incomingTransfers} /></dl>
