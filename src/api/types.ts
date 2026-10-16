@@ -342,7 +342,9 @@ export type SyncAttempt = {
 export type SyncOperationView = {
   id: string; state: SyncState; staffState: "awaiting_confirmation" | "attention" | "confirmed" | null; mechanism: SyncMechanism; generation: number; reasonCode: string | null;
   attempts: number; nextAttemptAt: string | null; dispatchedAt: string | null; lastPulledAt: string | null; providerResult: string | null; providerStatus: string | null;
-  confirmedAt: string | null; confirmedBy: "inbound_event" | "status_read" | null; lastError: string | null; lastErrorAt: string | null; createdAt: string; version: number; history: SyncAttempt[];
+  confirmedAt: string | null; confirmedBy: "inbound_event" | "status_read" | null; lastError: string | null; lastErrorAt: string | null;
+  /** An earlier notice may already have reached the channel: a retry must state a check in the channel (providerChecked). */
+  providerCheckRequired: boolean; createdAt: string; version: number; history: SyncAttempt[];
 };
 export type SyncProviderView = {
   source: string; mechanism: SyncMechanism; serverEnabled: boolean; flagEnabled: boolean; active: boolean; configured: boolean;

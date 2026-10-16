@@ -164,7 +164,7 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
      * (only behind the server switch and the provider flag). No refund is ever started.
      */
     sendCancellation: (globalOrderId: string, body: { expectedVersion: number; reasonCode?: number; note?: string }, idempotencyKey: string) => request<SyncOperationView>(`/management/orders/${encodeURIComponent(globalOrderId)}/cancellation/sync`, { method: "POST", body, idempotencyKey }),
-    syncOperation: (operationId: string, action: "retry" | "withdraw" | "close", body: { expectedVersion: number; reason?: string; note?: string }, idempotencyKey: string) => request<SyncOperationView>(`/management/cancellation-sync/operations/${encodeURIComponent(operationId)}/${action}`, { method: "POST", body, idempotencyKey }),
+    syncOperation: (operationId: string, action: "retry" | "withdraw" | "close", body: { expectedVersion: number; reason?: string; note?: string; providerChecked?: true }, idempotencyKey: string) => request<SyncOperationView>(`/management/cancellation-sync/operations/${encodeURIComponent(operationId)}/${action}`, { method: "POST", body, idempotencyKey }),
     cancellationSyncOverview: (signal?: AbortSignal) => request<CancellationSyncOverview>("/management/cancellation-sync", { signal }),
     reconcileCancellationSync: () => request<CancellationSyncDryRun>("/management/cancellation-sync/reconcile", { method: "POST", body: {} }),
     productionOverview: (source: string | undefined, signal?: AbortSignal) => request<ProductionOverview>("/management/production-overview", { query: { source }, signal }),

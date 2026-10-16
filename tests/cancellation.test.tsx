@@ -8,6 +8,7 @@ import { MESSAGES, type Locale } from "../src/i18n";
 import { I18nProvider } from "../src/i18n/context";
 import { CancellationPanelView } from "../src/pages/CancellationPanel";
 import { CancellationSyncOverviewView } from "../src/pages/CancellationSyncOverview";
+import { OperationDialog } from "../src/pages/CancellationSyncSection";
 import { StopBadge } from "../src/pages/orderParts";
 import { ProductionPanel } from "../src/pages/ProductionOverview";
 import { API, fakeFetch, me } from "./support";
@@ -149,7 +150,7 @@ const trendyolProvider = {
 function syncOperation(overrides: Partial<SyncOperationView> = {}): SyncOperationView {
   return {
     id: "op-1", state: "awaiting_confirmation", staffState: "awaiting_confirmation", mechanism: "api", generation: 1, reasonCode: "500", attempts: 1, nextAttemptAt: "2026-10-16T08:02:00.000Z",
-    dispatchedAt: "2026-10-16T08:00:00.000Z", lastPulledAt: null, providerResult: "accepted", providerStatus: "Created", confirmedAt: null, confirmedBy: null, lastError: null, lastErrorAt: null,
+    dispatchedAt: "2026-10-16T08:00:00.000Z", lastPulledAt: null, providerResult: "accepted", providerStatus: "Created", confirmedAt: null, confirmedBy: null, lastError: null, lastErrorAt: null, providerCheckRequired: false,
     createdAt: "2026-10-16T07:59:00.000Z", version: 4,
     history: [
       { sequence: 1, kind: "create", from: "queued", to: "queued", outcome: "created", httpStatus: null, error: null, providerStatus: null, actor: { id: "e-1", displayName: "Ana Manager" }, occurredAt: "2026-10-16T07:59:00.000Z" },
@@ -190,7 +191,7 @@ test("API 2.36.0: an accepted Trendyol request is shown as awaiting confirmation
 
 test("API 2.36.0: actions follow the server; gates and manual channels are explained", () => {
   const send = syncView("ro", withSync({ actions: { send: true, retry: false, withdraw: false, close: false } }));
-  assert.match(send, /data-action="sync-send"[^>]*>Trimite anularea la canal/);
+  assert.match(send, /data-action="sync-send"[^>]*>Trimite la Trendyol notificarea de nelivrare \(unsupplied\)/, "the Trendyol action names what it really is");
   assert.match(send, /Nu a fost trimisă nicio cerere de anulare pentru această oprire/);
   const off = syncView("ro", withSync({ provider: { ...trendyolProvider, serverEnabled: false, active: false } }));
   assert.match(off, /Oprită pe server \(ARASYA_CANCELLATION_SYNC\)/);
@@ -265,4 +266,37 @@ test("API 2.36.0: the client calls the synchronization routes with idempotency k
   ]);
   assert.deepEqual(routes[0].body, { expectedVersion: 3, reasonCode: 500 });
   assert.equal(routes[1].headers["Idempotency-Key"] ?? routes[1].headers["idempotency-key"], "key-sync-0000000002");
+});
+
+test("API 2.36.0: a retry after an unknown outcome needs a confirmed Seller Panel check; the Trendyol notice is described as unsupplied", () => {
+  const dialog = (locale: Locale, lastError: string | null, providerCheckRequired = lastError?.startsWith("UNCERTAIN") || lastError === "TRENDYOL_ANSWER_LOST") => wrap(locale, <OperationDialog action="retry" operation={syncOperation({ state: "manual_review", lastError, providerCheckRequired })} onCancel={() => undefined} onDone={() => undefined} onConflict={() => undefined}
+    submit={() => Promise.reject(new Error("not called"))} />);
+  const unknown = dialog("ro", "UNCERTAIN_OUTCOME_UNRESOLVED");
+  assert.match(unknown, /data-sync-uncertain[^>]*>Rezultatul trimiterii anterioare este necunoscut/);
+  assert.match(unknown, /data-field="sync-uncertain-checked"/);
+  assert.match(unknown, /<button[^>]*disabled=""[^>]*>Reîncearcă<\/button>/, "the retry stays disabled until the check is confirmed");
+  assert.match(dialog("tr", "TRENDYOL_ANSWER_LOST"), /Satıcı Paneli&#x27;nde kontrol ettim/);
+  const known = dialog("ro", "TRENDYOL_RATE_LIMITED");
+  assert.match(dialog("ro", "ATTEMPTS_EXHAUSTED", true), /data-sync-uncertain/, "the server flag decides, whatever the last error is");
+  assert.doesNotMatch(known, /data-sync-uncertain/);
+  assert.doesNotMatch(known, /<button[^>]*disabled=""[^>]*>Reîncearcă<\/button>/, "a retry after a refused (not unknown) answer needs no extra check");
+  for (const locale of ["ro", "tr"] as const) {
+    const sync = MESSAGES[locale].orders.cancellation.sync;
+    assert.ok(sync.error.UNCERTAIN_OUTCOME_UNRESOLVED && sync.error.UNCERTAIN_STILL_OPEN && !("UNCERTAIN_NOT_APPLIED" in sync.error), `${locale}: the new unknown-outcome codes are translated`);
+  }
+  assert.match(MESSAGES.ro.orders.cancellation.sync.sendBody.api, /nu o anulare cerută de client/);
+  assert.doesNotMatch(MESSAGES.ro.orders.cancellation.sync.sendBody.api + MESSAGES.ro.orders.cancellation.sync.sendApi, /tedarik/, "the Romanian text has no Turkish term");
+  assert.match(MESSAGES.tr.orders.cancellation.sync.sendBody.api, /müşteri iptali değildir/);
+});
+
+test("API 2.36.0: every refusal of the cancellation routes has its own Romanian and Turkish text", () => {
+  const codes = ["CANCELLATION_CHANGED", "CANCELLATION_NOT_HELD", "RELEASE_NOT_APPLICABLE", "RELEASE_REFUSED", "RELEASE_SOURCE_CANCELLED", "RELEASE_PHYSICAL_UNVERIFIED", "RELEASE_DOCUMENT_NOT_READY",
+    "RELEASE_SYNC_OPEN", "SOURCE_ALREADY_CANCELLED", "TRENDYOL_BEFORE_BASELINE", "CANCELLATION_SYNC_NOT_FOUND", "CANCELLATION_SYNC_CHANGED", "CANCELLATION_SYNC_CONFLICT", "CANCELLATION_SYNC_DISABLED",
+    "CANCELLATION_SYNC_EXISTS", "CANCELLATION_SYNC_OPEN", "CANCELLATION_SYNC_STALE", "CANCELLATION_SYNC_STATE", "CANCELLATION_SYNC_NOT_WITHDRAWABLE", "CANCELLATION_SYNC_RETRY_NOT_ELIGIBLE",
+    "CANCELLATION_SYNC_PROVIDER_CHECK_REQUIRED"];
+  for (const locale of ["ro", "tr"] as const) {
+    const errors = MESSAGES[locale].errors as Record<string, string>;
+    for (const code of codes) assert.ok(errors[code] && errors[code] !== errors.fallback, `${locale}: ${code}`);
+  }
+  assert.match(MESSAGES.ro.errors.CANCELLATION_SYNC_PROVIDER_CHECK_REQUIRED, /Verifică întâi comanda în platforma canalului/);
 });

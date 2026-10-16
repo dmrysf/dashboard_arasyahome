@@ -14,7 +14,7 @@ type SyncDialog = "send" | "retry" | "withdraw" | "close" | null;
 
 export type CancellationSyncActions = {
   send: (body: { expectedVersion: number; reasonCode?: number; note?: string }, key: string) => Promise<SyncOperationView>;
-  operation: (operationId: string, action: "retry" | "withdraw" | "close", body: { expectedVersion: number; reason?: string; note?: string }, key: string) => Promise<SyncOperationView>;
+  operation: (operationId: string, action: "retry" | "withdraw" | "close", body: { expectedVersion: number; reason?: string; note?: string; providerChecked?: true }, key: string) => Promise<SyncOperationView>;
 };
 
 /**
@@ -60,7 +60,7 @@ export function CancellationSyncSection({ sync, controlVersion, actions, onChang
       </dl>
       {!operation && <p className="muted" data-empty="cancellation-sync">{sync.required ? s.none : s.notRequired}</p>}
       <div className="button-row cancellation-actions">
-        {sync.actions.send && <button type="button" className="button button-danger" data-action="sync-send" onClick={() => { setNotice(null); setDialog("send"); }}>{provider.mechanism === "manual" ? s.sendManual : s.send}</button>}
+        {sync.actions.send && <button type="button" className="button button-danger" data-action="sync-send" onClick={() => { setNotice(null); setDialog("send"); }}>{provider.mechanism === "manual" ? s.sendManual : provider.mechanism === "api" ? s.sendApi : s.send}</button>}
         {sync.actions.retry && operation && <button type="button" className="button button-secondary" data-action="sync-retry" onClick={() => { setNotice(null); setDialog("retry"); }}>{s.retry}</button>}
         {sync.actions.withdraw && operation && <button type="button" className="button button-secondary" data-action="sync-withdraw" onClick={() => { setNotice(null); setDialog("withdraw"); }}>{s.withdraw}</button>}
         {sync.actions.close && operation && <button type="button" className="button button-secondary" data-action="sync-close" onClick={() => { setNotice(null); setDialog("close"); }}>{s.close}</button>}
@@ -141,17 +141,27 @@ function SendDialog({ sync, controlVersion, ...props }: DialogProps<{ expectedVe
   );
 }
 
-function OperationDialog({ action, operation, ...props }: DialogProps<{ expectedVersion: number; reason?: string; note?: string }> & { action: "retry" | "withdraw" | "close"; operation: SyncOperationView }) {
+export function OperationDialog({ action, operation, ...props }: DialogProps<{ expectedVersion: number; reason?: string; note?: string; providerChecked?: true }> & { action: "retry" | "withdraw" | "close"; operation: SyncOperationView }) {
   const { t } = useI18n();
   const s = t.orders.cancellation.sync;
   const [version] = useState(operation.version);
   const [text, setText] = useState("");
   const { busy, error, run } = useSubmit(props);
   const needsText = action !== "retry";
+  // A retry after an unknown outcome may repeat a notice the channel already received: the server requires the person's
+  // stated check in the channel (providerChecked) and says when it is needed.
+  const uncertain = action === "retry" && operation.providerCheckRequired === true;
+  const [checked, setChecked] = useState(false);
   return (
-    <ConfirmDialog title={s.dialog[action].title} confirmLabel={s.dialog[action].confirm} busy={busy} confirmDisabled={needsText && text.trim().length < 10}
-      onConfirm={() => { void run({ expectedVersion: version, ...(action === "withdraw" ? { reason: text.trim() } : action === "close" ? { note: text.trim() } : {}) }); }} onCancel={props.onCancel}>
+    <ConfirmDialog title={s.dialog[action].title} confirmLabel={s.dialog[action].confirm} busy={busy} confirmDisabled={(needsText && text.trim().length < 10) || (uncertain && !checked)}
+      onConfirm={() => { void run({ expectedVersion: version, ...(action === "withdraw" ? { reason: text.trim() } : action === "close" ? { note: text.trim() } : uncertain ? { providerChecked: true as const } : {}) }); }} onCancel={props.onCancel}>
       <p>{s.dialog[action].body}</p>
+      {uncertain && (
+        <>
+          <p className="notice notice-warning" data-sync-uncertain>{s.dialog.retry.uncertain}</p>
+          <label className="checkbox"><input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} data-field="sync-uncertain-checked" /> <span>{s.dialog.retry.uncertainConfirm}</span></label>
+        </>
+      )}
       {needsText && <label className="field"><span>{s.dialog[action].field}</span><textarea value={text} maxLength={1000} onChange={(event) => setText(event.target.value)} /></label>}
       {error && <ErrorText error={error} />}
     </ConfirmDialog>
