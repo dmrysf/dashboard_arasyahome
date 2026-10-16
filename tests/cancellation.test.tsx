@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createApi } from "../src/api/client";
-import type { ManagementMe, OrderCancellation, OrderSummary, ProductionOverview } from "../src/api/types";
+import type { CancellationSyncOverview, CancellationSyncView, ManagementMe, OrderCancellation, OrderSummary, ProductionOverview, SyncOperationView } from "../src/api/types";
 import { DashboardContext } from "../src/app/context";
 import { MESSAGES, type Locale } from "../src/i18n";
 import { I18nProvider } from "../src/i18n/context";
 import { CancellationPanelView } from "../src/pages/CancellationPanel";
+import { CancellationSyncOverviewView } from "../src/pages/CancellationSyncOverview";
 import { StopBadge } from "../src/pages/orderParts";
 import { ProductionPanel } from "../src/pages/ProductionOverview";
 import { API, fakeFetch, me } from "./support";
@@ -136,4 +137,132 @@ test("the API client calls the four cancellation routes with idempotency keys an
   ]);
   assert.deepEqual(routes[1].body, { reason: "Clientul a anulat telefonic.", requestSourceCancellation: true });
   assert.equal(routes[3].headers["Idempotency-Key"] ?? routes[3].headers["idempotency-key"], "key-rels-0000000001");
+});
+
+// ---- API 2.36.0 cancellation synchronization ------------------------------------------------------------------------
+const trendyolProvider = {
+  source: "trendyol", mechanism: "api" as const, serverEnabled: true, flagEnabled: true, active: true, configured: true, inbound: "marketplace_sync", outbound: "api",
+  confirmation: "status_read", retry: "bounded_backoff_after_status_read", reconciliation: "package_status_read", unsupported: ["refund", "shipped_package_cancellation"],
+  endpoint: "PUT /integration/order/sellers/{sellerId}/shipment-packages/{packageId}/items/unsupplied",
+  reasons: { "500": "Stoc epuizat", "501": "Produs defect sau deteriorat", "506": "Forță majoră" },
+};
+function syncOperation(overrides: Partial<SyncOperationView> = {}): SyncOperationView {
+  return {
+    id: "op-1", state: "awaiting_confirmation", staffState: "awaiting_confirmation", mechanism: "api", generation: 1, reasonCode: "500", attempts: 1, nextAttemptAt: "2026-10-16T08:02:00.000Z",
+    dispatchedAt: "2026-10-16T08:00:00.000Z", lastPulledAt: null, providerResult: "accepted", providerStatus: "Created", confirmedAt: null, confirmedBy: null, lastError: null, lastErrorAt: null,
+    createdAt: "2026-10-16T07:59:00.000Z", version: 4,
+    history: [
+      { sequence: 1, kind: "create", from: "queued", to: "queued", outcome: "created", httpStatus: null, error: null, providerStatus: null, actor: { id: "e-1", displayName: "Ana Manager" }, occurredAt: "2026-10-16T07:59:00.000Z" },
+      { sequence: 2, kind: "status_read", from: "queued", to: "processing", outcome: "leased", httpStatus: null, error: null, providerStatus: null, actor: { system: "worker-1" }, occurredAt: "2026-10-16T08:00:00.000Z" },
+      { sequence: 3, kind: "submit", from: "processing", to: "awaiting_confirmation", outcome: "accepted", httpStatus: 200, error: null, providerStatus: "Created", actor: { system: "worker-1" }, occurredAt: "2026-10-16T08:00:01.000Z" },
+    ],
+    ...overrides,
+  };
+}
+function withSync(sync: Partial<CancellationSyncView>, control: Partial<NonNullable<OrderCancellation["cancellation"]>> = {}): OrderCancellation {
+  return cancellation({ source: "trendyol", capabilities: { stop: true, recordPhysical: true, release: true, sync: true } }, {
+    category: "pending_source_confirmation", nextAction: "source_confirmation", origin: "local", reason: "manager_stop",
+    source: { status: "not_reported", statusCode: null, statusLabel: null, changedAt: null, cancellationReceivedAt: null, evidenceAt: null, request: "pending", requestedAt: "2026-10-16T07:58:00.000Z", outbound: sync.operation?.state ?? "not_sent" },
+    release: { possible: false, refusal: "sync_open" },
+    sync: { provider: trendyolProvider, operation: null, openOperationId: null, required: true, actions: { send: false, retry: false, withdraw: false, close: false }, ...sync },
+    ...control,
+  });
+}
+const syncActions = { send: () => Promise.reject(new Error("not called")), operation: () => Promise.reject(new Error("not called")) };
+const syncView = (locale: Locale, data: OrderCancellation) => wrap(locale, <CancellationPanelView data={data} onChanged={() => undefined} onConflict={() => undefined} stop={noop} physical={noop} release={noop} sync={syncActions} />);
+
+test("API 2.36.0: an accepted Trendyol request is shown as awaiting confirmation, never as confirmed, with its history", () => {
+  const html = syncView("ro", withSync({ operation: syncOperation(), openOperationId: "op-1", actions: { send: false, retry: false, withdraw: false, close: false } }));
+  assert.match(html, /data-section="cancellation-sync" data-mechanism="api" data-sync-state="awaiting_confirmation"/);
+  assert.match(html, /Arasya trimite cererea prin API \(Trendyol\)/);
+  assert.match(html, /Activă pentru acest canal/);
+  assert.match(html, /Așteaptă confirmarea canalului/);
+  assert.match(html, /Canalul a primit cererea; anularea nu este încă vizibilă acolo/);
+  assert.doesNotMatch(html, /Confirmată de canal|data-sync-state="confirmed"/, "accepted is not confirmed");
+  assert.match(html, /Stoc epuizat/, "the chosen reason is shown by its label");
+  assert.match(html, /data-sync-attempt="submit" data-outcome="accepted"[^]*HTTP 200/);
+  assert.match(html, /Arasya nu inițiază nicio rambursare/);
+  assert.match(html, /data-release-refusal="sync_open"[^]*O cerere de anulare către canal este încă deschisă/);
+  assert.match(html, /Cerere către sursă<\/dt><dd>[^<]*<small class="cell-sub">Așteaptă confirmarea canalului/);
+  assert.doesNotMatch(html, /data-action="release"/, "no release while the request is open");
+  assert.doesNotMatch(html, /data-action="sync-(send|retry|withdraw|close)"/, "no action the server did not offer");
+});
+
+test("API 2.36.0: actions follow the server; gates and manual channels are explained", () => {
+  const send = syncView("ro", withSync({ actions: { send: true, retry: false, withdraw: false, close: false } }));
+  assert.match(send, /data-action="sync-send"[^>]*>Trimite anularea la canal/);
+  assert.match(send, /Nu a fost trimisă nicio cerere de anulare pentru această oprire/);
+  const off = syncView("ro", withSync({ provider: { ...trendyolProvider, serverEnabled: false, active: false } }));
+  assert.match(off, /Oprită pe server \(ARASYA_CANCELLATION_SYNC\)/);
+  assert.doesNotMatch(off, /data-action="sync-send"/);
+  const flagOff = syncView("ro", withSync({ provider: { ...trendyolProvider, flagEnabled: false, active: false } }));
+  assert.match(flagOff, /Oprită pentru acest canal \(flag dezactivat\)/);
+  const b2b = syncView("ro", withSync({ provider: { ...trendyolProvider, source: "b2b", mechanism: "manual", active: false, configured: false, reasons: undefined, reason: "B2B_OUTBOUND_NOT_AVAILABLE" },
+    operation: syncOperation({ state: "manual_review", staffState: "attention", mechanism: "manual", reasonCode: null, attempts: 0, providerResult: null, providerStatus: null, lastError: "B2B_OUTBOUND_NOT_AVAILABLE", history: [] }),
+    actions: { send: false, retry: false, withdraw: false, close: true } }));
+  assert.match(b2b, /Fără apel automat: o persoană anulează în platforma canalului/);
+  assert.match(b2b, /Necesită verificare manuală/);
+  assert.match(b2b, /B2B nu are încă o anulare automată/);
+  assert.match(b2b, /data-action="sync-close"/);
+  const woo = syncView("ro", withSync({ provider: { ...trendyolProvider, source: "trendhome", mechanism: "source_pull", confirmation: "inbound_event", reasons: undefined },
+    operation: syncOperation({ state: "manual_review", staffState: "attention", mechanism: "source_pull", reasonCode: null, lastError: "PAID_ORDER_REQUIRES_PERSON", history: [] }),
+    actions: { send: false, retry: true, withdraw: false, close: true } }));
+  assert.match(woo, /Conectorul magazinului preia cererea \(WooCommerce\)/);
+  assert.match(woo, /Comanda este plătită: o persoană decide \(fără rambursare automată\)/);
+  assert.match(woo, /Evenimentul următor primit de la canal/);
+  assert.match(woo, /data-action="sync-retry"/);
+  const confirmed = syncView("ro", withSync({ operation: syncOperation({ state: "confirmed", staffState: "confirmed", confirmedAt: "2026-10-16T08:03:00.000Z", confirmedBy: "status_read", providerStatus: "Cancelled" }) }));
+  assert.match(confirmed, /Confirmată de canal/);
+  assert.match(confirmed, /prin citirea statusului la Trendyol/);
+  // An API before 2.36.0 has no sync block: the Phase 1 text stays.
+  assert.match(syncView("ro", cancellation()), /Arasya nu a trimis nimic către sursă/);
+  assert.doesNotMatch(syncView("ro", cancellation()), /data-section="cancellation-sync"/);
+});
+
+test("API 2.36.0: Turkish copy exists for every synchronization state, mechanism and finding", () => {
+  const ro = MESSAGES.ro.orders.cancellation.sync;
+  const tr = MESSAGES.tr.orders.cancellation.sync;
+  for (const state of ["queued", "processing", "awaiting_pickup", "awaiting_confirmation", "retry_scheduled", "uncertain", "confirmed", "rejected", "failed", "manual_review", "withdrawn", "closed"]) {
+    assert.ok(ro.state[state] && tr.state[state] && ro.stateHint[state] && tr.stateHint[state], `state ${state}`);
+  }
+  assert.deepEqual(Object.keys(tr.error).sort(), Object.keys(ro.error).sort());
+  assert.deepEqual(Object.keys(MESSAGES.tr.production.cancellationSync.kindLabel).sort(), Object.keys(MESSAGES.ro.production.cancellationSync.kindLabel).sort());
+  assert.match(syncView("tr", withSync({ operation: syncOperation() })), /Kanal onayını bekliyor/);
+});
+
+test("API 2.36.0: the synchronization overview lists channels, states and findings; a dry run is offered only with the permission", () => {
+  const overview: CancellationSyncOverview = {
+    ready: true,
+    providers: [trendyolProvider, { ...trendyolProvider, source: "trendhome", mechanism: "source_pull", active: false, flagEnabled: false, reasons: undefined }, { ...trendyolProvider, source: "b2b", mechanism: "manual", active: false, configured: false, reasons: undefined }],
+    operations: { trendyol: { confirmed: 3, awaiting_confirmation: 1 } },
+    discrepancies: [{ id: "d-1", kind: "operation_manual_review", severity: "medium", orderId: "trendhome:70100", orderNumber: "70100", operationId: "op-1", source: "trendhome", remediation: "person_decides", retryEligible: true, state: "open", details: {}, detectedAt: "2026-10-16T08:00:00.000Z", lastSeenAt: "2026-10-16T08:00:00.000Z", resolvedAt: null }],
+    capabilities: { sync: true },
+  };
+  const html = wrap("ro", <CancellationSyncOverviewView data={overview} dryRun={() => Promise.reject(new Error("not called"))} />);
+  assert.match(html, /data-provider="trendyol" data-active="true"/);
+  assert.match(html, /Confirmată de canal: 3/);
+  assert.match(html, /data-provider="trendhome" data-active="false"[^]*Oprită pentru acest canal/);
+  assert.match(html, /data-finding="operation_manual_review" data-severity="medium"[^]*Necesită o decizie[^]*O persoană decide/);
+  assert.match(html, /data-action="sync-dry-run"/);
+  const readOnly = wrap("ro", <CancellationSyncOverviewView data={{ ...overview, capabilities: { sync: false } }} dryRun={() => Promise.reject(new Error("not called"))} />);
+  assert.doesNotMatch(readOnly, /data-action="sync-dry-run"/);
+  assert.match(wrap("ro", <CancellationSyncOverviewView data={{ ...overview, ready: false }} dryRun={() => Promise.reject(new Error("not called"))} />), /migrarea 034/);
+});
+
+test("API 2.36.0: the client calls the synchronization routes with idempotency keys and exact bodies", async () => {
+  const { fetchImpl, calls } = fakeFetch(() => ({ body: syncOperation() }));
+  const api = createApi(API, fetchImpl);
+  await api.sendCancellation("trendyol:1", { expectedVersion: 3, reasonCode: 500 }, "key-sync-0000000001");
+  await api.syncOperation("op-1", "withdraw", { expectedVersion: 4, reason: "Clientul păstrează comanda." }, "key-sync-0000000002");
+  await api.cancellationSyncOverview();
+  await api.reconcileCancellationSync();
+  const routes = calls.filter((call) => call.url.pathname.includes("cancellation"));
+  assert.deepEqual(routes.map((call) => `${call.method} ${call.url.pathname}`), [
+    "POST /management/orders/trendyol%3A1/cancellation/sync",
+    "POST /management/cancellation-sync/operations/op-1/withdraw",
+    "GET /management/cancellation-sync",
+    "POST /management/cancellation-sync/reconcile",
+  ]);
+  assert.deepEqual(routes[0].body, { expectedVersion: 3, reasonCode: 500 });
+  assert.equal(routes[1].headers["Idempotency-Key"] ?? routes[1].headers["idempotency-key"], "key-sync-0000000002");
 });
