@@ -5,6 +5,7 @@ import { orderPath } from "../app/router";
 import { usePolling } from "../app/usePolling";
 import { Badge, ErrorBanner, Loading, RefreshBar } from "../components/ui";
 import { useI18n } from "../i18n/context";
+import { CancellationSyncOverview } from "./CancellationSyncOverview";
 
 const HEALTH_TONE: Record<SourceHealth, "success" | "warning" | "neutral"> = {
   healthy: "success", stale: "warning", offline: "warning", no_contact: "warning", not_configured: "neutral", disabled: "neutral",
@@ -23,7 +24,11 @@ export function ProductionOverview() {
     return result;
   }), [api, source]);
   const polling = usePolling(load, source);
-  return <ProductionPanel {...polling} source={source} sourceOptions={sourceOptions} onSource={setSource} />;
+  return <>
+    <ProductionPanel {...polling} source={source} sourceOptions={sourceOptions} onSource={setSource} />
+    {/* API 2.36.0; loaded once, not polled: the findings change with the operator's reconciliation runs. */}
+    {polling.data?.cancellations != null && <CancellationSyncOverview />}
+  </>;
 }
 
 export type ProductionPanelProps = {

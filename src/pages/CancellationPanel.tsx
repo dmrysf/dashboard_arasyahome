@@ -5,6 +5,7 @@ import { useDashboard } from "../app/context";
 import { Badge, ConfirmDialog, ErrorText, Loading, Notice } from "../components/ui";
 import { toProblem, type Problem } from "../i18n";
 import { useI18n } from "../i18n/context";
+import { CancellationSyncSection, type CancellationSyncActions } from "./CancellationSyncSection";
 
 type Dialog = "stop" | "physical" | "release" | null;
 
@@ -12,7 +13,8 @@ type Dialog = "stop" | "physical" | "release" | null;
  * API 2.35.0 cancellation control of one order. The server decides everything: the stop blocks every manufacturing
  * command, a release is accepted only when the source no longer reports a cancellation, the physical state was
  * verified and the document is usable. Buttons follow the server's capabilities and are a convenience, not security.
- * Nothing here writes to a source; a "cancellation at the source" is only recorded as a request.
+ * API 2.36.0 adds the outbound cancellation of a stop (CancellationSyncSection); it only queues a request, which the
+ * server's worker sends behind its gates. Nothing here starts a refund.
  */
 export function CancellationPanel({ orderId, revision, onChanged }: { orderId: string; revision: number; onChanged?: () => void }) {
   const { api } = useDashboard();
@@ -31,7 +33,9 @@ export function CancellationPanel({ orderId, revision, onChanged }: { orderId: s
   return <CancellationPanelView data={data} onChanged={changed} onConflict={() => setReload((value) => value + 1)}
     stop={(body, key) => api.stopProduction(orderId, body, key)}
     physical={(body, key) => api.recordPhysical(orderId, body, key)}
-    release={(body, key) => api.releaseStop(orderId, body, key)} />;
+    release={(body, key) => api.releaseStop(orderId, body, key)}
+    sync={{ send: (body, key) => api.sendCancellation(orderId, body, key), operation: (id, action, body, key) => api.syncOperation(id, action, body, key) }}
+    onSynced={() => { setReload((value) => value + 1); onChanged?.(); }} />;
 }
 
 export type CancellationPanelViewProps = {
@@ -41,9 +45,12 @@ export type CancellationPanelViewProps = {
   stop: (body: { reason: string; requestSourceCancellation: boolean }, key: string) => Promise<OrderCancellation>;
   physical: (body: { expectedVersion: number; outcome: PhysicalOutcome; note: string; qrToken?: string }, key: string) => Promise<OrderCancellation>;
   release: (body: { expectedVersion: number; reason: string }, key: string) => Promise<OrderCancellation>;
+  /** API 2.36.0: outbound cancellation commands; their result is the operation, so the panel reloads afterwards. */
+  sync?: CancellationSyncActions;
+  onSynced?: () => void;
 };
 
-export function CancellationPanelView({ data, onChanged, onConflict, stop, physical, release }: CancellationPanelViewProps) {
+export function CancellationPanelView({ data, onChanged, onConflict, stop, physical, release, sync, onSynced }: CancellationPanelViewProps) {
   const { t } = useI18n();
   const c = t.orders.cancellation;
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -63,6 +70,7 @@ export function CancellationPanelView({ data, onChanged, onConflict, stop, physi
         {data.capabilities.release && held && control?.release.possible && <button type="button" className="button button-primary" data-action="release" onClick={() => { setNotice(null); setDialog("release"); }}>{c.releaseAction}</button>}
       </div>
       {held && control && !control.release.possible && control.release.refusal && <p className="muted small" data-release-refusal={control.release.refusal}>{c.releaseBlocked} {c.refusal[control.release.refusal] ?? control.release.refusal}</p>}
+      {control?.sync && sync && <CancellationSyncSection sync={control.sync} controlVersion={control.version} actions={sync} onChanged={() => (onSynced ?? onConflict)()} onConflict={onConflict} />}
       <Events data={data} />
       {dialog === "stop" && <StopDialog onCancel={() => setDialog(null)} onDone={finish} onConflict={conflict} submit={stop} />}
       {dialog === "physical" && control && <PhysicalDialog control={control} onCancel={() => setDialog(null)} onDone={finish} onConflict={conflict} submit={physical} />}
@@ -83,7 +91,7 @@ function ControlFacts({ control }: { control: CancellationControlView }) {
       {control.reasonNote && <><dt>{f.note}</dt><dd>{control.reasonNote}</dd></>}
       <dt>{f.source}</dt><dd>{c.sourceStatus[control.source.status]}{control.source.statusLabel && <span className="muted small"> · {control.source.statusLabel}</span>}</dd>
       {control.source.cancellationReceivedAt && <><dt>{f.received}</dt><dd>{dateTime(control.source.cancellationReceivedAt)}</dd></>}
-      <dt>{f.request}</dt><dd>{c.request[control.source.request]}<small className="cell-sub">{c.outbound}</small></dd>
+      <dt>{f.request}</dt><dd>{c.request[control.source.request]}<small className="cell-sub">{control.sync ? (control.source.outbound === "not_sent" ? c.sync.none : c.sync.state[control.source.outbound]) : c.outbound}</small></dd>
       <dt>{f.atStop}</dt><dd>{c.phase[control.atStop.phase]}</dd>
       <dt>{f.stage}</dt><dd>{stageName(control.atStop.stageId, control.atStop.stageId)}</dd>
       <dt>{f.owner}</dt><dd>{control.atStop.owner?.displayName ?? t.orders.noOwner}</dd>

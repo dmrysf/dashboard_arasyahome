@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createApi } from "../src/api/client";
-import type { ManagementMe, OrderCancellation, OrderSummary, ProductionOverview } from "../src/api/types";
+import type { CancellationSyncOverview, CancellationSyncView, ManagementMe, OrderCancellation, OrderSummary, ProductionOverview, SyncOperationView } from "../src/api/types";
 import { DashboardContext } from "../src/app/context";
 import { MESSAGES, type Locale } from "../src/i18n";
 import { I18nProvider } from "../src/i18n/context";
 import { CancellationPanelView } from "../src/pages/CancellationPanel";
+import { CancellationSyncOverviewView } from "../src/pages/CancellationSyncOverview";
+import { OperationDialog } from "../src/pages/CancellationSyncSection";
 import { StopBadge } from "../src/pages/orderParts";
 import { ProductionPanel } from "../src/pages/ProductionOverview";
 import { API, fakeFetch, me } from "./support";
@@ -136,4 +138,207 @@ test("the API client calls the four cancellation routes with idempotency keys an
   ]);
   assert.deepEqual(routes[1].body, { reason: "Clientul a anulat telefonic.", requestSourceCancellation: true });
   assert.equal(routes[3].headers["Idempotency-Key"] ?? routes[3].headers["idempotency-key"], "key-rels-0000000001");
+});
+
+// ---- API 2.36.0 cancellation synchronization ------------------------------------------------------------------------
+const trendyolProvider = {
+  source: "trendyol", mechanism: "api" as const, serverEnabled: true, flagEnabled: true, active: true, configured: true, inbound: "marketplace_sync", outbound: "api",
+  confirmation: "status_read", retry: "bounded_backoff_after_status_read", reconciliation: "package_status_read", unsupported: ["refund", "shipped_package_cancellation"],
+  endpoint: "PUT /integration/order/sellers/{sellerId}/shipment-packages/{packageId}/items/unsupplied",
+  reasons: { "500": "Stoc epuizat", "501": "Produs defect sau deteriorat", "506": "Forță majoră" },
+};
+function syncOperation(overrides: Partial<SyncOperationView> = {}): SyncOperationView {
+  return {
+    id: "op-1", state: "awaiting_confirmation", staffState: "awaiting_confirmation", mechanism: "api", generation: 1, reasonCode: "500", attempts: 1, nextAttemptAt: "2026-10-16T08:02:00.000Z",
+    dispatchedAt: "2026-10-16T08:00:00.000Z", lastPulledAt: null, providerResult: "accepted", providerStatus: "Created", confirmedAt: null, confirmedBy: null, lastError: null, lastErrorAt: null, providerCheckRequired: false,
+    createdAt: "2026-10-16T07:59:00.000Z", version: 4,
+    history: [
+      { sequence: 1, kind: "create", from: "queued", to: "queued", outcome: "created", httpStatus: null, error: null, providerStatus: null, actor: { id: "e-1", displayName: "Ana Manager" }, occurredAt: "2026-10-16T07:59:00.000Z" },
+      { sequence: 2, kind: "status_read", from: "queued", to: "processing", outcome: "leased", httpStatus: null, error: null, providerStatus: null, actor: { system: "worker-1" }, occurredAt: "2026-10-16T08:00:00.000Z" },
+      { sequence: 3, kind: "submit", from: "processing", to: "awaiting_confirmation", outcome: "accepted", httpStatus: 200, error: null, providerStatus: "Created", actor: { system: "worker-1" }, occurredAt: "2026-10-16T08:00:01.000Z" },
+    ],
+    ...overrides,
+  };
+}
+function withSync(sync: Partial<CancellationSyncView>, control: Partial<NonNullable<OrderCancellation["cancellation"]>> = {}): OrderCancellation {
+  return cancellation({ source: "trendyol", capabilities: { stop: true, recordPhysical: true, release: true, sync: true } }, {
+    category: "pending_source_confirmation", nextAction: "source_confirmation", origin: "local", reason: "manager_stop",
+    source: { status: "not_reported", statusCode: null, statusLabel: null, changedAt: null, cancellationReceivedAt: null, evidenceAt: null, request: "pending", requestedAt: "2026-10-16T07:58:00.000Z", outbound: sync.operation?.state ?? "not_sent" },
+    release: { possible: false, refusal: "sync_open" },
+    sync: { provider: trendyolProvider, operation: null, openOperationId: null, required: true, actions: { send: false, retry: false, withdraw: false, close: false }, ...sync },
+    ...control,
+  });
+}
+const syncActions = { send: () => Promise.reject(new Error("not called")), operation: () => Promise.reject(new Error("not called")) };
+const syncView = (locale: Locale, data: OrderCancellation) => wrap(locale, <CancellationPanelView data={data} onChanged={() => undefined} onConflict={() => undefined} stop={noop} physical={noop} release={noop} sync={syncActions} />);
+
+test("API 2.36.0: an accepted Trendyol request is shown as awaiting confirmation, never as confirmed, with its history", () => {
+  const html = syncView("ro", withSync({ operation: syncOperation(), openOperationId: "op-1", actions: { send: false, retry: false, withdraw: false, close: false } }));
+  assert.match(html, /data-section="cancellation-sync" data-mechanism="api" data-sync-state="awaiting_confirmation"/);
+  assert.match(html, /Arasya trimite cererea prin API \(Trendyol\)/);
+  assert.match(html, /Activă pentru acest canal/);
+  assert.match(html, /Notificare de nelivrare \(unsupplied\) către Trendyol/, "the Trendyol section names the seller's declaration");
+  assert.match(html, /data-sync-meaning="api"[^>]*>Declarația vânzătorului că nu poate livra coletul, cerută de Arasya\. Nu este o anulare cerută de client/);
+  assert.match(html, /Notificare acceptată, neconfirmată de Trendyol/);
+  assert.match(html, /Acceptarea nu este o confirmare/);
+  assert.doesNotMatch(html, /Confirmată de canal|data-sync-state="confirmed"/, "accepted is not confirmed");
+  assert.match(html, /Stoc epuizat/, "the chosen reason is shown by its label");
+  assert.match(html, /data-sync-attempt="submit" data-outcome="accepted"[^]*HTTP 200/);
+  assert.match(html, /Arasya nu inițiază nicio rambursare/);
+  assert.match(html, /data-release-refusal="sync_open"[^]*O cerere de anulare către canal este încă deschisă/);
+  assert.match(html, /Cerere către sursă<\/dt><dd>[^<]*<small class="cell-sub">Așteaptă confirmarea canalului/);
+  assert.doesNotMatch(html, /data-sync-evidence/, "no evidence row while no retry needs it");
+  assert.doesNotMatch(html, /data-action="release"/, "no release while the request is open");
+  assert.doesNotMatch(html, /data-action="sync-(send|retry|withdraw|close)"/, "no action the server did not offer");
+});
+
+test("API 2.36.0: actions follow the server; gates and manual channels are explained", () => {
+  const send = syncView("ro", withSync({ actions: { send: true, retry: false, withdraw: false, close: false } }));
+  assert.match(send, /data-action="sync-send"[^>]*>Trimite la Trendyol notificarea de nelivrare \(unsupplied\)/, "the Trendyol action names what it really is");
+  assert.match(send, /Nu a fost trimisă nicio cerere de anulare pentru această oprire/);
+  const off = syncView("ro", withSync({ provider: { ...trendyolProvider, serverEnabled: false, active: false } }));
+  assert.match(off, /Oprită pe server \(ARASYA_CANCELLATION_SYNC\)/);
+  assert.doesNotMatch(off, /data-action="sync-send"/);
+  const flagOff = syncView("ro", withSync({ provider: { ...trendyolProvider, flagEnabled: false, active: false } }));
+  assert.match(flagOff, /Oprită pentru acest canal \(flag dezactivat\)/);
+  const b2b = syncView("ro", withSync({ provider: { ...trendyolProvider, source: "b2b", mechanism: "manual", active: false, configured: false, reasons: undefined, reason: "B2B_OUTBOUND_NOT_AVAILABLE" },
+    operation: syncOperation({ state: "manual_review", staffState: "attention", mechanism: "manual", reasonCode: null, attempts: 0, providerResult: null, providerStatus: null, lastError: "B2B_OUTBOUND_NOT_AVAILABLE", history: [] }),
+    actions: { send: false, retry: false, withdraw: false, close: true } }));
+  assert.match(b2b, /Fără apel automat: o persoană anulează în platforma canalului/);
+  assert.match(b2b, /Necesită verificare manuală/);
+  assert.match(b2b, /B2B nu are încă o anulare automată/);
+  assert.match(b2b, /data-action="sync-close"/);
+  const woo = syncView("ro", withSync({ provider: { ...trendyolProvider, source: "trendhome", mechanism: "source_pull", confirmation: "inbound_event", reasons: undefined },
+    operation: syncOperation({ state: "manual_review", staffState: "attention", mechanism: "source_pull", reasonCode: null, lastError: "PAID_ORDER_REQUIRES_PERSON", history: [] }),
+    actions: { send: false, retry: true, withdraw: false, close: true } }));
+  assert.match(woo, /Conectorul magazinului preia cererea \(WooCommerce\)/);
+  assert.match(woo, /Comanda este plătită: o persoană decide \(fără rambursare automată\)/);
+  assert.match(woo, /Evenimentul următor primit de la canal/);
+  assert.match(woo, /data-action="sync-retry"/);
+  const confirmed = syncView("ro", withSync({ operation: syncOperation({ state: "confirmed", staffState: "confirmed", confirmedAt: "2026-10-16T08:03:00.000Z", confirmedBy: "status_read", providerStatus: "Cancelled" }) }));
+  assert.match(confirmed, /Confirmat de Trendyol: coletul apare anulat/);
+  assert.match(confirmed, /prin citirea statusului la Trendyol/);
+  assert.match(woo, /Necesită verificare manuală/, "the WooCommerce section keeps the generic channel names");
+  assert.doesNotMatch(woo, /nelivrare/, "only Trendyol is described as an unsupplied declaration");
+  // An API before 2.36.0 has no sync block: the Phase 1 text stays.
+  assert.match(syncView("ro", cancellation()), /Arasya nu a trimis nimic către sursă/);
+  assert.doesNotMatch(syncView("ro", cancellation()), /data-section="cancellation-sync"/);
+});
+
+test("API 2.36.0: Turkish copy exists for every synchronization state, mechanism and finding", () => {
+  const ro = MESSAGES.ro.orders.cancellation.sync;
+  const tr = MESSAGES.tr.orders.cancellation.sync;
+  for (const state of ["queued", "processing", "awaiting_pickup", "awaiting_confirmation", "retry_scheduled", "uncertain", "confirmed", "rejected", "failed", "manual_review", "withdrawn", "closed"]) {
+    assert.ok(ro.state[state] && tr.state[state] && ro.stateHint[state] && tr.stateHint[state], `state ${state}`);
+  }
+  assert.deepEqual(Object.keys(tr.error).sort(), Object.keys(ro.error).sort());
+  assert.deepEqual(Object.keys(MESSAGES.tr.production.cancellationSync.kindLabel).sort(), Object.keys(MESSAGES.ro.production.cancellationSync.kindLabel).sort());
+  assert.match(syncView("tr", withSync({ operation: syncOperation() })), /Bildirim kabul edildi, Trendyol henüz onaylamadı/);
+  assert.match(syncView("tr", withSync({ operation: syncOperation({ mechanism: "source_pull" }), provider: { ...trendyolProvider, source: "trendhome", mechanism: "source_pull", reasons: undefined } })), /Kanal onayını bekliyor/);
+  for (const key of Object.keys(ro.apiState)) assert.ok(tr.apiState[key], `tr apiState ${key}`);
+  for (const key of Object.keys(ro.evidence)) assert.ok(tr.evidence[key], `tr evidence ${key}`);
+});
+
+test("API 2.36.0: the synchronization overview lists channels, states and findings; a dry run is offered only with the permission", () => {
+  const overview: CancellationSyncOverview = {
+    ready: true,
+    providers: [trendyolProvider, { ...trendyolProvider, source: "trendhome", mechanism: "source_pull", active: false, flagEnabled: false, reasons: undefined }, { ...trendyolProvider, source: "b2b", mechanism: "manual", active: false, configured: false, reasons: undefined }],
+    operations: { trendyol: { confirmed: 3, awaiting_confirmation: 1 } },
+    discrepancies: [{ id: "d-1", kind: "operation_manual_review", severity: "medium", orderId: "trendhome:70100", orderNumber: "70100", operationId: "op-1", source: "trendhome", remediation: "person_decides", retryEligible: true, state: "open", details: {}, detectedAt: "2026-10-16T08:00:00.000Z", lastSeenAt: "2026-10-16T08:00:00.000Z", resolvedAt: null }],
+    capabilities: { sync: true },
+  };
+  const html = wrap("ro", <CancellationSyncOverviewView data={overview} dryRun={() => Promise.reject(new Error("not called"))} />);
+  assert.match(html, /data-provider="trendyol" data-active="true"/);
+  assert.match(html, /Confirmată de canal: 3/);
+  assert.match(html, /data-provider="trendhome" data-active="false"[^]*Oprită pentru acest canal/);
+  assert.match(html, /data-finding="operation_manual_review" data-severity="medium"[^]*Necesită o decizie[^]*O persoană decide/);
+  assert.match(html, /data-action="sync-dry-run"/);
+  const readOnly = wrap("ro", <CancellationSyncOverviewView data={{ ...overview, capabilities: { sync: false } }} dryRun={() => Promise.reject(new Error("not called"))} />);
+  assert.doesNotMatch(readOnly, /data-action="sync-dry-run"/);
+  assert.match(wrap("ro", <CancellationSyncOverviewView data={{ ...overview, ready: false }} dryRun={() => Promise.reject(new Error("not called"))} />), /migrarea 034/);
+});
+
+test("API 2.36.0: the client calls the synchronization routes with idempotency keys and exact bodies", async () => {
+  const { fetchImpl, calls } = fakeFetch(() => ({ body: syncOperation() }));
+  const api = createApi(API, fetchImpl);
+  await api.sendCancellation("trendyol:1", { expectedVersion: 3, reasonCode: 500 }, "key-sync-0000000001");
+  await api.syncOperation("op-1", "withdraw", { expectedVersion: 4, reason: "Clientul păstrează comanda." }, "key-sync-0000000002");
+  await api.cancellationSyncOverview();
+  await api.reconcileCancellationSync();
+  const routes = calls.filter((call) => call.url.pathname.includes("cancellation"));
+  assert.deepEqual(routes.map((call) => `${call.method} ${call.url.pathname}`), [
+    "POST /management/orders/trendyol%3A1/cancellation/sync",
+    "POST /management/cancellation-sync/operations/op-1/withdraw",
+    "GET /management/cancellation-sync",
+    "POST /management/cancellation-sync/reconcile",
+  ]);
+  assert.deepEqual(routes[0].body, { expectedVersion: 3, reasonCode: 500 });
+  assert.equal(routes[1].headers["Idempotency-Key"] ?? routes[1].headers["idempotency-key"], "key-sync-0000000002");
+});
+
+test("API 2.36.0: a retry after a possible delivery needs the server's evidence and a dated statement; the Trendyol notice is described as unsupplied", () => {
+  const evidence = (status: "ok" | "stale" | "missing" | "unknown" | "not_open" | "observing") => ({ status, readAt: "2026-10-16T09:00:00.000Z", providerStatus: "Created", maxAgeSeconds: 3600, observationSeconds: 1800 });
+  const dialog = (locale: Locale, providerCheckRequired: boolean, status: Parameters<typeof evidence>[0] | null = "ok") => wrap(locale, <OperationDialog action="retry"
+    operation={syncOperation({ state: "manual_review", lastError: "UNCERTAIN_OUTCOME_UNRESOLVED", providerCheckRequired, providerEvidence: providerCheckRequired && status ? evidence(status) : null })}
+    onCancel={() => undefined} onDone={() => undefined} onConflict={() => undefined} submit={() => Promise.reject(new Error("not called"))} />);
+  const ready = dialog("ro", true, "ok");
+  assert.match(ready, /data-sync-uncertain[^>]*>O notificare anterioară poate să fi ajuns deja la Trendyol/);
+  assert.match(ready, /data-sync-evidence="ok"[^]*Coletul era încă activ la ultima citire/);
+  assert.match(ready, /data-field="sync-uncertain-checked"/);
+  assert.match(ready, /data-field="sync-provider-check-note"/, "the person writes what they saw");
+  assert.match(ready, /Nu este o confirmare de la Trendyol/, "the statement is labelled as an attestation");
+  assert.match(ready, /<button[^>]*disabled=""[^>]*>Reîncearcă<\/button>/, "disabled until the check is ticked and described");
+  assert.match(dialog("tr", true, "ok"), /Satıcı Paneli&#x27;nde şimdi kontrol ettim/);
+  for (const status of ["stale", "missing", "unknown", "not_open", "observing"] as const) {
+    const blocked = dialog("ro", true, status);
+    assert.match(blocked, new RegExp(`data-sync-evidence="${status}"`));
+    assert.match(blocked, /data-sync-evidence-blocked/, `${status}: the retry is explained as impossible`);
+    assert.doesNotMatch(blocked, /data-field="sync-uncertain-checked"/, `${status}: no statement can replace the server read`);
+    assert.match(blocked, /<button[^>]*disabled=""[^>]*>Reîncearcă<\/button>/);
+  }
+  assert.match(dialog("ro", true, null), /data-sync-evidence="missing"[^]*data-sync-evidence-blocked/, "an API without evidence never enables the retry");
+  const known = dialog("ro", false);
+  assert.doesNotMatch(known, /data-sync-uncertain|data-sync-evidence/);
+  assert.doesNotMatch(known, /<button[^>]*disabled=""[^>]*>Reîncearcă<\/button>/, "a retry when nothing can have been delivered needs no extra check");
+  for (const locale of ["ro", "tr"] as const) {
+    const sync = MESSAGES[locale].orders.cancellation.sync;
+    assert.ok(sync.error.UNCERTAIN_OUTCOME_UNRESOLVED && sync.error.UNCERTAIN_STILL_OPEN && sync.error.PROVIDER_CHECK_REQUIRED && sync.kind.recheck, `${locale}: the unknown-outcome codes are translated`);
+  }
+  assert.match(MESSAGES.ro.orders.cancellation.sync.sendBody.api, /nu o anulare cerută de client/);
+  assert.doesNotMatch(MESSAGES.ro.orders.cancellation.sync.sendBody.api + MESSAGES.ro.orders.cancellation.sync.sendApi + MESSAGES.ro.orders.cancellation.sync.apiHint, /tedarik/, "the Romanian text has no Turkish term");
+  assert.match(MESSAGES.tr.orders.cancellation.sync.sendBody.api, /müşteri iptali değildir/);
+});
+
+test("API 2.36.0: the read-only recheck is offered by the server, sends only the version, and the history shows the person's statement as such", async () => {
+  const history = [...syncOperation().history,
+    { sequence: 9, kind: "retry", from: "manual_review" as const, to: "retry_scheduled" as const, outcome: "retry_after_provider_check", httpStatus: null, error: null, providerStatus: null,
+      actor: { id: "e-1", displayName: "Ana Manager" }, evidence: { attestation: { checkedAt: "2026-10-16T09:05:00Z", note: "Pachet activ în Seller Panel." }, serverRead: { attemptSeq: 8, readAt: "2026-10-16T09:00:00.000Z", providerStatus: "Created" }, deliveryAttemptSeq: 3 },
+      occurredAt: "2026-10-16T09:06:00.000Z" }];
+  const html = syncView("ro", withSync({ operation: syncOperation({ state: "manual_review", providerCheckRequired: true, providerEvidence: { status: "stale", readAt: "2026-10-16T07:00:00.000Z", providerStatus: "Created", maxAgeSeconds: 3600, observationSeconds: 1800 }, history }),
+    actions: { send: false, retry: true, withdraw: false, close: true, recheck: true } }));
+  assert.match(html, /data-action="sync-retry"[^>]*>Retrimite notificarea de nelivrare/);
+  assert.match(html, /data-action="sync-recheck"[^>]*>Recitește statusul la Trendyol \(fără trimitere\)/);
+  assert.match(html, /Ultima citire Arasya la canal<\/dt><dd data-sync-evidence="stale">Ultima citire are peste o oră/);
+  assert.match(html, /data-sync-attestation[^>]*>Declarația persoanei \(nu este o confirmare Trendyol\), verificat la[^]*Pachet activ în Seller Panel/);
+  assert.doesNotMatch(syncView("ro", withSync({ operation: syncOperation({ state: "manual_review" }), actions: { send: false, retry: true, withdraw: false, close: true } })), /data-action="sync-recheck"/, "no recheck the server did not offer");
+  const { fetchImpl, calls } = fakeFetch(() => ({ body: syncOperation() }));
+  const api = createApi(API, fetchImpl);
+  await api.syncOperation("op-1", "recheck", { expectedVersion: 7 }, "key-sync-0000000003");
+  await api.syncOperation("op-1", "retry", { expectedVersion: 8, providerCheck: { checkedAt: "2026-10-16T09:05:00.000Z", note: "Pachet activ în Seller Panel." } }, "key-sync-0000000004");
+  const routes = calls.filter((call) => call.url.pathname.includes("cancellation-sync"));
+  assert.deepEqual(routes.map((call) => `${call.method} ${call.url.pathname}`), ["POST /management/cancellation-sync/operations/op-1/recheck", "POST /management/cancellation-sync/operations/op-1/retry"]);
+  assert.deepEqual(routes[0].body, { expectedVersion: 7 });
+  assert.deepEqual(routes[1].body, { expectedVersion: 8, providerCheck: { checkedAt: "2026-10-16T09:05:00.000Z", note: "Pachet activ în Seller Panel." } });
+});
+
+test("API 2.36.0: every refusal of the cancellation routes has its own Romanian and Turkish text", () => {
+  const codes = ["CANCELLATION_CHANGED", "CANCELLATION_NOT_HELD", "RELEASE_NOT_APPLICABLE", "RELEASE_REFUSED", "RELEASE_SOURCE_CANCELLED", "RELEASE_PHYSICAL_UNVERIFIED", "RELEASE_DOCUMENT_NOT_READY",
+    "RELEASE_SYNC_OPEN", "SOURCE_ALREADY_CANCELLED", "TRENDYOL_BEFORE_BASELINE", "CANCELLATION_SYNC_NOT_FOUND", "CANCELLATION_SYNC_CHANGED", "CANCELLATION_SYNC_CONFLICT", "CANCELLATION_SYNC_DISABLED",
+    "CANCELLATION_SYNC_EXISTS", "CANCELLATION_SYNC_OPEN", "CANCELLATION_SYNC_STALE", "CANCELLATION_SYNC_STATE", "CANCELLATION_SYNC_NOT_WITHDRAWABLE", "CANCELLATION_SYNC_RETRY_NOT_ELIGIBLE",
+    "CANCELLATION_SYNC_PROVIDER_CHECK_REQUIRED", "CANCELLATION_SYNC_PROVIDER_EVIDENCE_REQUIRED", "CANCELLATION_SYNC_PROVIDER_CHECK_STALE", "CANCELLATION_SYNC_RECHECK_NOT_ELIGIBLE"];
+  for (const locale of ["ro", "tr"] as const) {
+    const errors = MESSAGES[locale].errors as Record<string, string>;
+    for (const code of codes) assert.ok(errors[code] && errors[code] !== errors.fallback, `${locale}: ${code}`);
+  }
+  assert.match(MESSAGES.ro.errors.CANCELLATION_SYNC_PROVIDER_CHECK_REQUIRED, /Verifică întâi comanda în platforma canalului/);
 });

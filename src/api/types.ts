@@ -43,6 +43,8 @@ export type Capabilities = {
   /** API 2.35.0: production.cancellation.manage / production.cancellation.release (granted to no role by default). */
   manageCancellations?: boolean;
   releaseCancellations?: boolean;
+  /** API 2.36.0: production.cancellation.sync (send a stop's cancellation to its sales channel; granted to no role by default). */
+  syncCancellations?: boolean;
 };
 
 export type DocumentChange = { field: string; line: number | null; before: string | null; after: string | null };
@@ -314,7 +316,9 @@ export type CancellationControlView = {
   reason: "source_cancelled" | "marketplace_cancelled" | "manager_stop" | "legacy_source_cancellation";
   reasonNote: string | null;
   source: { status: "cancelled" | "reactivated" | "not_reported"; statusCode: string | null; statusLabel: string | null; changedAt: string | null; cancellationReceivedAt: string | null; evidenceAt: string | null;
-    request: "not_requested" | "pending" | "confirmed" | "withdrawn"; requestedAt: string | null; outbound: "not_sent" };
+    request: "not_requested" | "pending" | "confirmed" | "withdrawn"; requestedAt: string | null;
+    /** "not_sent" without an outbound operation (always before API 2.36.0), otherwise the operation state. */
+    outbound: "not_sent" | SyncState };
   atStop: { phase: "not_started" | "in_progress" | "completed"; stageId: string; owner: OwnerRef | null; exceptionId: string | null; productionVersion: number; completedAt: string | null; cuttingStartedAt: string | null;
     tracks: Array<{ trackId: string; number: number; stageId: string; ownerId: string | null; exceptionId: string | null }> };
   physical: { status: PhysicalStatus; outcome: PhysicalOutcome | null; note: string | null; scan: "order_qr" | "unit_label" | null; verifiedBy: OwnerRef | null; verifiedAt: string | null };
@@ -325,13 +329,64 @@ export type CancellationControlView = {
   releaseReason: string | null;
   release: { possible: boolean; refusal: string | null };
   version: number;
+  /** API 2.36.0: the outbound cancellation of the current stop; absent before it. */
+  sync?: CancellationSyncView;
 };
+/** API 2.36.0 outbound cancellation synchronization (one operation per stop generation). */
+export type SyncState = "queued" | "processing" | "awaiting_pickup" | "awaiting_confirmation" | "retry_scheduled" | "uncertain" | "confirmed" | "rejected" | "failed" | "manual_review" | "withdrawn" | "closed";
+export type SyncMechanism = "api" | "source_pull" | "manual";
+/** What a person's retry after a possibly delivered notice rested on (API 2.36.0 evidence rule). */
+export type SyncAttemptEvidence = {
+  /** The person's own statement of their check in the channel: an attestation, never a provider confirmation. */
+  attestation?: { checkedAt: string; note: string };
+  /** The server's own status read the decision relied on. */
+  serverRead?: { attemptSeq: number; readAt: string | null; providerStatus: string | null };
+  deliveryAttemptSeq?: number;
+};
+export type SyncAttempt = {
+  sequence: number; kind: string; from: SyncState; to: SyncState; outcome: string; httpStatus: number | null; error: string | null; providerStatus: string | null;
+  actor: { id: string; displayName: string } | { system: string } | null; evidence?: SyncAttemptEvidence | null; occurredAt: string;
+};
+/** The server's own knowledge of the channel since an earlier notice may have reached it (its status reads only). */
+export type SyncEvidenceStatus = "missing" | "unknown" | "not_open" | "observing" | "stale" | "ok";
+export type SyncProviderEvidence = { status: SyncEvidenceStatus; readAt: string | null; providerStatus: string | null; maxAgeSeconds: number; observationSeconds: number };
+/** Body of a retry: after a possible delivery the person's dated statement is required (the server adds its own evidence). */
+export type SyncRetryBody = { expectedVersion: number; providerCheck?: { checkedAt: string; note: string } };
+export type SyncOperationView = {
+  id: string; state: SyncState; staffState: "awaiting_confirmation" | "attention" | "confirmed" | null; mechanism: SyncMechanism; generation: number; reasonCode: string | null;
+  attempts: number; nextAttemptAt: string | null; dispatchedAt: string | null; lastPulledAt: string | null; providerResult: string | null; providerStatus: string | null;
+  confirmedAt: string | null; confirmedBy: "inbound_event" | "status_read" | null; lastError: string | null; lastErrorAt: string | null;
+  /**
+   * An earlier notice may already have reached the channel: a retry needs the server's own fresh evidence (providerEvidence
+   * "ok") and the person's dated statement of their check (providerCheck). Absent before the evidence rule.
+   */
+  providerCheckRequired: boolean; providerEvidence?: SyncProviderEvidence | null; createdAt: string; version: number; history: SyncAttempt[];
+};
+export type SyncProviderView = {
+  source: string; mechanism: SyncMechanism; serverEnabled: boolean; flagEnabled: boolean; active: boolean; configured: boolean;
+  inbound: string; outbound: string; confirmation: string; retry: string; reconciliation: string; unsupported: string[];
+  endpoint?: string; reasons?: Record<string, string>; reason?: string;
+};
+export type CancellationSyncView = {
+  provider: SyncProviderView; operation: SyncOperationView | null; openOperationId: string | null; required: boolean;
+  actions: { send: boolean; retry: boolean; withdraw: boolean; close: boolean; recheck?: boolean };
+};
+export type SyncDiscrepancy = {
+  id?: string; kind: string; severity: "high" | "medium" | "low"; orderId: string | null; orderNumber: string | null; operationId: string | null; source: string;
+  remediation: string; retryEligible: boolean; beforeBaseline?: boolean; state?: "open" | "resolved"; details: Record<string, unknown>; detectedAt?: string; lastSeenAt?: string; resolvedAt?: string | null;
+};
+/** GET /management/cancellation-sync (orders.view_all). */
+export type CancellationSyncOverview = {
+  ready: boolean; providers: SyncProviderView[]; operations: Record<string, Partial<Record<SyncState, number>>>; discrepancies: SyncDiscrepancy[]; capabilities: { sync: boolean };
+};
+/** POST /management/cancellation-sync/reconcile: a dry run, nothing is changed or recorded. */
+export type CancellationSyncDryRun = { dryRun: true; checkedAt: string; counts: Record<string, number>; findings: SyncDiscrepancy[] };
 export type CancellationEvent = { id: string; sequence: number; type: string; controlVersion: number | null; actor: OwnerRef | null; sourceEventRef: string | null; stageId: string; productionVersion: number; details: Record<string, unknown> | null; occurredAt: string };
 /** GET /management/orders/{id}/cancellation and the result of every cancellation command. */
 export type OrderCancellation = {
   orderId: string; orderNumber: string; source: string; stage: { id: string }; productionVersion: number; productionCompleted: boolean; sourceAvailability: "active" | "cancelled";
   cancellation: CancellationControlView | null; events: CancellationEvent[]; eventsTruncated: boolean;
-  capabilities: { stop: boolean; recordPhysical: boolean; release: boolean };
+  capabilities: { stop: boolean; recordPhysical: boolean; release: boolean; sync?: boolean };
 };
 /** Neutral, objective attention for active production. There is no SLA, so time never produces attention. */
 export type OrderAttention = "unassigned" | "owner_inactive" | "owner_no_staff_access" | "owner_stage_not_allowed";

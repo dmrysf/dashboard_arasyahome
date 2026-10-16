@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-// API 2.35.0 cancellation control against the real Operations API, MySQL and Chromium. The scenario is synthetic: a
+// API 2.35.0 cancellation control (and the API 2.36.0 synchronization section, switched off) against the real Operations API, MySQL and Chromium. The scenario is synthetic: a
 // stopped order is physically verified and released by root, an active order is stopped locally (nothing is sent to a
 // source), and the production overview lists both once, apart from active production.
 const fixture = JSON.parse(readFileSync(path.join(import.meta.dirname, ".real-api-fixture.json"), "utf8"));
@@ -34,7 +34,15 @@ test("cancellation control: verify, release, local stop, overview and mobile lay
   await expect(panel).toHaveAttribute("data-stop-state", "stopped");
   await expect(panel).toContainText("Reactivată de sursă, așteaptă decizia");
   await expect(panel).toContainText("Conducerea: verificare fizică a produsului");
-  await expect(panel).toContainText("Arasya nu a trimis nimic către sursă");
+  // API 2.36.0: the synchronization section states the channel's mechanism and that the server switch is off (the E2E
+  // server never enables it), so nothing can be sent and no send action is offered.
+  const sync = panel.locator('[data-section="cancellation-sync"]');
+  await expect(sync).toHaveAttribute("data-mechanism", "source_pull");
+  await expect(sync).toHaveAttribute("data-sync-state", "none");
+  await expect(sync).toContainText("Conectorul magazinului preia cererea (WooCommerce)");
+  await expect(sync).toContainText("Oprită pe server (ARASYA_CANCELLATION_SYNC)");
+  await expect(sync).toContainText("Arasya nu inițiază nicio rambursare");
+  await expect(sync.locator('[data-action="sync-send"]')).toHaveCount(0);
   await expect(panel.locator('[data-action="release"]')).toHaveCount(0);
   await expect(page.locator('[data-production-state="stopped"]').first()).toBeVisible();
 
@@ -74,17 +82,27 @@ test("cancellation control: verify, release, local stop, overview and mobile lay
   const view = await (await rootApi.get(`/management/orders/${encodeURIComponent(created.local.order)}/cancellation`)).json();
   expect(view.cancellation.source.outbound).toBe("not_sent");
   expect(view.cancellation.category).toBe("pending_source_confirmation");
+  expect(view.cancellation.sync.provider).toMatchObject({ source: "trendhome", mechanism: "source_pull", serverEnabled: false, flagEnabled: false, active: false });
+  expect(view.cancellation.sync.operation).toBeNull();
+  expect(view.cancellation.sync.actions.send).toBe(false);
+  expect(view.capabilities.sync).toBe(true);
 
   await page.goto("/");
   const card = page.getByTestId("production-cancellations");
   await expect(card).toBeVisible();
   await expect(card.locator(`[data-cancelled-order="${created.stopped.number}"]`)).toHaveAttribute("data-category", "released");
   await expect(card.locator(`[data-cancelled-order="${created.local.number}"]`)).toHaveAttribute("data-next-action", "physical_reconciliation");
+  const syncOverview = page.getByTestId("cancellation-sync-overview");
+  await expect(syncOverview).toHaveAttribute("data-ready", "true");
+  await expect(syncOverview.locator('[data-provider="trendyol"]')).toHaveAttribute("data-active", "false");
+  await syncOverview.locator('[data-action="sync-dry-run"]').click();
+  await expect(syncOverview.getByTestId("cancellation-sync-dry-run")).toContainText("Nimic nu a fost modificat");
 
   for (const [width, order] of [[320, created.local.order], [320, created.stopped.order], [390, created.local.order], [1280, created.stopped.order]] as const) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto(`/comenzi/${encodeURIComponent(order)}`);
     await expect(page.locator('[data-section="cancellation"]')).toBeVisible();
+    await expect(page.locator('[data-section="cancellation-sync"]')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
     await page.screenshot({ path: `e2e/.runtime/dashboard-cancellation-${width}-${order.slice(-4)}.png`, fullPage: true });
   }
