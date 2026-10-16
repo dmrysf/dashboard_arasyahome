@@ -335,16 +335,32 @@ export type CancellationControlView = {
 /** API 2.36.0 outbound cancellation synchronization (one operation per stop generation). */
 export type SyncState = "queued" | "processing" | "awaiting_pickup" | "awaiting_confirmation" | "retry_scheduled" | "uncertain" | "confirmed" | "rejected" | "failed" | "manual_review" | "withdrawn" | "closed";
 export type SyncMechanism = "api" | "source_pull" | "manual";
+/** What a person's retry after a possibly delivered notice rested on (API 2.36.0 evidence rule). */
+export type SyncAttemptEvidence = {
+  /** The person's own statement of their check in the channel: an attestation, never a provider confirmation. */
+  attestation?: { checkedAt: string; note: string };
+  /** The server's own status read the decision relied on. */
+  serverRead?: { attemptSeq: number; readAt: string | null; providerStatus: string | null };
+  deliveryAttemptSeq?: number;
+};
 export type SyncAttempt = {
   sequence: number; kind: string; from: SyncState; to: SyncState; outcome: string; httpStatus: number | null; error: string | null; providerStatus: string | null;
-  actor: { id: string; displayName: string } | { system: string } | null; occurredAt: string;
+  actor: { id: string; displayName: string } | { system: string } | null; evidence?: SyncAttemptEvidence | null; occurredAt: string;
 };
+/** The server's own knowledge of the channel since an earlier notice may have reached it (its status reads only). */
+export type SyncEvidenceStatus = "missing" | "unknown" | "not_open" | "observing" | "stale" | "ok";
+export type SyncProviderEvidence = { status: SyncEvidenceStatus; readAt: string | null; providerStatus: string | null; maxAgeSeconds: number; observationSeconds: number };
+/** Body of a retry: after a possible delivery the person's dated statement is required (the server adds its own evidence). */
+export type SyncRetryBody = { expectedVersion: number; providerCheck?: { checkedAt: string; note: string } };
 export type SyncOperationView = {
   id: string; state: SyncState; staffState: "awaiting_confirmation" | "attention" | "confirmed" | null; mechanism: SyncMechanism; generation: number; reasonCode: string | null;
   attempts: number; nextAttemptAt: string | null; dispatchedAt: string | null; lastPulledAt: string | null; providerResult: string | null; providerStatus: string | null;
   confirmedAt: string | null; confirmedBy: "inbound_event" | "status_read" | null; lastError: string | null; lastErrorAt: string | null;
-  /** An earlier notice may already have reached the channel: a retry must state a check in the channel (providerChecked). */
-  providerCheckRequired: boolean; createdAt: string; version: number; history: SyncAttempt[];
+  /**
+   * An earlier notice may already have reached the channel: a retry needs the server's own fresh evidence (providerEvidence
+   * "ok") and the person's dated statement of their check (providerCheck). Absent before the evidence rule.
+   */
+  providerCheckRequired: boolean; providerEvidence?: SyncProviderEvidence | null; createdAt: string; version: number; history: SyncAttempt[];
 };
 export type SyncProviderView = {
   source: string; mechanism: SyncMechanism; serverEnabled: boolean; flagEnabled: boolean; active: boolean; configured: boolean;
@@ -353,7 +369,7 @@ export type SyncProviderView = {
 };
 export type CancellationSyncView = {
   provider: SyncProviderView; operation: SyncOperationView | null; openOperationId: string | null; required: boolean;
-  actions: { send: boolean; retry: boolean; withdraw: boolean; close: boolean };
+  actions: { send: boolean; retry: boolean; withdraw: boolean; close: boolean; recheck?: boolean };
 };
 export type SyncDiscrepancy = {
   id?: string; kind: string; severity: "high" | "medium" | "low"; orderId: string | null; orderNumber: string | null; operationId: string | null; source: string;

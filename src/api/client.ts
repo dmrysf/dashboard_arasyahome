@@ -2,7 +2,7 @@ import { mapManufacturingPlan, mapPhysicalHistory } from "./physical";
 import type { ManufacturingPlan, PhysicalHistory, PlanConfirmation } from "./physical";
 import type {
   DocumentLookupItem, OrderDocuments, RevisionRequest,
-  Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, CancellationSyncDryRun, CancellationSyncOverview, OrderCancellation, OrderDetail, SyncOperationView, OrderPage, Organization, OwnerChange, PhysicalOutcome, Overview, Permission, ProductionOverview, ProductionSettings, RestoreRecipient, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
+  Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, CancellationSyncDryRun, CancellationSyncOverview, OrderCancellation, OrderDetail, SyncOperationView, SyncRetryBody, OrderPage, Organization, OwnerChange, PhysicalOutcome, Overview, Permission, ProductionOverview, ProductionSettings, RestoreRecipient, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
 } from "./types";
 import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
 import type { AnalyticsPolicy } from "./analytics";
@@ -69,6 +69,9 @@ function mapSession(value: unknown): Session & { csrfToken: string } {
 }
 
 export type DashboardApi = ReturnType<typeof createApi>;
+/** The person's decisions on a cancellation synchronization operation (API 2.36.0). recheck is a read-only status read. */
+export type SyncOperationAction = "retry" | "recheck" | "withdraw" | "close";
+export type SyncOperationBody = { expectedVersion: number; reason?: string; note?: string } & Omit<SyncRetryBody, "expectedVersion">;
 
 export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch(...args)) {
   // The CSRF token lives only in memory; the session itself is an HttpOnly cookie owned by the API.
@@ -164,7 +167,7 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
      * (only behind the server switch and the provider flag). No refund is ever started.
      */
     sendCancellation: (globalOrderId: string, body: { expectedVersion: number; reasonCode?: number; note?: string }, idempotencyKey: string) => request<SyncOperationView>(`/management/orders/${encodeURIComponent(globalOrderId)}/cancellation/sync`, { method: "POST", body, idempotencyKey }),
-    syncOperation: (operationId: string, action: "retry" | "withdraw" | "close", body: { expectedVersion: number; reason?: string; note?: string; providerChecked?: true }, idempotencyKey: string) => request<SyncOperationView>(`/management/cancellation-sync/operations/${encodeURIComponent(operationId)}/${action}`, { method: "POST", body, idempotencyKey }),
+    syncOperation: (operationId: string, action: SyncOperationAction, body: SyncOperationBody, idempotencyKey: string) => request<SyncOperationView>(`/management/cancellation-sync/operations/${encodeURIComponent(operationId)}/${action}`, { method: "POST", body, idempotencyKey }),
     cancellationSyncOverview: (signal?: AbortSignal) => request<CancellationSyncOverview>("/management/cancellation-sync", { signal }),
     reconcileCancellationSync: () => request<CancellationSyncDryRun>("/management/cancellation-sync/reconcile", { method: "POST", body: {} }),
     productionOverview: (source: string | undefined, signal?: AbortSignal) => request<ProductionOverview>("/management/production-overview", { query: { source }, signal }),

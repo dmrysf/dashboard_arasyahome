@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { ApiError, newIdempotencyKey } from "../api/client";
-import type { CancellationSyncView, SyncAttempt, SyncOperationView, SyncState } from "../api/types";
+import { ApiError, newIdempotencyKey, type SyncOperationAction, type SyncOperationBody } from "../api/client";
+import type { CancellationSyncView, SyncAttempt, SyncMechanism, SyncOperationView, SyncState } from "../api/types";
 import { Badge, ConfirmDialog, ErrorText, Notice } from "../components/ui";
 import { toProblem, type Problem } from "../i18n";
 import { useI18n } from "../i18n/context";
@@ -10,12 +10,25 @@ const TONE: Record<SyncState, "success" | "warning" | "danger" | "neutral"> = {
   confirmed: "success", rejected: "danger", failed: "danger", manual_review: "danger", withdrawn: "neutral", closed: "neutral",
 };
 
-type SyncDialog = "send" | "retry" | "withdraw" | "close" | null;
+type SyncDialog = "send" | SyncOperationAction | null;
 
 export type CancellationSyncActions = {
   send: (body: { expectedVersion: number; reasonCode?: number; note?: string }, key: string) => Promise<SyncOperationView>;
-  operation: (operationId: string, action: "retry" | "withdraw" | "close", body: { expectedVersion: number; reason?: string; note?: string; providerChecked?: true }, key: string) => Promise<SyncOperationView>;
+  operation: (operationId: string, action: SyncOperationAction, body: SyncOperationBody, key: string) => Promise<SyncOperationView>;
 };
+
+/**
+ * Trendyol's outbound call is the seller's unsupplied declaration, not a customer cancellation: its states are named as
+ * such. The other channels keep the generic names.
+ */
+function useStateText(mechanism: SyncMechanism) {
+  const { t } = useI18n();
+  const s = t.orders.cancellation.sync;
+  return {
+    label: (state: SyncState) => (mechanism === "api" ? s.apiState[state] : undefined) ?? s.state[state] ?? state,
+    hint: (state: SyncState) => (mechanism === "api" ? s.apiStateHint[state] : undefined) ?? s.stateHint[state],
+  };
+}
 
 /**
  * API 2.36.0: the cancellation of this stop at its sales channel. The page never decides anything: the server says which
@@ -32,12 +45,14 @@ export function CancellationSyncSection({ sync, controlVersion, actions, onChang
   const [notice, setNotice] = useState<"done" | "changed" | null>(null);
   const operation = sync.operation;
   const provider = sync.provider;
+  const stateText = useStateText(provider.mechanism);
+  const evidence = operation?.providerEvidence ?? null;
   const done = () => { setDialog(null); setNotice("done"); onChanged(); };
   const conflict = () => { setDialog(null); setNotice("changed"); onConflict(); };
   return (
     <div className="cancellation-sync" data-section="cancellation-sync" data-mechanism={provider.mechanism} data-sync-state={operation?.state ?? "none"}>
-      <h3>{s.title}</h3>
-      <p className="muted small">{s.hint}</p>
+      <h3>{provider.mechanism === "api" ? s.apiTitle : s.title}</h3>
+      <p className="muted small" data-sync-meaning={provider.mechanism}>{provider.mechanism === "api" ? s.apiHint : s.hint}</p>
       {notice && <Notice tone={notice === "changed" ? "warning" : "success"}>{notice === "changed" ? s.changed : s.done}</Notice>}
       <dl className="facts cancellation-facts">
         <dt>{s.facts.mechanism}</dt><dd data-provider-mechanism={provider.mechanism}>{s.mechanism[provider.mechanism]}</dd>
@@ -48,25 +63,29 @@ export function CancellationSyncSection({ sync, controlVersion, actions, onChang
         <dt>{s.facts.confirmation}</dt><dd>{s.confirmation[provider.confirmation] ?? provider.confirmation}</dd>
         {provider.unsupported.length > 0 && <><dt>{s.facts.unsupported}</dt><dd>{provider.unsupported.map((key) => s.unsupported[key] ?? key).join(" · ")}</dd></>}
         {operation && <>
-          <dt>{s.facts.state}</dt><dd><Badge tone={TONE[operation.state]}>{s.state[operation.state]}</Badge><small className="cell-sub">{s.stateHint[operation.state]}</small></dd>
+          <dt>{s.facts.state}</dt><dd><Badge tone={TONE[operation.state]}>{stateText.label(operation.state)}</Badge><small className="cell-sub">{stateText.hint(operation.state)}</small></dd>
           {operation.reasonCode && <><dt>{s.facts.reason}</dt><dd>{provider.reasons?.[operation.reasonCode] ?? operation.reasonCode}</dd></>}
           <dt>{s.facts.attempts}</dt><dd className="mono">{number(operation.attempts)}</dd>
           {operation.nextAttemptAt && <><dt>{s.facts.nextAttempt}</dt><dd>{dateTime(operation.nextAttemptAt)}</dd></>}
           {operation.lastPulledAt && <><dt>{s.facts.pickedUp}</dt><dd>{dateTime(operation.lastPulledAt)}</dd></>}
           {operation.providerStatus && <><dt>{s.facts.providerStatus}</dt><dd className="mono">{operation.providerStatus}</dd></>}
           {operation.lastError && <><dt>{s.facts.lastError}</dt><dd data-sync-error={operation.lastError}>{s.error[operation.lastError] ?? operation.lastError}</dd></>}
+          {operation.providerCheckRequired && evidence && <><dt>{s.facts.evidence}</dt>
+            <dd data-sync-evidence={evidence.status}>{s.evidence[evidence.status] ?? evidence.status}
+              {evidence.readAt && <small className="cell-sub">{s.evidenceRead} {dateTime(evidence.readAt)}{evidence.providerStatus && <> · <span className="mono">{evidence.providerStatus}</span></>}</small>}</dd></>}
           {operation.confirmedAt && <><dt>{s.facts.confirmedAt}</dt><dd>{dateTime(operation.confirmedAt)}{operation.confirmedBy && <small className="cell-sub">{s.confirmedBy[operation.confirmedBy]}</small>}</dd></>}
         </>}
       </dl>
       {!operation && <p className="muted" data-empty="cancellation-sync">{sync.required ? s.none : s.notRequired}</p>}
       <div className="button-row cancellation-actions">
         {sync.actions.send && <button type="button" className="button button-danger" data-action="sync-send" onClick={() => { setNotice(null); setDialog("send"); }}>{provider.mechanism === "manual" ? s.sendManual : provider.mechanism === "api" ? s.sendApi : s.send}</button>}
-        {sync.actions.retry && operation && <button type="button" className="button button-secondary" data-action="sync-retry" onClick={() => { setNotice(null); setDialog("retry"); }}>{s.retry}</button>}
+        {sync.actions.retry && operation && <button type="button" className="button button-secondary" data-action="sync-retry" onClick={() => { setNotice(null); setDialog("retry"); }}>{provider.mechanism === "api" ? s.retryApi : s.retry}</button>}
+        {sync.actions.recheck && operation && <button type="button" className="button button-secondary" data-action="sync-recheck" onClick={() => { setNotice(null); setDialog("recheck"); }}>{s.recheck}</button>}
         {sync.actions.withdraw && operation && <button type="button" className="button button-secondary" data-action="sync-withdraw" onClick={() => { setNotice(null); setDialog("withdraw"); }}>{s.withdraw}</button>}
         {sync.actions.close && operation && <button type="button" className="button button-secondary" data-action="sync-close" onClick={() => { setNotice(null); setDialog("close"); }}>{s.close}</button>}
       </div>
       <p className="muted small">{s.noRefund}</p>
-      {operation && operation.history.length > 0 && <History history={operation.history} />}
+      {operation && operation.history.length > 0 && <History history={operation.history} mechanism={provider.mechanism} />}
       {dialog === "send" && <SendDialog sync={sync} controlVersion={controlVersion} onCancel={() => setDialog(null)} onDone={done} onConflict={conflict} submit={actions.send} />}
       {dialog !== null && dialog !== "send" && operation && (
         <OperationDialog action={dialog} operation={operation} onCancel={() => setDialog(null)} onDone={done} onConflict={conflict} submit={(body, key) => actions.operation(operation.id, dialog, body, key)} />
@@ -75,9 +94,10 @@ export function CancellationSyncSection({ sync, controlVersion, actions, onChang
   );
 }
 
-function History({ history }: { history: SyncAttempt[] }) {
+function History({ history, mechanism }: { history: SyncAttempt[]; mechanism: SyncMechanism }) {
   const { t, dateTime } = useI18n();
   const s = t.orders.cancellation.sync;
+  const stateText = useStateText(mechanism);
   return (
     <div className="cancellation-events">
       <h3>{s.history}</h3>
@@ -85,8 +105,14 @@ function History({ history }: { history: SyncAttempt[] }) {
         {history.map((attempt) => (
           <li key={attempt.sequence} data-sync-attempt={attempt.kind} data-outcome={attempt.outcome}>
             <strong>{s.kind[attempt.kind] ?? attempt.kind}</strong>
-            <span className="muted small"> · {s.state[attempt.to] ?? attempt.to}{attempt.httpStatus !== null && ` · HTTP ${attempt.httpStatus}`}{attempt.error && ` · ${s.error[attempt.error] ?? attempt.error}`}</span>
+            <span className="muted small"> · {stateText.label(attempt.to)}{attempt.httpStatus !== null && ` · HTTP ${attempt.httpStatus}`}{attempt.error && ` · ${s.error[attempt.error] ?? attempt.error}`}</span>
             <span className="muted small"> · {dateTime(attempt.occurredAt)}{attempt.actor && ` · ${"displayName" in attempt.actor ? attempt.actor.displayName : s.system}`}</span>
+            {attempt.evidence?.attestation && (
+              <span className="cell-sub small" data-sync-attestation>
+                {s.attestation} {dateTime(attempt.evidence.attestation.checkedAt)}: „{attempt.evidence.attestation.note}”
+                {attempt.evidence.serverRead && <> · {s.evidenceRead} {attempt.evidence.serverRead.readAt ? dateTime(attempt.evidence.serverRead.readAt) : "—"}{attempt.evidence.serverRead.providerStatus && <> · <span className="mono">{attempt.evidence.serverRead.providerStatus}</span></>}</>}
+              </span>
+            )}
           </li>
         ))}
       </ol>
@@ -141,25 +167,47 @@ function SendDialog({ sync, controlVersion, ...props }: DialogProps<{ expectedVe
   );
 }
 
-export function OperationDialog({ action, operation, ...props }: DialogProps<{ expectedVersion: number; reason?: string; note?: string; providerChecked?: true }> & { action: "retry" | "withdraw" | "close"; operation: SyncOperationView }) {
-  const { t } = useI18n();
+export function OperationDialog({ action, operation, ...props }: DialogProps<SyncOperationBody> & { action: SyncOperationAction; operation: SyncOperationView }) {
+  const { t, dateTime } = useI18n();
   const s = t.orders.cancellation.sync;
   const [version] = useState(operation.version);
   const [text, setText] = useState("");
   const { busy, error, run } = useSubmit(props);
-  const needsText = action !== "retry";
-  // A retry after an unknown outcome may repeat a notice the channel already received: the server requires the person's
-  // stated check in the channel (providerChecked) and says when it is needed.
-  const uncertain = action === "retry" && operation.providerCheckRequired === true;
-  const [checked, setChecked] = useState(false);
+  const needsText = action === "withdraw" || action === "close";
+  // A retry after a possible delivery may repeat a notice the channel already received. The server requires its own fresh
+  // evidence (a status read that found the package open after the observation window) and the person's dated statement
+  // of their own check; the page asks for the statement only when the server's evidence allows a retry at all.
+  const gated = action === "retry" && operation.providerCheckRequired === true;
+  const evidence = operation.providerEvidence ?? null;
+  const evidenceOk = evidence?.status === "ok";
+  const [checkedAt, setCheckedAt] = useState<string | null>(null);
+  const statementReady = checkedAt !== null && text.trim().length >= 10;
+  const disabled = (needsText && text.trim().length < 10) || (gated && (!evidenceOk || !statementReady));
+  const body = (): SyncOperationBody => {
+    if (action === "withdraw") return { expectedVersion: version, reason: text.trim() };
+    if (action === "close") return { expectedVersion: version, note: text.trim() };
+    if (gated && checkedAt !== null) return { expectedVersion: version, providerCheck: { checkedAt, note: text.trim() } };
+    return { expectedVersion: version };
+  };
   return (
-    <ConfirmDialog title={s.dialog[action].title} confirmLabel={s.dialog[action].confirm} busy={busy} confirmDisabled={(needsText && text.trim().length < 10) || (uncertain && !checked)}
-      onConfirm={() => { void run({ expectedVersion: version, ...(action === "withdraw" ? { reason: text.trim() } : action === "close" ? { note: text.trim() } : uncertain ? { providerChecked: true as const } : {}) }); }} onCancel={props.onCancel}>
+    <ConfirmDialog title={s.dialog[action].title} confirmLabel={s.dialog[action].confirm} busy={busy} confirmDisabled={disabled}
+      onConfirm={() => { void run(body()); }} onCancel={props.onCancel}>
       <p>{s.dialog[action].body}</p>
-      {uncertain && (
+      {gated && (
         <>
           <p className="notice notice-warning" data-sync-uncertain>{s.dialog.retry.uncertain}</p>
-          <label className="checkbox"><input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} data-field="sync-uncertain-checked" /> <span>{s.dialog.retry.uncertainConfirm}</span></label>
+          <p className="small" data-sync-evidence={evidence?.status ?? "missing"}>
+            <strong>{s.facts.evidence}:</strong> {s.evidence[evidence?.status ?? "missing"]}
+            {evidence?.readAt && <> · {s.evidenceRead} {dateTime(evidence.readAt)}{evidence.providerStatus && <> · <span className="mono">{evidence.providerStatus}</span></>}</>}
+          </p>
+          {!evidenceOk && <p className="notice notice-danger" data-sync-evidence-blocked>{s.dialog.retry.evidenceBlocked}</p>}
+          {evidenceOk && (
+            <>
+              <label className="checkbox"><input type="checkbox" checked={checkedAt !== null} onChange={(event) => setCheckedAt(event.target.checked ? new Date().toISOString() : null)} data-field="sync-uncertain-checked" /> <span>{s.dialog.retry.uncertainConfirm}</span></label>
+              <label className="field"><span>{s.dialog.retry.field}</span><textarea value={text} maxLength={1000} onChange={(event) => setText(event.target.value)} data-field="sync-provider-check-note" /></label>
+              <p className="muted small">{s.dialog.retry.attestationHint}</p>
+            </>
+          )}
         </>
       )}
       {needsText && <label className="field"><span>{s.dialog[action].field}</span><textarea value={text} maxLength={1000} onChange={(event) => setText(event.target.value)} /></label>}
