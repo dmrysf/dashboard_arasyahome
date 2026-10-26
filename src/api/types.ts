@@ -178,7 +178,18 @@ export type EmployeeDetail = EmployeeSummary & {
   documentScopes?: DocumentScopes | null;
   /** Active sources the root-only scope editor offers; null for every other viewer and for root itself. */
   documentScopeSources?: Array<{ key: string; name: string }> | null;
+  /** API 2.38+ (Confirmare): absent on an older API, null for root or before the migration. Root edits them only. */
+  confirmareScopes?: ConfirmareScopes | null;
+  /** API 2.41+ (Confirmare finance). */
+  financeScopes?: FinanceScopes | null;
+  /** API 2.45+ (SmartBill invoicing). */
+  invoiceScopes?: InvoiceScopes | null;
 };
+
+/** The shop-scoped rights of the dual-store workflow (Trend Home, Outlet Perdele): who confirms, who checks money, who invoices. */
+export type ConfirmareScopes = { operate: string[]; supervise: string[] };
+export type FinanceScopes = { view: string[]; record: string[]; approve: string[] };
+export type InvoiceScopes = { issue: string[]; manage: string[] };
 
 export type EmployeePage = { items: EmployeeSummary[]; nextCursor: string | null; total: number };
 
@@ -239,10 +250,19 @@ export type ProductionActivityAction = "claimed" | "stage_completed" | "producti
 /** Owner interventions record whose ownership ended and who received it; Staff actions carry null. */
 export type OwnerRef = { id: string; displayName: string };
 
+/**
+ * Owner 2026-10-26 (read filter only): "current" leaves out the older Trend Home / Outlet Perdele orders WordPress still
+ * manages (the API decides which); "legacy" shows only those. Trendyol and B2B orders are never legacy.
+ */
+export type OrderFlow = "current" | "legacy";
+
 export type ProductionOverview = {
   generatedAt: string;
   timezone: string;
-  filters: { source: string | null };
+  /** `flow` is absent from APIs before the flow filter. */
+  filters: { source: string | null; flow?: OrderFlow | null };
+  /** Active legacy orders within the source filter, whatever the flow filter; absent from older APIs. */
+  legacy?: { active: number; waiting: number };
   summary: { active: number; waiting: number; inWork: number; unassigned: number; completedToday: number };
   stages: Array<{ id: string; label: string; ordinal: number; active: number; unassigned: number; oldestEnteredAt: string | null }>;
   oldestOrders: Array<{
