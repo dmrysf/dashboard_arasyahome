@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { ProductionOverview as Overview, SourceHealth } from "../api/types";
+import type { OrderFlow, ProductionOverview as Overview, SourceHealth } from "../api/types";
 import { useDashboard } from "../app/context";
 import { orderPath } from "../app/router";
 import { usePolling } from "../app/usePolling";
@@ -10,6 +10,9 @@ const HEALTH_TONE: Record<SourceHealth, "success" | "warning" | "neutral"> = {
   healthy: "success", stale: "warning", offline: "warning", no_contact: "warning", not_configured: "neutral", disabled: "neutral",
 };
 
+/** Owner 2026-10-26: which orders the numbers cover; the new system's by default, older WordPress-managed shop orders apart. */
+export type FlowChoice = OrderFlow | "all";
+
 /**
  * Read-only production snapshot. Every number comes from GET /management/production-overview; this
  * component only lays it out. It offers no production action (claim, advance, handover).
@@ -17,13 +20,14 @@ const HEALTH_TONE: Record<SourceHealth, "success" | "warning" | "neutral"> = {
 export function ProductionOverview() {
   const { api } = useDashboard();
   const [source, setSource] = useState("");
+  const [flow, setFlow] = useState<FlowChoice>("current");
   const [sourceOptions, setSourceOptions] = useState<Array<{ key: string; name: string }>>([]);
-  const load = useCallback((signal: AbortSignal) => api.productionOverview(source || undefined, signal).then((result) => {
+  const load = useCallback((signal: AbortSignal) => api.productionOverview(source || undefined, signal, flow === "all" ? undefined : flow).then((result) => {
     if (result.sources) setSourceOptions(result.sources.map(({ key, name }) => ({ key, name })));
     return result;
-  }), [api, source]);
-  const polling = usePolling(load, source);
-  return <ProductionPanel {...polling} source={source} sourceOptions={sourceOptions} onSource={setSource} />;
+  }), [api, source, flow]);
+  const polling = usePolling(load, `${source}|${flow}`);
+  return <ProductionPanel {...polling} source={source} sourceOptions={sourceOptions} onSource={setSource} flow={flow} onFlow={setFlow} />;
 }
 
 export type ProductionPanelProps = {
@@ -35,10 +39,13 @@ export type ProductionPanelProps = {
   source: string;
   sourceOptions: Array<{ key: string; name: string }>;
   onSource: (source: string) => void;
+  /** Absent: every order, no flow selector (APIs before the flow filter). */
+  flow?: FlowChoice;
+  onFlow?: (flow: FlowChoice) => void;
 };
 
 /** Presentation of one polling state: first load, data, a failed first load, or stale data after a failed refresh. */
-export function ProductionPanel({ data, error, updatedAt, refreshing, refresh, source, sourceOptions, onSource }: ProductionPanelProps) {
+export function ProductionPanel({ data, error, updatedAt, refreshing, refresh, source, sourceOptions, onSource, flow, onFlow }: ProductionPanelProps) {
   const { t } = useI18n();
   const p = t.production;
   return (
@@ -58,20 +65,31 @@ export function ProductionPanel({ data, error, updatedAt, refreshing, refresh, s
               </select>
             </label>
           )}
+          {flow && onFlow && (
+            <label className="inline-select">
+              <span>{p.flow}</span>
+              <select value={flow} onChange={(event) => onFlow(event.target.value as FlowChoice)} data-testid="production-flow">
+                <option value="current">{p.flowCurrent}</option>
+                <option value="legacy">{p.flowLegacy}</option>
+                <option value="all">{p.flowAll}</option>
+              </select>
+            </label>
+          )}
           <RefreshBar updatedAt={updatedAt} refreshing={refreshing} hasData={data !== null} onRefresh={refresh} />
         </div>
       </div>
       {error !== null && data && <div className="notice notice-warning" role="status">{p.refreshFailed}</div>}
       {error !== null && !data && <div className="stack"><p className="muted">{p.loadFailed}</p><ErrorBanner error={error} onRetry={refresh} /></div>}
       {!data && error === null && <Loading label={p.loading} />}
-      {data && <ProductionContent data={data} />}
+      {data && <ProductionContent data={data} flow={flow} />}
     </section>
   );
 }
 
-function ProductionContent({ data }: { data: Overview }) {
+function ProductionContent({ data, flow }: { data: Overview; flow?: FlowChoice }) {
   const { t, number } = useI18n();
   const p = t.production;
+  const legacy = data.legacy;
   const metrics = [
     ["active", p.active, p.activeHint, data.summary.active],
     ["waiting", p.waiting, p.waitingHint, data.summary.waiting],
@@ -81,6 +99,8 @@ function ProductionContent({ data }: { data: Overview }) {
   ] as const;
   return (
     <>
+      {flow && legacy && (flow === "legacy" || legacy.active > 0) && <p className="notice" role="note" data-testid="production-legacy">
+        {flow === "current" ? p.legacyExcluded(number(legacy.active), number(legacy.waiting)) : flow === "legacy" ? p.legacyOnly : p.legacyIncluded(number(legacy.active))}</p>}
       <div className="metric-grid" role="list" aria-label={p.summaryLabel}>
         {metrics.map(([key, label, hint, value]) => (
           <div className="metric metric-static" role="listitem" key={key} data-metric={key}><span>{label}</span><strong>{number(value)}</strong><small>{hint}</small></div>

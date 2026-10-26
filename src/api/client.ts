@@ -1,9 +1,6 @@
 import { mapManufacturingPlan, mapPhysicalHistory } from "./physical";
 import type { ManufacturingPlan, PhysicalHistory, PlanConfirmation } from "./physical";
-import type {
-  DocumentLookupItem, OrderDocuments, RevisionRequest,
-  Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, RestoreRecipient, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow,
-} from "./types";
+import type { DocumentLookupItem, OrderDocuments, RevisionRequest, Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, RestoreRecipient, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow, ConfirmareScopes, FinanceScopes, InvoiceScopes, OrderFlow } from "./types";
 import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
 import type { AnalyticsPolicy } from "./analytics";
 
@@ -154,7 +151,8 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     /** Owner interventions change internal production ownership only. The key makes a browser retry safe. */
     releaseOwner: (globalOrderId: string, expectedVersion: number, idempotencyKey: string) => request<OwnerChange>(`/management/orders/${encodeURIComponent(globalOrderId)}/release-owner`, { method: "POST", body: { expectedVersion }, idempotencyKey }),
     reassignOwner: (globalOrderId: string, employeeId: string, expectedVersion: number, idempotencyKey: string) => request<OwnerChange>(`/management/orders/${encodeURIComponent(globalOrderId)}/owner`, { method: "PUT", body: { employeeId, expectedVersion }, idempotencyKey }),
-    productionOverview: (source: string | undefined, signal?: AbortSignal) => request<ProductionOverview>("/management/production-overview", { query: { source }, signal }),
+    /** flow (owner 2026-10-26): "current" leaves out, "legacy" shows only, the older WordPress-managed shop orders; undefined shows every order. */
+    productionOverview: (source: string | undefined, signal?: AbortSignal, flow?: OrderFlow) => request<ProductionOverview>("/management/production-overview", { query: { source, flow }, signal }),
     system: () => request<SystemStatus>("/management/system"),
     workflow: () => request<Workflow>("/production/workflow"),
     employees: (query: Record<string, string | undefined>) => request<EmployeePage>("/management/employees", { query }),
@@ -171,6 +169,10 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     setStages: (id: string, stageIds: string[]) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/stages`, { method: "PUT", body: { stageIds } }),
     /** Root only: the order sources this identity's document permissions reach. */
     setDocumentScopes: (id: string, scopes: DocumentScopes) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/document-scopes`, { method: "PUT", body: scopes }),
+    /** Root only (API refuses everybody else with ROOT_ONLY): each call replaces that kind of scope of the identity. */
+    setConfirmareScopes: (id: string, scopes: ConfirmareScopes) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/confirmare-scopes`, { method: "PUT", body: scopes }),
+    setFinanceScopes: (id: string, scopes: FinanceScopes) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/finance-scopes`, { method: "PUT", body: scopes }),
+    setInvoiceScopes: (id: string, scopes: InvoiceScopes) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/invoice-scopes`, { method: "PUT", body: scopes }),
     setManager: (id: string, managerId: string | null) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/manager`, { method: "PUT", body: { managerId } }),
     /** Additional organisational functions; membership only, never a permission. */
     setSecondaryDepartments: (id: string, departmentIds: number[]) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/secondary-departments`, { method: "PUT", body: { departmentIds } }),

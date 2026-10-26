@@ -259,6 +259,8 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
         {data.documentScopes && <DocumentScopesCard data={data} scopes={scopes} editable={editable && me.isRoot && Array.isArray(data.documentScopeSources)}
           busy={busy} onChange={setScopes} onPending={onPending} />}
 
+        {!data.isRoot && <ShopScopesCards data={data} editable={editable && me.isRoot} busy={busy} onPending={onPending} />}
+
         <Card title={m.hierarchy} description={m.hierarchyHint}
           actions={allowed("employees.manage_hierarchy") ? <button type="button" className="button button-secondary" disabled={busy || managerId === (data.manager?.id ?? "")}
             onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.managerTitle, confirmLabel: tr.common.save, body: <p>{tr.employee.managerBody}</p> }),
@@ -349,6 +351,77 @@ export function DocumentScopesCard({ data, scopes, editable, busy, onChange, onP
         )}
       </div>
       <p className="muted small">{editable ? m.scopesNeedPermission : m.scopesRootOnly}</p>
+    </Card>
+  );
+}
+
+/** The shops the dual-store scopes may name (the API refuses any other source with UNKNOWN_SOURCE). */
+export const SHOP_SOURCES = [{ key: "trendhome", name: "Trend Home" }, { key: "outletperdele", name: "Outlet Perdele" }] as const;
+
+type ShopScopeKind = "confirmare" | "finance" | "invoice";
+
+/**
+ * The shop-scoped rights of the dual-store workflow (Confirmare operate/supervise, finance view/record/approve, invoice
+ * issue/manage), edited by root only like the document sources: one card per kind, each change reviewed in the confirm
+ * dialog and sent as the whole list of that kind (the API replaces it, audits it and refuses anybody but root).
+ */
+export function ShopScopesCards({ data, editable, busy, onPending }: { data: EmployeeDetail; editable: boolean; busy: boolean; onPending: (pending: Pending) => void }) {
+  const { api } = useDashboard();
+  const { t } = useI18n();
+  const m = t.employee;
+  const cards: { kind: ShopScopeKind; title: string; hint?: string; saved: Record<string, string[]> | null | undefined; capabilities: { key: string; label: string }[];
+    save: (scopes: Record<string, string[]>) => Promise<EmployeeDetail> }[] = [
+    { kind: "confirmare", title: m.confirmareScopes, saved: data.confirmareScopes, capabilities: [{ key: "operate", label: m.scopeOperate }, { key: "supervise", label: m.scopeSupervise }],
+      save: (scopes) => api.setConfirmareScopes(data.id, { operate: scopes.operate ?? [], supervise: scopes.supervise ?? [] }) },
+    { kind: "finance", title: m.financeScopes, hint: m.financeScopesHint, saved: data.financeScopes,
+      capabilities: [{ key: "view", label: m.scopeView }, { key: "record", label: m.scopeRecord }, { key: "approve", label: m.scopeApprove }],
+      save: (scopes) => api.setFinanceScopes(data.id, { view: scopes.view ?? [], record: scopes.record ?? [], approve: scopes.approve ?? [] }) },
+    { kind: "invoice", title: m.invoiceScopes, saved: data.invoiceScopes, capabilities: [{ key: "issue", label: m.scopeIssue }, { key: "manage", label: m.scopeManage }],
+      save: (scopes) => api.setInvoiceScopes(data.id, { issue: scopes.issue ?? [], manage: scopes.manage ?? [] }) },
+  ];
+  return <>{cards.map((card) => <ShopScopesCard key={`${card.kind}:${JSON.stringify(card.saved ?? null)}`} {...card} editable={editable} busy={busy} onPending={onPending} />)}</>;
+}
+
+function ShopScopesCard({ kind, title, hint, saved, capabilities, save, editable, busy, onPending }: {
+  kind: ShopScopeKind; title: string; hint?: string; saved: Record<string, string[]> | null | undefined; capabilities: { key: string; label: string }[];
+  save: (scopes: Record<string, string[]>) => Promise<EmployeeDetail>; editable: boolean; busy: boolean; onPending: (pending: Pending) => void;
+}) {
+  const { t } = useI18n();
+  const m = t.employee;
+  const stored = Object.fromEntries(capabilities.map((capability) => [capability.key, [...(saved?.[capability.key] ?? [])].sort()]));
+  const [scopes, setScopes] = useState<Record<string, string[]>>(stored);
+  const available = saved !== undefined && saved !== null;
+  const changed = capabilities.some((capability) => !sameSet(scopes[capability.key] ?? [], stored[capability.key] ?? []));
+  const shopName = (key: string) => SHOP_SOURCES.find((source) => source.key === key)?.name ?? key;
+  const names = (tr: Messages, items: string[]) => items.length ? items.map(shopName).join(", ") : tr.common.nothing;
+  return (
+    <Card title={title} description={[m.shopScopesHint, hint].filter(Boolean).join(" ")}
+      actions={editable && available ? <button type="button" className="button button-secondary" disabled={busy || !changed} data-shop-scopes-review={kind}
+        onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.shopScopesTitle(title), confirmLabel: tr.employee.applyScopes,
+          body: <>{capabilities.map((capability) => <p key={capability.key}>{capability.label}: {tr.common.before}: <strong>{names(tr, stored[capability.key] ?? [])}</strong> · {tr.common.after}: <strong>{names(tr, scopes[capability.key] ?? [])}</strong></p>)}<p>{tr.employee.shopScopesApply}</p></> }),
+          run: () => save(Object.fromEntries(capabilities.map((capability) => [capability.key, [...(scopes[capability.key] ?? [])].sort()]))) })}>{m.reviewScopes}</button> : undefined}>
+      {!available ? <p className="muted">{m.shopScopesUnavailable}</p> : (
+        <table className="data-table compact-table" data-shop-scopes={kind}>
+          <thead><tr><th>{m.scopeSource}</th>{capabilities.map((capability) => <th key={capability.key}>{capability.label}</th>)}</tr></thead>
+          <tbody>
+            {SHOP_SOURCES.map((source) => (
+              <tr key={source.key} data-source={source.key}>
+                <td>{source.name} <small className="mono">{source.key}</small></td>
+                {capabilities.map((capability) => (
+                  <td key={capability.key}>
+                    <label className={`check ${editable ? "" : "disabled"}`}>
+                      <input type="checkbox" data-capability={capability.key} aria-label={`${source.name}: ${capability.label}`} disabled={!editable}
+                        checked={(scopes[capability.key] ?? []).includes(source.key)}
+                        onChange={() => setScopes({ ...scopes, [capability.key]: toggle(scopes[capability.key] ?? [], source.key) })} />
+                    </label>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {available && !editable && <p className="muted small">{m.shopScopesRootOnly}</p>}
     </Card>
   );
 }

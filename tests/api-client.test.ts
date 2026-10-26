@@ -142,3 +142,17 @@ test("document scopes are replaced with both capabilities stated, under the sess
   assert.deepEqual(put.body, { operate: [], approve: ["outletperdele", "trendhome"] });
   assert.equal(put.headers["X-CSRF-Token"], "csrf-scope");
 });
+
+test("the dual-store shop scopes (Confirmare, finance, invoice) are each replaced whole, under the session CSRF token", async () => {
+  const { fetchImpl, calls } = fakeFetch((call) => call.url.pathname === "/auth/session" ? { body: sessionPayload({}, "csrf-shop") } : { body: employee() });
+  const api = createApi(API, fetchImpl);
+  await api.getSession();
+  await api.setConfirmareScopes(employee().id, { operate: ["outletperdele", "trendhome"], supervise: [] });
+  await api.setFinanceScopes(employee().id, { view: ["trendhome"], record: ["trendhome"], approve: [] });
+  await api.setInvoiceScopes(employee().id, { issue: ["outletperdele"], manage: [] });
+  const [confirmare, finance, invoice] = calls.slice(1);
+  assert.deepEqual([confirmare.method, confirmare.url.pathname, confirmare.body], ["PUT", `/management/employees/${employee().id}/confirmare-scopes`, { operate: ["outletperdele", "trendhome"], supervise: [] }]);
+  assert.deepEqual([finance.method, finance.url.pathname, finance.body], ["PUT", `/management/employees/${employee().id}/finance-scopes`, { view: ["trendhome"], record: ["trendhome"], approve: [] }]);
+  assert.deepEqual([invoice.method, invoice.url.pathname, invoice.body], ["PUT", `/management/employees/${employee().id}/invoice-scopes`, { issue: ["outletperdele"], manage: [] }]);
+  assert.ok([confirmare, finance, invoice].every((call) => call.headers["X-CSRF-Token"] === "csrf-shop"));
+});

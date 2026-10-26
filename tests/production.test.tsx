@@ -212,6 +212,25 @@ test("the container renders the loading state before any data and the API method
   assert.equal(calls[1].url, `${API}/management/production-overview`);
 });
 
+test("flow filter (owner 2026-10-26): the new system by default, older WordPress shop orders counted apart, the request reads only", async () => {
+  const legacy = { active: 837, waiting: 821 };
+  const current = panel("ro", { data: overview({ legacy, filters: { source: null, flow: "current" } }), flow: "current", onFlow: () => undefined });
+  assert.ok(current.includes('data-testid="production-flow"') && /<option value="current" selected="">Sistemul nou/.test(current), "the selector opens on the new system");
+  assert.ok(text(current).includes("837 comenzi vechi Trend Home / Outlet Perdele, gestionate în WordPress, nu sunt incluse în aceste cifre (821 în așteptare)"));
+  assert.ok(text(panel("tr", { data: overview({ legacy }), flow: "legacy", onFlow: () => undefined })).includes("Yalnız WordPress'te yönetilen eski Trend Home / Outlet Perdele siparişleri gösteriliyor"));
+  assert.ok(text(panel("ro", { data: overview({ legacy }), flow: "all", onFlow: () => undefined })).includes("Cifrele includ 837 comenzi vechi"));
+  assert.ok(!panel("ro", { data: overview({ legacy: { active: 0, waiting: 0 } }), flow: "current", onFlow: () => undefined }).includes("production-legacy"), "no note without legacy orders");
+  assert.ok(!panel("ro").includes("production-flow") && !panel("ro").includes("production-legacy"), "without a flow (older callers) nothing changes");
+  const calls: string[] = [];
+  const api = createApi(API, (async (url: string, init?: RequestInit) => {
+    calls.push(`${init?.method ?? "GET"} ${url}`);
+    return new Response(JSON.stringify(overview({ legacy })), { status: 200, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch);
+  assert.deepEqual((await api.productionOverview("outletperdele", undefined, "current")).legacy, legacy);
+  await api.productionOverview(undefined, undefined, "legacy");
+  assert.deepEqual(calls, [`GET ${API}/management/production-overview?source=outletperdele&flow=current`, `GET ${API}/management/production-overview?flow=legacy`]);
+});
+
 test("durations are compact, localized and never negative", () => {
   const ro = createTranslator("ro");
   const tr = createTranslator("tr");
