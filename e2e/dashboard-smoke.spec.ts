@@ -240,7 +240,8 @@ test("production overview: real response numbers, 14 stages, oldest orders, acti
   await expect(production.locator('[data-source="trendyol"] .badge')).toHaveText("Neconfigurat");
   await expect(production.locator('[data-source="outletperdele"] .badge')).toHaveText("Atenție");
   await expect(production.getByText("Actualizat la 15:00:10")).toBeVisible();
-  expect(api.overviewRequests).toEqual([""]);
+  // Owner 2026-10-26: the overview opens on the new system; older WordPress-managed shop orders are counted apart.
+  expect(api.overviewRequests).toEqual(["?flow=current"]);
 
   await production.getByRole("button", { name: "Actualizează" }).click();
   await expect.poll(() => api.overviewRequests.length).toBe(2);
@@ -268,7 +269,7 @@ test("production overview: real response numbers, 14 stages, oldest orders, acti
   await production.getByLabel("Kaynak").selectOption("outletperdele");
   await expect(metric("active")).toHaveText("0");
   await expect(production.getByText("Aktif sipariş bulunmuyor.").first()).toBeVisible();
-  expect(api.overviewRequests.at(-1)).toBe("?source=outletperdele");
+  expect(api.overviewRequests.at(-1)).toBe("?source=outletperdele&flow=current");
 
   await page.reload();
   await expect(page.locator("section.production").getByRole("heading", { name: "Üretim", exact: true })).toBeVisible();
