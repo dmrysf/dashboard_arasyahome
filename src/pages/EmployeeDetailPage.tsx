@@ -260,6 +260,7 @@ export function EmployeeEditor({ data, departments, roles, catalog, applicationK
           busy={busy} onChange={setScopes} onPending={onPending} />}
 
         {!data.isRoot && <ShopScopesCards data={data} editable={editable && me.isRoot} busy={busy} onPending={onPending} />}
+        {!data.isRoot && data.financeSupervision !== undefined && <FinanceSupervisionCard data={data} editable={editable && me.isRoot} busy={busy} onPending={onPending} />}
 
         <Card title={m.hierarchy} description={m.hierarchyHint}
           actions={allowed("employees.manage_hierarchy") ? <button type="button" className="button button-secondary" disabled={busy || managerId === (data.manager?.id ?? "")}
@@ -369,13 +370,15 @@ export function ShopScopesCards({ data, editable, busy, onPending }: { data: Emp
   const { api } = useDashboard();
   const { t } = useI18n();
   const m = t.employee;
+  const verifyKnown = Array.isArray(data.financeScopes?.verify);
   const cards: { kind: ShopScopeKind; title: string; hint?: string; saved: Record<string, string[]> | null | undefined; capabilities: { key: string; label: string }[];
     save: (scopes: Record<string, string[]>) => Promise<EmployeeDetail> }[] = [
     { kind: "confirmare", title: m.confirmareScopes, saved: data.confirmareScopes, capabilities: [{ key: "operate", label: m.scopeOperate }, { key: "supervise", label: m.scopeSupervise }],
       save: (scopes) => api.setConfirmareScopes(data.id, { operate: scopes.operate ?? [], supervise: scopes.supervise ?? [] }) },
-    { kind: "finance", title: m.financeScopes, hint: m.financeScopesHint, saved: data.financeScopes,
-      capabilities: [{ key: "view", label: m.scopeView }, { key: "record", label: m.scopeRecord }, { key: "approve", label: m.scopeApprove }],
-      save: (scopes) => api.setFinanceScopes(data.id, { view: scopes.view ?? [], record: scopes.record ?? [], approve: scopes.approve ?? [] }) },
+    // API 2.50+: `verify` is shown only when the API reports it (an older API keeps the three columns and their payload).
+    { kind: "finance", title: m.financeScopes, hint: verifyKnown ? `${m.financeScopesHint} ${m.financeVerifyHint}` : m.financeScopesHint, saved: data.financeScopes,
+      capabilities: [{ key: "view", label: m.scopeView }, { key: "record", label: m.scopeRecord }, { key: "approve", label: m.scopeApprove }, ...(verifyKnown ? [{ key: "verify", label: m.scopeVerify }] : [])],
+      save: (scopes) => api.setFinanceScopes(data.id, { view: scopes.view ?? [], record: scopes.record ?? [], approve: scopes.approve ?? [], ...(verifyKnown ? { verify: scopes.verify ?? [] } : {}) }) },
     { kind: "invoice", title: m.invoiceScopes, saved: data.invoiceScopes, capabilities: [{ key: "issue", label: m.scopeIssue }, { key: "manage", label: m.scopeManage }],
       save: (scopes) => api.setInvoiceScopes(data.id, { issue: scopes.issue ?? [], manage: scopes.manage ?? [] }) },
   ];
@@ -422,6 +425,42 @@ function ShopScopesCard({ kind, title, hint, saved, capabilities, save, editable
         </table>
       )}
       {available && !editable && <p className="muted small">{m.shopScopesRootOnly}</p>}
+    </Card>
+  );
+}
+
+/**
+ * API 2.50+: the finance employees this identity observes in Staff ("Activitatea contabilității"): their payment checks
+ * and decisions, read only. Root edits it like the shop scopes (reviewed in the confirm dialog, the whole list replaced,
+ * audited by the API). Supervision is never a right to act: approving or recording stays in the finance scopes.
+ */
+export function FinanceSupervisionCard({ data, editable, busy, onPending }: { data: EmployeeDetail; editable: boolean; busy: boolean; onPending: (pending: Pending) => void }) {
+  const { api } = useDashboard();
+  const { t } = useI18n();
+  const m = t.employee;
+  const saved = data.financeSupervision;
+  const stored = [...(saved?.employeeIds ?? [])].sort();
+  const [chosen, setChosen] = useState<string[]>(stored);
+  const changed = !sameSet(chosen, stored);
+  const candidates = saved?.candidates ?? [];
+  const name = (id: string) => candidates.find((candidate) => candidate.id === id)?.displayName ?? id;
+  const names = (tr: Messages, ids: string[]) => ids.length ? ids.map(name).join(", ") : tr.common.nothing;
+  return (
+    <Card title={m.financeSupervision} description={m.financeSupervisionHint}
+      actions={editable && saved ? <button type="button" className="button button-secondary" disabled={busy || !changed} data-finance-supervision-review
+        onClick={() => onPending({ view: ({ t: tr }) => ({ title: tr.employee.financeSupervisionTitle, confirmLabel: tr.employee.applyScopes,
+          body: <><p>{tr.common.before}: <strong>{names(tr, stored)}</strong> · {tr.common.after}: <strong>{names(tr, chosen)}</strong></p><p>{tr.employee.financeSupervisionApply}</p></> }),
+          run: () => api.setFinanceSupervision(data.id, [...chosen].sort()) })}>{m.reviewScopes}</button> : undefined}>
+      {!saved ? <p className="muted">{m.shopScopesUnavailable}</p> : candidates.length === 0 ? <p className="muted">{m.financeSupervisionNobody}</p> : (
+        <div className="check-list" data-finance-supervision>
+          {candidates.map((candidate) => (
+            <label key={candidate.id} className={`check ${editable ? "" : "disabled"}`}>
+              <input type="checkbox" data-supervised={candidate.id} disabled={!editable} checked={chosen.includes(candidate.id)} onChange={() => setChosen(toggle(chosen, candidate.id))} /> {candidate.displayName}
+            </label>
+          ))}
+        </div>
+      )}
+      {saved && !editable && <p className="muted small">{m.shopScopesRootOnly}</p>}
     </Card>
   );
 }

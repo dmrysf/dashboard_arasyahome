@@ -182,13 +182,18 @@ export type EmployeeDetail = EmployeeSummary & {
   confirmareScopes?: ConfirmareScopes | null;
   /** API 2.41+ (Confirmare finance). */
   financeScopes?: FinanceScopes | null;
+  /** API 2.50+: the finance employees this identity observes (read-only oversight in Staff); null for root or before 044. */
+  financeSupervision?: FinanceSupervision | null;
   /** API 2.45+ (SmartBill invoicing). */
   invoiceScopes?: InvoiceScopes | null;
 };
 
 /** The shop-scoped rights of the dual-store workflow (Trend Home, Outlet Perdele): who confirms, who checks money, who invoices. */
 export type ConfirmareScopes = { operate: string[]; supervise: string[] };
-export type FinanceScopes = { view: string[]; record: string[]; approve: string[] };
+/** `verify` (API 2.50+): single-person verification, effective only once the shop's verification policy is `single`. */
+export type FinanceScopes = { view: string[]; record: string[]; approve: string[]; verify?: string[] };
+/** API 2.50+: whom the identity supervises and who could be supervised (every employee holding a finance scope). */
+export type FinanceSupervision = { employeeIds: string[]; candidates: Array<{ id: string; displayName: string }> };
 export type InvoiceScopes = { issue: string[]; manage: string[] };
 
 export type EmployeePage = { items: EmployeeSummary[]; nextCursor: string | null; total: number };

@@ -197,3 +197,21 @@ test("secondary departments are shown and edited through the reviewed flow; dire
   assert.ok(!buttons(readOnly).includes("Salvează departamentele suplimentare"));
   assert.match(readOnly, /Depozit/);
 });
+
+test("API 2.50: the finance card shows Verificare only when the API reports it, and supervision is a root-only read-only card", () => {
+  const rootProfile = me({ isRoot: true, authorityRank: null });
+  const older = editor(employee({ financeScopes: { view: ["trendhome"], record: ["trendhome"], approve: [] } }), rootProfile);
+  assert.doesNotMatch(older, /data-capability="verify"/, "an older API keeps the three finance columns");
+  assert.doesNotMatch(older, /Supraveghere contabilitate/, "no supervision card without the API's answer");
+  const candidates = [{ id: "33333333-3333-4333-8333-333333333333", displayName: "Test Contabil" }];
+  const current = employee({ financeScopes: { view: ["trendhome"], record: [], approve: ["trendhome"], verify: [] }, financeSupervision: { employeeIds: [candidates[0].id], candidates } });
+  const html = editor(current, rootProfile);
+  assert.match(html, /data-capability="verify"/);
+  assert.match(html, /o singură persoană/, "the hint says single verification waits for the owner, the accountant and the shop");
+  assert.match(html, /Supraveghere contabilitate/);
+  assert.match(html, /Doar citire: nu aprobă și nu înregistrează nimic/);
+  assert.match(html, /data-supervised="33333333-3333-4333-8333-333333333333"[^>]*checked/);
+  const notRoot = editor(current);
+  assert.doesNotMatch(notRoot, /<input type="checkbox" data-supervised="[^"]+"(?![^>]*disabled)/, "only root edits the supervision");
+  assert.match(notRoot, /Doar administratorul principal poate schimba aceste drepturi/);
+});

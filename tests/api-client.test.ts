@@ -150,6 +150,12 @@ test("the dual-store shop scopes (Confirmare, finance, invoice) are each replace
   await api.setConfirmareScopes(employee().id, { operate: ["outletperdele", "trendhome"], supervise: [] });
   await api.setFinanceScopes(employee().id, { view: ["trendhome"], record: ["trendhome"], approve: [] });
   await api.setInvoiceScopes(employee().id, { issue: ["outletperdele"], manage: [] });
+  await api.setFinanceScopes(employee().id, { view: [], record: [], approve: ["outletperdele"], verify: ["outletperdele"] });
+  await api.setFinanceSupervision(employee().id, ["33333333-3333-4333-8333-333333333333"]);
+  const [verify, supervision] = calls.slice(4);
+  assert.deepEqual([verify.url.pathname, verify.body], [`/management/employees/${employee().id}/finance-scopes`, { view: [], record: [], approve: ["outletperdele"], verify: ["outletperdele"] }]);
+  assert.deepEqual([supervision.method, supervision.url.pathname, supervision.body], ["PUT", `/management/employees/${employee().id}/finance-supervision`, { employeeIds: ["33333333-3333-4333-8333-333333333333"] }]);
+  assert.equal(supervision.headers["X-CSRF-Token"], "csrf-shop");
   const [confirmare, finance, invoice] = calls.slice(1);
   assert.deepEqual([confirmare.method, confirmare.url.pathname, confirmare.body], ["PUT", `/management/employees/${employee().id}/confirmare-scopes`, { operate: ["outletperdele", "trendhome"], supervise: [] }]);
   assert.deepEqual([finance.method, finance.url.pathname, finance.body], ["PUT", `/management/employees/${employee().id}/finance-scopes`, { view: ["trendhome"], record: ["trendhome"], approve: [] }]);

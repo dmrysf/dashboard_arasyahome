@@ -172,6 +172,7 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     /** Root only (API refuses everybody else with ROOT_ONLY): each call replaces that kind of scope of the identity. */
     setConfirmareScopes: (id: string, scopes: ConfirmareScopes) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/confirmare-scopes`, { method: "PUT", body: scopes }),
     setFinanceScopes: (id: string, scopes: FinanceScopes) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/finance-scopes`, { method: "PUT", body: scopes }),
+    setFinanceSupervision: (id: string, employeeIds: string[]) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/finance-supervision`, { method: "PUT", body: { employeeIds } }),
     setInvoiceScopes: (id: string, scopes: InvoiceScopes) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/invoice-scopes`, { method: "PUT", body: scopes }),
     setManager: (id: string, managerId: string | null) => request<EmployeeDetail>(`/management/employees/${encodeURIComponent(id)}/manager`, { method: "PUT", body: { managerId } }),
     /** Additional organisational functions; membership only, never a permission. */
