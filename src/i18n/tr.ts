@@ -3,9 +3,11 @@ import type { Messages } from "./ro";
 /** Turkish interface text. It must match the Romanian reference shape exactly. */
 import { analyticsTr } from "./analytics";
 import { documentsTr } from "./documents";
+import { interventionsTr } from "./interventions";
 export const tr: Messages = {
   analytics: analyticsTr,
   documents: documentsTr,
+  interventions: interventionsTr,
   locale: { short: "TR", name: "Türkçe", switcher: "Arayüz dili" },
   brand: { product: "Yönetim Paneli", title: "Arasya · Yönetim Paneli", notConfigured: "Yönetim Paneli yapılandırılmamış." },
   common: {
@@ -108,6 +110,7 @@ export const tr: Messages = {
     orderSearch: "Sipariş Ara",
     organization: "Organizasyon",
     productionSettings: "Üretim Ayarları",
+    interventions: "Müdahale",
     displayDevices: "Ekran Cihazları",
     documentRevisions: "Belge revizyonları",
     documentHistory: "Onay geçmişi",

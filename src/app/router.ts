@@ -27,6 +27,8 @@ export type Route =
   | { name: "document-revisions"; view: "pending" | "history" }
   | { name: "document-revision"; id: string }
   | { name: "documents"; id?: string }
+  | { name: "interventions" }
+  | { name: "intervention"; id: string }
   | { name: "not-found" };
 
 export function parseRoute(pathname: string): Route {
@@ -79,6 +81,11 @@ export function parseRoute(pathname: string): Route {
   if (documents) {
     try { return { name: "documents", id: decodeURIComponent(documents[1]) }; } catch { return { name: "not-found" }; }
   }
+  if (path === "/interventii") return { name: "interventions" };
+  const intervention = /^\/interventii\/([^/]{1,600})$/.exec(path);
+  if (intervention) {
+    try { return { name: "intervention", id: decodeURIComponent(intervention[1]) }; } catch { return { name: "not-found" }; }
+  }
   if (path === "/organizatie") return { name: "organization" };
   if (path === "/setari-productie") return { name: "production-settings" };
   return { name: "not-found" };
@@ -101,3 +108,6 @@ export function useRouter() {
 
 /** Dashboard path of one order; the source-aware global id is the identity, never the bare order number. */
 export const orderPath = (globalOrderId: string) => `/comenzi/${encodeURIComponent(globalOrderId)}`;
+
+/** Dashboard path of one order on the root intervention desk. */
+export const interventionPath = (globalOrderId: string) => `/interventii/${encodeURIComponent(globalOrderId)}`;

@@ -5,9 +5,11 @@
  */
 import { analyticsRo } from "./analytics";
 import { documentsRo } from "./documents";
+import { interventionsRo } from "./interventions";
 export const ro = {
   analytics: analyticsRo,
   documents: documentsRo,
+  interventions: interventionsRo,
   locale: { short: "RO", name: "Română", switcher: "Limba interfeței" },
   brand: { product: "Panou de control", title: "Arasya · Panou de control", notConfigured: "Panoul de control nu este configurat." },
   common: {
@@ -110,6 +112,7 @@ export const ro = {
     orderSearch: "Caută comandă",
     organization: "Organizație",
     productionSettings: "Setări producție",
+    interventions: "Intervenții",
     displayDevices: "Dispozitive de afișare",
     documentRevisions: "Revizii documente",
     documentHistory: "Istoricul aprobărilor",
