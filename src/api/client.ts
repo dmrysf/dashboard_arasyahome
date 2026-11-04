@@ -3,6 +3,7 @@ import type { ManufacturingPlan, PhysicalHistory, PlanConfirmation } from "./phy
 import type { DocumentLookupItem, OrderDocuments, RevisionRequest, Application, AuditPage, Department, DocumentScopes, EligibleOwners, EmployeeDetail, EmployeePage, ExceptionDetail, ExceptionSummary, LookupDetail, LookupMatch, ManagementMe, OrderDetail, OrderPage, Organization, OwnerChange, Overview, Permission, ProductionOverview, ProductionSettings, RestoreRecipient, Role, Session, SessionEmployee, SystemStatus, WorkingDay, Workflow, ConfirmareScopes, FinanceScopes, InvoiceScopes, OrderFlow } from "./types";
 import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
 import type { AnalyticsPolicy } from "./analytics";
+import type { InterventionAction, InterventionOrder, InterventionOverview } from "./interventions";
 
 /**
  * A fresh Idempotency-Key for one user-confirmed mutation. Reusing it for a retry of the same submission lets
@@ -121,6 +122,9 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     cuttingTransfer: (id: string, signal?: AbortSignal) => request<CuttingTransfer>(`/management/cutting/transfers/${encodeURIComponent(id)}`, { signal }),
     decideTransfer: (id: string, body: { expectedVersion: number; decision: "approve" | "reject"; comment?: string }, key: string) => request<CuttingTransfer>(`/management/cutting/transfers/${encodeURIComponent(id)}/decision`, { method: "POST", body, idempotencyKey: key }),
     cancelTransfer: (id: string, expectedVersion: number, comment: string, key: string) => request<CuttingTransfer>(`/management/cutting/transfers/${encodeURIComponent(id)}/cancel`, { method: "POST", body: { expectedVersion, comment }, idempotencyKey: key }),
+    interventions: (view: "stuck" | "all", number: string | undefined, signal?: AbortSignal) => request<InterventionOverview>("/management/interventions", { query: { view, number }, signal }),
+    intervention: (globalOrderId: string, signal?: AbortSignal) => request<InterventionOrder>(`/management/interventions/orders/${encodeURIComponent(globalOrderId)}`, { signal }),
+    intervene: (globalOrderId: string, action: InterventionAction, body: Record<string, unknown>, key: string) => request<Record<string, unknown>>(`/management/interventions/orders/${encodeURIComponent(globalOrderId)}/${action}`, { method: "POST", body, idempotencyKey: key }),
     displayDevices: (signal?: AbortSignal) => request<{ items: DisplayDevice[]; settings: DisplaySettings }>("/management/cutting/devices", { signal }),
     createDisplay: (name: string, key: string) => request<DisplayPairing>("/management/cutting/devices", { method: "POST", body: { name }, idempotencyKey: key }),
     repairDisplay: (id: string, key: string) => request<DisplayPairing>(`/management/cutting/devices/${encodeURIComponent(id)}/re-pair`, { method: "POST", body: { confirmed: true }, idempotencyKey: key }),

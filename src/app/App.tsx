@@ -25,6 +25,7 @@ import { EmployeesPage } from "../pages/EmployeesPage";
 import { StageCoveragePage } from "../pages/StageCoveragePage";
 import { OverviewPage } from "../pages/OverviewPage";
 import { RoleEditorPage } from "../pages/RoleEditorPage";
+import { InterventionPage, InterventionsPage } from "../pages/InterventionsPage";
 import { RolesPage } from "../pages/RolesPage";
 import { SystemPage } from "../pages/SystemPage";
 import { DashboardContext, type DashboardContextValue } from "./context";
@@ -127,6 +128,8 @@ function renderRoute(route: Route) {
     case "approval": return <ApprovalDetailPage key={route.id} id={route.id} />;
     case "transfer": return <TransferDetailPage key={route.id} id={route.id} />;
     case "display-devices": return <DisplayDevicesPage />;
+    case "interventions": return <InterventionsPage />;
+    case "intervention": return <InterventionPage key={route.id} id={route.id} />;
     case "order-search": return <OrderSearchPage />;
     case "order-lookup": return <OrderLookupDetailPage key={route.id} id={route.id} />;
     case "organization": return <OrganizationPage />;
