@@ -6,10 +6,12 @@
 import { analyticsRo } from "./analytics";
 import { documentsRo } from "./documents";
 import { interventionsRo } from "./interventions";
+import { timelineRo } from "./timeline";
 export const ro = {
   analytics: analyticsRo,
   documents: documentsRo,
   interventions: interventionsRo,
+  timeline: timelineRo,
   locale: { short: "RO", name: "Română", switcher: "Limba interfeței" },
   brand: { product: "Panou de control", title: "Arasya · Panou de control", notConfigured: "Panoul de control nu este configurat." },
   common: {
