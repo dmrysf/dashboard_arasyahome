@@ -125,6 +125,20 @@ export type LookupDetail = {
     items: { id: string; lineNumber: number; name: string; code: string | null; variant: string | null; color: string | null; meters: string | null; quantity: number }[];
   };
   exceptions: ExceptionSummary[];
+  /** API 2.59.0: the order's full event history, oldest first. Missing from older APIs. */
+  timeline?: { items: TimelineEvent[]; truncated: boolean };
+};
+
+export type TimelineKind = "intake" | "confirmation" | "production" | "document" | "qr" | "exception" | "cancellation";
+
+export type TimelineEvent = {
+  id: string; at: string; kind: TimelineKind; action: string;
+  actor: { displayName: string; department: string | null } | null;
+  /** The automatic actor (e.g. "trendyol-sync", "system") when no employee acted. */
+  system: string | null;
+  fromStage: { id: string; label: string } | null;
+  toStage: { id: string; label: string } | null;
+  detail: Record<string, string | number | boolean>;
 };
 
 export type WorkingDay = { weekday: number; isOpen: boolean; opensAt: string | null; closesAt: string | null };

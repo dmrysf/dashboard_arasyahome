@@ -4,10 +4,12 @@ import type { Messages } from "./ro";
 import { analyticsTr } from "./analytics";
 import { documentsTr } from "./documents";
 import { interventionsTr } from "./interventions";
+import { timelineTr } from "./timeline";
 export const tr: Messages = {
   analytics: analyticsTr,
   documents: documentsTr,
   interventions: interventionsTr,
+  timeline: timelineTr,
   locale: { short: "TR", name: "Türkçe", switcher: "Arayüz dili" },
   brand: { product: "Yönetim Paneli", title: "Arasya · Yönetim Paneli", notConfigured: "Yönetim Paneli yapılandırılmamış." },
   common: {

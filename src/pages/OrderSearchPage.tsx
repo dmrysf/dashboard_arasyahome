@@ -5,6 +5,7 @@ import { Badge, Card, EmptyState, ErrorBanner, ErrorText, Field, Loading, PageHe
 import { toProblem, type Problem } from "../i18n";
 import { useI18n } from "../i18n/context";
 import { faultScope, meters } from "./ApprovalsPage";
+import { OrderTimelineCard } from "./OrderTimelineCard";
 import { useLoaderWithSignal } from "./useLoaderWithSignal";
 
 /** Exact order search: one typed number, exact matches only, never a list of orders. */
@@ -85,6 +86,7 @@ export function OrderLookupDetailPage({ id }: { id: string }) {
           </tbody></table>
         </Card>
       </div>
+      <OrderTimelineCard timeline={data.timeline} />
       <Card title={l.exceptions}>
         {data.exceptions.length === 0 ? <p className="muted">{l.noExceptions}</p> : <ul className="history-list">{data.exceptions.map((item) => <li key={item.id}>
           <button type="button" className="link-button" onClick={() => navigate(`/aprobari/cerere/${item.id}`)}>{item.number} · {item.reason.label} · {faultScope(x, item)} · {x.responsible}: {item.responsible.displayName}</button>
