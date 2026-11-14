@@ -214,6 +214,7 @@ export function PaymentBreakdown({ data }: { data: IntelligenceSummary }) {
           })}
         </tbody>
       </table>
+      <p className="muted small payment-as-of" role="note">{x.payment.asOf}</p>
       {(data.ordered.byPayment.unknown?.orders ?? 0) > 0 && <p className="muted small">{x.payment.unknownHint}</p>}
     </div>
   );
@@ -317,6 +318,7 @@ export function SeriesView({ data }: { data: IntelligenceSeries }) {
   if (data.items.length === 0) return <EmptyState title={x.series.empty} />;
   return (
     <Card title={x.series.chart} actions={<button type="button" className="button button-ghost" aria-pressed={table} onClick={() => setTable((value) => !value)}>{x.series.table}</button>}>
+      <p className="muted small series-note" role="note">{x.series.dateNote}</p>
       <ul className="series-legend">{SERIES.map((s) => <li key={s.key}><span className="series-key" style={{ background: s.color }} aria-hidden="true" />{x.series.legend[s.key]}</li>)}</ul>
       {!table && <SeriesChart items={data.items} />}
       {table && <div className="table-wrap"><table className="data-table intelligence-table">

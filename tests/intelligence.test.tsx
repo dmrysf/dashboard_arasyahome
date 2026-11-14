@@ -111,6 +111,7 @@ test("the summary keeps the five concepts apart and shows every payment class", 
     assert.ok(has(html, x.ledger.manual), "manual ledger notice");
     assert.ok(has(html, x.coverage.warning(913)), "unknown and conflicting lines are named, never zero");
     assert.ok(has(html, x.payment.unknownHint));
+    assert.ok(has(html, x.payment.asOf), "the payment class is the state at report time, never the payment date");
   }
   const { html } = render(<SummaryView data={data} />);
   assert.ok(html.includes("1.000,0 m") && html.includes("400,0 m"), "ordered and verified sale side by side");
@@ -159,6 +160,7 @@ test("products, employees and series render their rows, the table view and the c
   const series: IntelligenceSeries = { range: summary().range, source: null, contractVersion: 1, bucket: "week", items: [point("2026-W44", "5.000"), point("2026-W45", "7.500")] };
   const s = render(<SeriesView data={series} />).html;
   assert.ok(s.includes("<svg") && s.includes("2026-W45") && s.includes(intelligenceRo.series.legend.verified));
+  assert.ok(s.includes("nu ziua plății") && s.includes("nu metri măsurați"), "series dates and line meters are explained");
   assert.equal(render(<SeriesView data={{ ...series, items: [] }} />).html.includes("<svg"), false);
 });
 

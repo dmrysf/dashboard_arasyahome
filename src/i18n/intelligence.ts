@@ -39,6 +39,7 @@ export const intelligenceRo = {
     hint: "Starea plății, așa cum a trimis-o sursa. Doar „Plătit integral” intră în vânzare dovedită; restul se arată separat, niciodată ca zero.",
     classes: { paid: "Plătit integral", advance_verified: "Ramburs: doar avansul dovedit", partial: "Plată parțială", no_charge: "Total zero", unverified: "Plată nedovedită", reversed: "Plată anulată", unknown: "Stare necunoscută" } as Record<string, string>,
     unknownHint: "Comenzile dinainte de 26 octombrie 2026 nu au starea plății: sunt comandate, cu plată necunoscută.",
+    asOf: "Starea plății este cea de acum (momentul raportului), aplicată metrilor la data comenzii. Nu este data plății: o comandă din octombrie plătită ieri apare în octombrie ca plătită.",
     column: { class: "Starea plății", fabric: "Țesătură", rail: "Șină", orders: "Comenzi", share: "Pondere" },
     chart: "Metri de țesătură comandați, după starea plății",
   },
@@ -83,6 +84,7 @@ export const intelligenceRo = {
   },
   series: {
     chart: "Metri de țesătură pe perioadă",
+    dateNote: "Comandat și plată dovedită: la data comenzii, cu starea plății de acum (nu ziua plății). Finalizat: la data finalizării în producție, din metrii liniei comenzii, nu metri măsurați.",
     legend: { ordered: "Comandat", verified: "Plată dovedită", completed: "Finalizat în producție" },
     table: "Tabel",
     columns: { period: "Perioada", ordered: "Comandat", verified: "Plată dovedită", outside: "Din magazin", cut: "Tăiat", completed: "Finalizat", rail: "Șină comandată" },
@@ -131,6 +133,7 @@ export const intelligenceTr: typeof intelligenceRo = {
     hint: "Kaynağın gönderdiği ödeme durumu. Yalnız \"Tamamı ödendi\" doğrulanmış satışa girer; diğerleri ayrı gösterilir, asla sıfır sayılmaz.",
     classes: { paid: "Tamamı ödendi", advance_verified: "Kapıda ödeme: yalnız avans doğrulandı", partial: "Kısmi ödeme", no_charge: "Toplam sıfır", unverified: "Ödeme doğrulanmadı", reversed: "Ödeme iade/iptal", unknown: "Durum bilinmiyor" },
     unknownHint: "26 Ekim 2026'dan önceki siparişlerde ödeme durumu yok: sipariş alınmış, ödemesi bilinmiyor olarak sayılır.",
+    asOf: "Ödeme durumu raporun alındığı andaki durumdur ve metreye siparişin tarihinde uygulanır. Ödeme tarihi değildir: dün ödenen bir Ekim siparişi Ekim'de ödenmiş görünür.",
     column: { class: "Ödeme durumu", fabric: "Kumaş", rail: "Ray", orders: "Sipariş", share: "Pay" },
     chart: "Ödeme durumuna göre sipariş alınan kumaş metresi",
   },
@@ -175,6 +178,7 @@ export const intelligenceTr: typeof intelligenceRo = {
   },
   series: {
     chart: "Döneme göre kumaş metresi",
+    dateNote: "Sipariş alınan ve ödeme doğrulanan: siparişin tarihinde, ödemenin bugünkü durumuyla (ödeme günü değil). Tamamlanan: üretimde tamamlandığı tarihte, sipariş satırı metresiyle; ölçülmüş metre değil.",
     legend: { ordered: "Sipariş alınan", verified: "Ödeme doğrulandı", completed: "Üretimde tamamlanan" },
     table: "Tablo",
     columns: { period: "Dönem", ordered: "Sipariş alınan", verified: "Ödeme doğrulandı", outside: "Mağazadan", cut: "Kesilen", completed: "Tamamlanan", rail: "Sipariş alınan ray" },
