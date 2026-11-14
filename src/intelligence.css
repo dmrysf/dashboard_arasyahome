@@ -1,0 +1,73 @@
+/* Production Intelligence V2 (Dashboard 0.19.0): five meter concepts apart, executive first. */
+.intelligence-page { max-width: 1320px; }
+.intelligence-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 16px; }
+.intelligence-tabs a { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 14px; font-weight: 600; background: var(--surface); }
+.intelligence-tabs a[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.intelligence-filters, .intelligence-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.intelligence-filters .field, .intelligence-toolbar .field { flex: 1 1 170px; min-width: 0; margin: 0; }
+.intelligence-filters .button { flex: 0 0 auto; }
+.intelligence-toolbar { margin: 4px 0 12px; }
+.intelligence-range, .intelligence-note { margin: 12px 0; }
+.intelligence-summary { display: grid; gap: 16px; margin-top: 4px; }
+
+.concept-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 12px; }
+.concept-tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 16px 14px; box-shadow: var(--shadow); min-width: 0; display: grid; gap: 4px; align-content: start; border-top: 3px solid var(--line-strong); }
+.concept-ordered { border-top-color: #2a78d6; }
+.concept-verified { border-top-color: #104281; }
+.concept-production { border-top-color: var(--accent); }
+.concept-none { border-top-style: dashed; background: #fbfbfc; }
+.concept-tile h2 { font-size: 12.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.concept-value { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.concept-hidden { display: block; font-size: 13px; line-height: 1.4; font-weight: 600; color: var(--warning); letter-spacing: 0; }
+.concept-secondary { color: var(--ink-soft); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.concept-hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+.intelligence-columns { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
+.intelligence-facts { display: grid; gap: 14px; margin: 0; }
+.intelligence-facts div { border-left: 2px solid var(--line); padding-left: 12px; }
+.intelligence-facts dt { color: var(--muted); font-size: 12px; }
+.intelligence-facts dd { margin: 3px 0 0; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.intelligence-facts small { color: var(--muted); }
+.intelligence-details { margin-top: 12px; }
+.intelligence-details summary { cursor: pointer; font-weight: 600; }
+.intelligence-status-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.intelligence-status-list li { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding: 4px 0; }
+
+.payment-bar { display: flex; gap: 2px; height: 18px; margin: 4px 0 14px; }
+.payment-segment { display: block; min-width: 3px; border-radius: 4px; transition: opacity 120ms ease; }
+.payment-bar:hover .payment-segment:not(.is-active) { opacity: 0.55; }
+.payment-unknown, .payment-reversed { background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.55) 0 2px, transparent 2px 6px) !important; }
+.payment-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.payment-table th, .payment-table td { text-align: right; padding: 7px 6px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.payment-table thead th { color: var(--muted); font-size: 12px; font-weight: 600; }
+.payment-table th[scope="row"], .payment-table thead th:first-child { text-align: left; font-weight: 500; }
+.payment-table tr.is-active { background: #f4f7fc; }
+.payment-table td { white-space: nowrap; }
+.payment-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; }
+
+.coverage-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.coverage-list li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 13px; }
+.coverage-list strong { font-variant-numeric: tabular-nums; }
+.coverage-meter { grid-column: 1 / -1; height: 6px; border-radius: 4px; background: var(--canvas); overflow: hidden; }
+.coverage-meter span { display: block; height: 100%; border-radius: 4px; background: #2a78d6; }
+.coverage-list li.is-warning .coverage-meter span { background: var(--warning); }
+.coverage-list li.is-warning strong { color: var(--warning); }
+
+.intelligence-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.intelligence-table tbody tr { cursor: default; }
+
+.series-note, .payment-as-of { margin: 6px 0 10px; max-width: 90ch; }
+.series-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 8px; padding: 0; font-size: 12.5px; color: var(--ink-soft); }
+.series-key { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.series-chart { position: relative; max-width: 1040px; }
+.series-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.series-grid { stroke: var(--line); stroke-width: 1; }
+.series-axis { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.series-end { fill: var(--ink-soft); font-size: 11.5px; font-weight: 600; }
+.series-crosshair { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 3 3; }
+.series-tooltip { position: absolute; top: 6px; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgba(16, 18, 22, 0.1); padding: 8px 10px; display: grid; gap: 3px; font-size: 12px; pointer-events: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.series-tooltip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+@media (max-width: 900px) { .intelligence-columns { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .concept-value { font-size: 22px; } .intelligence-filters .button { width: 100%; } .intelligence-tabs a { padding: 7px 10px; } .payment-table th:nth-child(3), .payment-table td:nth-child(3) { display: none; } .payment-table th, .payment-table td { padding: 7px 4px; font-size: 12.5px; } .series-tooltip { transform: none; left: 8px !important; } }
+@media (prefers-reduced-motion: reduce) { .payment-segment { transition: none; } }

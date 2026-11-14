@@ -13,6 +13,8 @@ export const canSeeOverview = (me: ManagementMe, can: (permission: string) => bo
   can("dashboard.overview.view") && (me.isRoot || can("employees.view") || can("production.view") || can("orders.view_all"));
 
 export const NAVIGATION: NavItem[] = [
+  // Production Intelligence V2 (Dashboard 0.19.0): the server decides (Root and the canonical CEO only).
+  { path: "/metraj", label: "intelligence", visible: (me) => Boolean(me.capabilities?.viewProductionIntelligence), match: (path) => path === "/metraj" || path.startsWith("/metraj/") },
   { path: "/analiza/angajati", label: "analytics", visible: (me) => Boolean(me.capabilities?.viewAnalytics), match: path => path.startsWith("/analiza") },
   { path: "/", label: "overview", visible: canSeeOverview, match: (path) => path === "/" },
   { path: "/aprobari", label: "approvals", visible: (me) => Boolean(me.capabilities?.approveExceptions), match: (path) => path === "/aprobari" || path.startsWith("/aprobari/cerere/") || path.startsWith("/aprobari/transfer/") },

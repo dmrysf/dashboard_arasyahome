@@ -40,6 +40,8 @@ export type Capabilities = {
   documentRevisionViaBackup?: boolean;
   viewDocumentHistory?: boolean;
   revokeDocuments?: boolean;
+  /** API 2.72.0: Production Intelligence (Root and the canonical CEO only). Absent on older APIs. */
+  viewProductionIntelligence?: boolean;
 };
 
 export type DocumentChange = { field: string; line: number | null; before: string | null; after: string | null };
