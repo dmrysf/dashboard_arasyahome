@@ -4,6 +4,7 @@ import type { DocumentLookupItem, OrderDocuments, RevisionRequest, Application, 
 import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
 import type { AnalyticsPolicy } from "./analytics";
 import type { InterventionAction, InterventionOrder, InterventionOverview } from "./interventions";
+import type { IntelligenceSection } from "./intelligence";
 
 /**
  * A fresh Idempotency-Key for one user-confirmed mutation. Reusing it for a retry of the same submission lets
@@ -146,6 +147,8 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     health: () => request<{ status: string; version: string }>("/health"),
     me: () => request<ManagementMe>("/management/me"),
     analytics: <T>(section: string, query: Record<string, string | undefined>, signal?: AbortSignal) => request<T>(`/management/analytics/${section}`, { query, signal }),
+    /** Production Intelligence V2 management reports (read only; Root and the canonical CEO). */
+    intelligence: <T>(section: IntelligenceSection, query: Record<string, string | undefined>, signal?: AbortSignal) => request<T>(`/management/production-intelligence/${section}`, { query, signal }),
     analyticsPolicy: (signal?: AbortSignal) => request<AnalyticsPolicy>("/management/analytics/policy", { signal }),
     updateAnalyticsPolicy: (body: { approvalGraceMinutes: number; expectedVersion: number }, key: string) => request<AnalyticsPolicy>("/management/analytics/policy", { method: "PUT", body, idempotencyKey: key }),
     overview: () => request<Overview>("/management/dashboard"),

@@ -4,11 +4,13 @@ import type { Messages } from "./ro";
 import { analyticsTr } from "./analytics";
 import { documentsTr } from "./documents";
 import { interventionsTr } from "./interventions";
+import { intelligenceTr } from "./intelligence";
 import { timelineTr } from "./timeline";
 export const tr: Messages = {
   analytics: analyticsTr,
   documents: documentsTr,
   interventions: interventionsTr,
+  intelligence: intelligenceTr,
   timeline: timelineTr,
   locale: { short: "TR", name: "Türkçe", switcher: "Arayüz dili" },
   brand: { product: "Yönetim Paneli", title: "Arasya · Yönetim Paneli", notConfigured: "Yönetim Paneli yapılandırılmamış." },
@@ -113,6 +115,7 @@ export const tr: Messages = {
     organization: "Organizasyon",
     productionSettings: "Üretim Ayarları",
     interventions: "Müdahale",
+    intelligence: "Metraj",
     displayDevices: "Ekran Cihazları",
     documentRevisions: "Belge revizyonları",
     documentHistory: "Onay geçmişi",

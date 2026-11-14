@@ -6,11 +6,13 @@
 import { analyticsRo } from "./analytics";
 import { documentsRo } from "./documents";
 import { interventionsRo } from "./interventions";
+import { intelligenceRo } from "./intelligence";
 import { timelineRo } from "./timeline";
 export const ro = {
   analytics: analyticsRo,
   documents: documentsRo,
   interventions: interventionsRo,
+  intelligence: intelligenceRo,
   timeline: timelineRo,
   locale: { short: "RO", name: "Română", switcher: "Limba interfeței" },
   brand: { product: "Panou de control", title: "Arasya · Panou de control", notConfigured: "Panoul de control nu este configurat." },
@@ -115,6 +117,7 @@ export const ro = {
     organization: "Organizație",
     productionSettings: "Setări producție",
     interventions: "Intervenții",
+    intelligence: "Metraj",
     displayDevices: "Dispozitive de afișare",
     documentRevisions: "Revizii documente",
     documentHistory: "Istoricul aprobărilor",

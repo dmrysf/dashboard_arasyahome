@@ -6,6 +6,7 @@ import { initialLocale, MESSAGES } from "./i18n";
 import { I18nProvider } from "./i18n/context";
 import "./styles.css";
 import "./analytics.css";
+import "./intelligence.css";
 
 const root = createRoot(document.getElementById("root") as HTMLElement);
 try {

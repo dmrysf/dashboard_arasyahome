@@ -26,6 +26,7 @@ import { StageCoveragePage } from "../pages/StageCoveragePage";
 import { OverviewPage } from "../pages/OverviewPage";
 import { RoleEditorPage } from "../pages/RoleEditorPage";
 import { InterventionPage, InterventionsPage } from "../pages/InterventionsPage";
+import { ProductionIntelligencePage } from "../pages/ProductionIntelligencePage";
 import { RolesPage } from "../pages/RolesPage";
 import { SystemPage } from "../pages/SystemPage";
 import { DashboardContext, type DashboardContextValue } from "./context";
@@ -129,6 +130,7 @@ function renderRoute(route: Route) {
     case "transfer": return <TransferDetailPage key={route.id} id={route.id} />;
     case "display-devices": return <DisplayDevicesPage />;
     case "interventions": return <InterventionsPage />;
+    case "intelligence": return <ProductionIntelligencePage key={route.section} section={route.section} />;
     case "intervention": return <InterventionPage key={route.id} id={route.id} />;
     case "order-search": return <OrderSearchPage />;
     case "order-lookup": return <OrderLookupDetailPage key={route.id} id={route.id} />;
