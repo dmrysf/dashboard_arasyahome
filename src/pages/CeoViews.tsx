@@ -65,7 +65,7 @@ export function CeoOverviewView({ data }: { data: CeoOverview }) {
       <section className="ceo-kpis ceo-kpis-now" aria-label={x.kpi.nowNote}>
         <Kpi title={x.kpi.inProduction} tone="now" value={number(current.inProduction)} hint={x.kpi.stopped(current.stopped)} />
         <Kpi title={x.kpi.waiting} tone="now" value={number(current.waiting)} hint={x.kpi.legacy(current.legacyActive)} />
-        <Kpi title={x.kpi.delayed} tone={current.delayed > 0 ? "warn" : "now"} value={number(current.delayed)} hint={x.kpi.delayedHint(current.delayHours)}>
+        <Kpi title={x.kpi.delayed(current.delayHours)} tone={current.delayed > 0 ? "warn" : "now"} value={number(current.delayed)} hint={x.kpi.delayedHint(current.delayHours)}>
           {Object.keys(delayedByStage).length > 0 && <ul className="ceo-chips">{Object.entries(delayedByStage).map(([id, n]) => <li key={id}>{stage(id)} <strong>{number(n)}</strong></li>)}</ul>}
         </Kpi>
       </section>

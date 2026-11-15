@@ -129,12 +129,12 @@ test("helpers: sums in millimetres, reconciliation, unit-safe SKU ranking, refre
 
 test("overview: KPIs per channel, Trendyol panel width apart, empty ledger unavailable (never 0), current state", () => {
   const { html } = render(<CeoOverviewView data={overview()} />);
-  for (const text of [ceoRo.kpi.received, ceoRo.kpi.worked, ceoRo.kpi.completed, ceoRo.kpi.units, ceoRo.kpi.thMeters, ceoRo.kpi.opMeters, ceoRo.kpi.tyPanel, ceoRo.kpi.inProduction, ceoRo.kpi.waiting, ceoRo.kpi.delayed]) assert.ok(has(html, text), text);
+  for (const text of [ceoRo.kpi.received, ceoRo.kpi.worked, ceoRo.kpi.completed, ceoRo.kpi.units, ceoRo.kpi.thMeters, ceoRo.kpi.opMeters, ceoRo.kpi.tyPanel, ceoRo.kpi.inProduction, ceoRo.kpi.waiting, ceoRo.kpi.delayed(48)]) assert.ok(has(html, text), text);
   assert.ok(html.includes("5,0 m") && html.includes("7,0 m") && html.includes("2,8 m"), "TH 5.0, OP 7.0 and Trendyol 2.8 m each shown on their own");
   assert.ok(!html.includes("14,8 m") && !html.includes("9,8 m"), "Trendyol panel width is never added to the L meters");
   assert.ok(has(html, ceoRo.noSum));
   assert.equal(html.split(ceoRo.concepts.unavailable).length - 1, 2, "ordered and verified sale are unavailable while the ledger is empty");
-  assert.ok(has(html, ceoRo.kpi.delayedHint(48)) && has(html, ceoRo.kpi.legacy(40)) && has(html, ceoRo.kpi.stopped(1)));
+  assert.ok(has(html, ceoRo.kpi.delayedHint(48)) && ceoTr.kpi.delayed(48) === "Aynı aşamada 48 saatten uzun süredir bekleyen siparişler" && has(html, ceoRo.kpi.legacy(40)) && has(html, ceoRo.kpi.stopped(1)));
   assert.ok(has(html, ceoRo.catalogMissing), "a missing category catalog is said, not hidden");
   assert.ok(has(html, ceoRo.charts.reconciled), "the channel table proves the chart");
   const withLedger = render(<CeoOverviewView data={overview({ ledger: { state: "manual", available: true, syncedThrough: null, ordered: { fabricMeters: "120.500", railMeters: "0.000" }, verifiedSale: { fabricMeters: "0.000", railMeters: "0.000" } } })} />).html;
@@ -143,7 +143,7 @@ test("overview: KPIs per channel, Trendyol panel width apart, empty ledger unava
 
 test("overview in Turkish", () => {
   const { html } = render(<CeoOverviewView data={overview()} />, "tr");
-  for (const text of [ceoTr.kpi.received, ceoTr.kpi.worked, ceoTr.kpi.tyPanel, ceoTr.concepts.unavailable, ceoTr.noSum]) assert.ok(has(html, text), text);
+  for (const text of [ceoTr.kpi.received, ceoTr.kpi.worked, ceoTr.kpi.tyPanel, ceoTr.kpi.delayed(48), ceoTr.concepts.unavailable, ceoTr.noSum]) assert.ok(has(html, text), text);
 });
 
 test("completions: charts with tables, totals reconciled, after-completion split, stage work apart", () => {
