@@ -6,12 +6,14 @@
 import { analyticsRo } from "./analytics";
 import { documentsRo } from "./documents";
 import { interventionsRo } from "./interventions";
+import { ceoRo } from "./ceo";
 import { intelligenceRo } from "./intelligence";
 import { timelineRo } from "./timeline";
 export const ro = {
   analytics: analyticsRo,
   documents: documentsRo,
   interventions: interventionsRo,
+  ceo: ceoRo,
   intelligence: intelligenceRo,
   timeline: timelineRo,
   locale: { short: "RO", name: "Română", switcher: "Limba interfeței" },

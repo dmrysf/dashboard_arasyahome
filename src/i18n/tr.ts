@@ -4,12 +4,14 @@ import type { Messages } from "./ro";
 import { analyticsTr } from "./analytics";
 import { documentsTr } from "./documents";
 import { interventionsTr } from "./interventions";
+import { ceoTr } from "./ceo";
 import { intelligenceTr } from "./intelligence";
 import { timelineTr } from "./timeline";
 export const tr: Messages = {
   analytics: analyticsTr,
   documents: documentsTr,
   interventions: interventionsTr,
+  ceo: ceoTr,
   intelligence: intelligenceTr,
   timeline: timelineTr,
   locale: { short: "TR", name: "Türkçe", switcher: "Arayüz dili" },

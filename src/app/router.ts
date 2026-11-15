@@ -28,7 +28,7 @@ export type Route =
   | { name: "document-revision"; id: string }
   | { name: "documents"; id?: string }
   | { name: "interventions" }
-  | { name: "intelligence"; section: "summary" | "products" | "employees" | "series" }
+  | { name: "intelligence"; section: "overview" | "completions" | "skus" | "summary" | "products" | "employees" | "series" }
   | { name: "intervention"; id: string }
   | { name: "not-found" };
 
@@ -82,10 +82,10 @@ export function parseRoute(pathname: string): Route {
   if (documents) {
     try { return { name: "documents", id: decodeURIComponent(documents[1]) }; } catch { return { name: "not-found" }; }
   }
-  const intelligence = /^\/metraj(?:\/(produse|angajati|evolutie))?$/.exec(path);
+  const intelligence = /^\/metraj(?:\/(sumar|finalizate|produse-analiza|produse|angajati|evolutie))?$/.exec(path);
   if (intelligence) {
-    const sections = { produse: "products", angajati: "employees", evolutie: "series" } as const;
-    return { name: "intelligence", section: intelligence[1] ? sections[intelligence[1] as keyof typeof sections] : "summary" };
+    const sections = { sumar: "summary", finalizate: "completions", "produse-analiza": "skus", produse: "products", angajati: "employees", evolutie: "series" } as const;
+    return { name: "intelligence", section: intelligence[1] ? sections[intelligence[1] as keyof typeof sections] : "overview" };
   }
   if (path === "/interventii") return { name: "interventions" };
   const intervention = /^\/interventii\/([^/]{1,600})$/.exec(path);
@@ -115,9 +115,9 @@ export function useRouter() {
 /** Dashboard path of one order; the source-aware global id is the identity, never the bare order number. */
 export const orderPath = (globalOrderId: string) => `/comenzi/${encodeURIComponent(globalOrderId)}`;
 
-/** Dashboard path of one Production Intelligence section. */
-export const intelligencePath = (section: "summary" | "products" | "employees" | "series") =>
-  section === "summary" ? "/metraj" : `/metraj/${({ products: "produse", employees: "angajati", series: "evolutie" } as const)[section]}`;
+/** Dashboard path of one Production Intelligence section; the CEO overview is the section's home (Dashboard 0.20.0). */
+export const intelligencePath = (section: "overview" | "completions" | "skus" | "summary" | "products" | "employees" | "series") =>
+  section === "overview" ? "/metraj" : `/metraj/${({ completions: "finalizate", skus: "produse-analiza", summary: "sumar", products: "produse", employees: "angajati", series: "evolutie" } as const)[section]}`;
 
 /** Dashboard path of one order on the root intervention desk. */
 export const interventionPath = (globalOrderId: string) => `/interventii/${encodeURIComponent(globalOrderId)}`;

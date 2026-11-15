@@ -45,7 +45,8 @@ function render(node: ReactNode, actor = me({ capabilities: { ...capabilities, v
 }
 
 test("Production Intelligence routes", () => {
-  assert.deepEqual(parseRoute("/metraj"), { name: "intelligence", section: "summary" });
+  assert.deepEqual(parseRoute("/metraj"), { name: "intelligence", section: "overview" }, "the CEO overview is the section's home since 0.20.0");
+  assert.deepEqual(parseRoute("/metraj/sumar"), { name: "intelligence", section: "summary" });
   assert.deepEqual(parseRoute("/metraj/produse"), { name: "intelligence", section: "products" });
   assert.deepEqual(parseRoute("/metraj/angajati?period=month"), { name: "intelligence", section: "employees" });
   assert.deepEqual(parseRoute("/metraj/evolutie"), { name: "intelligence", section: "series" });

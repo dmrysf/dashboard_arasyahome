@@ -107,13 +107,23 @@ export function App({ apiBaseUrl }: { apiBaseUrl: string }) {
   );
 }
 
+/** The page an identity starts on: the CEO starts on the CEO production overview (Dashboard 0.20.0); Root keeps the operations overview. */
+export function homePath(me: Parameters<typeof canSeeOverview>[0], can: (permission: string) => boolean): string | null {
+  if (!me.isRoot && me.capabilities?.viewProductionIntelligence) return "/metraj";
+  if (canSeeOverview(me, can)) return null;
+  return NAVIGATION.find((item) => item.path !== "/" && item.visible(me, can))?.path ?? null;
+}
+
 /** Narrow roles (for example operations managers) start on their first section instead of the overview. */
+let landed = false;
 function Home() {
   const { me, can, navigate } = useDashboard();
-  const first = NAVIGATION.find((item) => item.path !== "/" && item.visible(me, can));
-  const showOverview = canSeeOverview(me, can);
-  useEffect(() => { if (!showOverview && first) navigate(first.path); }, [first, navigate, showOverview]);
-  return showOverview || !first ? <OverviewPage /> : null;
+  const target = homePath(me, can);
+  // The CEO is sent to the production overview once, when the Dashboard opens; the operations overview stays reachable.
+  const optional = target === "/metraj" && canSeeOverview(me, can);
+  const go = target !== null && !(optional && landed);
+  useEffect(() => { landed = true; if (go && target) navigate(target); }, [go, navigate, target]);
+  return go ? null : <OverviewPage />;
 }
 
 function NotFound() {
