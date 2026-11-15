@@ -6,7 +6,9 @@
 
 export const INTELLIGENCE_SOURCES = ["trendhome", "outletperdele", "trendyol", "b2b"] as const;
 export type IntelligenceSource = (typeof INTELLIGENCE_SOURCES)[number];
-export const INTELLIGENCE_SECTIONS = ["summary", "products", "employees", "series"] as const;
+export const INTELLIGENCE_SECTIONS = ["overview", "completions", "skus", "summary", "products", "employees", "series"] as const;
+/** The CEO reports of API 2.73.0 (Dashboard 0.20.0). */
+export const CEO_SECTIONS = ["overview", "completions", "skus"] as const;
 export type IntelligenceSection = (typeof INTELLIGENCE_SECTIONS)[number];
 export const PAYMENT_CLASSES = ["paid", "advance_verified", "partial", "no_charge", "unverified", "reversed", "unknown"] as const;
 export type PaymentClass = (typeof PAYMENT_CLASSES)[number];

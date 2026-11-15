@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { SKU_STATUSES, isCeoOverview, refreshSeconds, type CeoCompletions, type CeoOverview, type CeoSkus, type SkuFilters, type SkuStatus } from "../api/ceo";
 import { ApiError } from "../api/client";
 import {
-  COVERAGE_STATUSES, INTELLIGENCE_SOURCES, PAYMENT_CLASSES, PERIODS, isCurrentSummary, ledgerState, meterUnits, periodQuery, share, validCustomRange,
+  CEO_SECTIONS, COVERAGE_STATUSES, INTELLIGENCE_SOURCES, PAYMENT_CLASSES, PERIODS, isCurrentSummary, ledgerState, meterUnits, periodQuery, share, validCustomRange,
   type EmployeeRow, type IntelligenceEmployees, type IntelligenceProducts, type IntelligenceSection, type IntelligenceSeries, type IntelligenceSummary,
   type PaymentClass, type Period, type ProductRow, type SeriesBucket, type SeriesPoint,
 } from "../api/intelligence";
@@ -9,31 +10,57 @@ import { useDashboard } from "../app/context";
 import { intelligencePath } from "../app/router";
 import { Badge, Card, EmptyState, ErrorBanner, Field, Loading, Notice, PageHeader } from "../components/ui";
 import { useI18n } from "../i18n/context";
+import { CeoCompletionsView, CeoOverviewView, CeoSkusView } from "./CeoViews";
 
-type Filters = { period: Period; from: string; to: string; source: string; bucket: SeriesBucket };
-type Result = IntelligenceSummary | IntelligenceProducts | IntelligenceEmployees | IntelligenceSeries;
+type Filters = { period: Period; from: string; to: string; source: string; bucket: SeriesBucket } & SkuFilters;
+type Result = IntelligenceSummary | IntelligenceProducts | IntelligenceEmployees | IntelligenceSeries | CeoOverview | CeoCompletions | CeoSkus;
 
-function initialFilters(): Filters {
-  const query = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
+/** The page's filters from the address bar. The CEO overview opens on today, every other report on this month. */
+export function initialFilters(section: IntelligenceSection = "summary", locationSearch?: string): Filters {
+  const query = new URLSearchParams(locationSearch ?? (typeof window === "undefined" ? "" : window.location.search));
   const period = query.get("period");
   const source = query.get("source") ?? "";
   const bucket = query.get("bucket");
+  const status = query.get("status") ?? "all";
   const from = query.get("from") ?? ""; const to = query.get("to") ?? "";
   return {
-    period: from && to ? "custom" : PERIODS.includes(period as Period) && period !== "custom" ? period as Period : "month",
+    period: from && to ? "custom" : PERIODS.includes(period as Period) && period !== "custom" ? period as Period : section === "overview" ? "today" : "month",
     from, to,
     source: (INTELLIGENCE_SOURCES as readonly string[]).includes(source) ? source : "",
     bucket: bucket === "day" || bucket === "week" || bucket === "month" ? bucket : "day",
+    category: (query.get("category") ?? "").slice(0, 120), code: (query.get("code") ?? "").slice(0, 120), variant: (query.get("variant") ?? "").slice(0, 160),
+    status: (SKU_STATUSES as readonly string[]).includes(status) ? status as SkuStatus : "all",
   };
 }
 
-function search(filters: Filters): string {
+export function search(filters: Filters): string {
   const query = new URLSearchParams();
   if (filters.period === "custom") { query.set("from", filters.from); query.set("to", filters.to); } else query.set("period", filters.period);
   if (filters.source) query.set("source", filters.source);
   if (filters.bucket !== "day") query.set("bucket", filters.bucket);
+  if (filters.category) query.set("category", filters.category);
+  if (filters.code) query.set("code", filters.code);
+  if (filters.variant) query.set("variant", filters.variant);
+  if (filters.status !== "all") query.set("status", filters.status);
   return `?${query}`;
 }
+
+/** The report range as Bucharest calendar days: the first day and the last day included (the API sends UTC instants, end exclusive). */
+export function bucharestRange(fromUtc: string, toUtcExclusive: string): [string, string] {
+  const day = (instant: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Bucharest", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(instant));
+  const parse = (value: string) => Date.parse(`${value.replace(" ", "T")}Z`);
+  return [day(parse(fromUtc)), day(parse(toUtcExclusive) - 1)];
+}
+
+/** The API query of one section: buckets only where the API accepts them, SKU filters only on the SKU analysis. */
+export function sectionQuery(section: IntelligenceSection, filters: Filters, now = new Date()): Record<string, string | undefined> {
+  return {
+    ...periodQuery(filters.period, filters, now), source: filters.source || undefined,
+    ...(section === "series" || section === "completions" ? { bucket: filters.bucket } : {}),
+    ...(section === "skus" ? { category: filters.category || undefined, code: filters.code || undefined, variant: filters.variant || undefined, status: filters.status === "all" ? undefined : filters.status } : {}),
+  };
+}
+
 
 /** Meters for display: "13428.240" -> "13.428,2" (ro) / "13.428,2" (tr). Malformed values show a dash, never 0. */
 function useMeters() {
@@ -49,25 +76,45 @@ export function ProductionIntelligencePage({ section }: { section: IntelligenceS
   const { api, me, navigate } = useDashboard();
   const { t } = useI18n(); const x = t.intelligence;
   const allowed = Boolean(me.capabilities?.viewProductionIntelligence);
-  const [draft, setDraft] = useState<Filters>(initialFilters);
-  const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [draft, setDraft] = useState<Filters>(() => initialFilters(section));
+  const [filters, setFilters] = useState<Filters>(() => initialFilters(section));
   const [invalid, setInvalid] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [result, setResult] = useState<{ key: string; data: Result | null; error: unknown }>({ key: "", data: null, error: null });
-  const query = useMemo(() => ({ ...periodQuery(filters.period, filters), source: filters.source || undefined, ...(section === "series" ? { bucket: filters.bucket } : {}) }), [filters, section]);
+  // Kept in memory only (the Dashboard stores nothing but the language in the browser); on by default.
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [result, setResult] = useState<{ key: string; base: string; data: Result | null; error: unknown }>({ key: "", base: "", data: null, error: null });
+  const query = useMemo(() => sectionQuery(section, filters), [filters, section]);
+  const baseKey = JSON.stringify([section, query]);
   const requestKey = JSON.stringify([section, query, revision]);
-  const data = result.key === requestKey ? result.data : null;
+  // A refresh of the same report keeps the previous numbers on screen until the new ones arrive.
+  const data = result.key === requestKey || result.base === baseKey ? result.data : null;
   const error = result.key === requestKey ? result.error : null;
+  const ceo = (CEO_SECTIONS as readonly string[]).includes(section);
 
   useEffect(() => {
     if (!allowed) return undefined;
     const abort = new AbortController();
     api.intelligence<Result>(section, query, abort.signal).then(
-      (value) => { if (!abort.signal.aborted) setResult({ key: requestKey, data: value, error: null }); },
-      (caught: unknown) => { if (!abort.signal.aborted) setResult({ key: requestKey, data: null, error: caught }); },
+      (value) => { if (!abort.signal.aborted) setResult({ key: requestKey, base: baseKey, data: value, error: null }); },
+      (caught: unknown) => { if (!abort.signal.aborted) setResult({ key: requestKey, base: "", data: null, error: caught }); },
     );
     return () => abort.abort();
-  }, [allowed, api, query, requestKey, section]);
+  }, [allowed, api, baseKey, query, requestKey, section]);
+
+  // Light, controlled refresh of the CEO overview: only while the page is visible, at the server's suggested pace (at
+  // most every 2 minutes), and once more when the tab becomes visible again. It reads the same report; nothing is
+  // scheduled on the server.
+  const suggested = section === "overview" && data && isCeoOverview(data) ? data.refresh.suggestedSeconds : undefined;
+  useEffect(() => {
+    if (!allowed || section !== "overview" || !autoRefresh) return undefined;
+    const every = refreshSeconds(suggested) * 1000;
+    let last = Date.now();
+    const tick = () => { if (document.visibilityState === "visible") { last = Date.now(); setRevision((value) => value + 1); } };
+    const timer = window.setInterval(tick, every);
+    const onVisible = () => { if (document.visibilityState === "visible" && Date.now() - last >= every) tick(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [allowed, autoRefresh, section, suggested]);
 
   if (!allowed) return <div className="page"><PageHeader title={x.title} /><ErrorBanner error={new ApiError("UNAUTHORIZED_ACTION", 403)} /><p className="muted small">{x.denied}</p></div>;
 
@@ -78,16 +125,25 @@ export function ProductionIntelligencePage({ section }: { section: IntelligenceS
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${search(draft)}`);
     setFilters(draft);
   };
-  const tabs: IntelligenceSection[] = ["summary", "products", "employees", "series"];
-  const range = data && "range" in data ? x.range(data.range.fromUtc.slice(0, 10), data.range.toUtcExclusive.slice(0, 10)) : null;
-  const stale = section === "summary" && data !== null && !isCurrentSummary(data);
+  const tabs: IntelligenceSection[] = ["overview", "completions", "skus", "summary", "products", "employees", "series"];
+  const range = data && "range" in data ? x.range(...bucharestRange(data.range.fromUtc, data.range.toUtcExclusive)) : null;
+  const stale = (section === "summary" && data !== null && !isCurrentSummary(data)) || (section === "overview" && data !== null && !isCeoOverview(data));
+  const applySku = (next: SkuFilters) => {
+    const merged = { ...filters, ...next };
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${search(merged)}`);
+    setDraft(merged); setFilters(merged);
+  };
   return (
     <div className="page intelligence-page">
-      <PageHeader title={x.title} description={x.hint} actions={<button type="button" className="button button-secondary" onClick={() => setRevision((value) => value + 1)}>{x.filters.refresh}</button>} />
+      <PageHeader title={x.title} description={x.hint} actions={<div className="ceo-header-actions">
+        {section === "overview" && <label className="ceo-inline"><input type="checkbox" checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} />{t.ceo.autoRefresh(Math.round(refreshSeconds(suggested) / 60))}</label>}
+        <button type="button" className="button button-secondary" onClick={() => setRevision((value) => value + 1)}>{x.filters.refresh}</button>
+      </div>} />
       <nav className="intelligence-tabs" aria-label={x.title}>
         {tabs.map((key) => {
           const href = `${intelligencePath(key)}${search(filters)}`;
-          return <a key={key} href={href} aria-current={key === section ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate(intelligencePath(key)); window.history.replaceState(window.history.state, "", href); }}>{x.tabs[key]}</a>;
+          const label = (CEO_SECTIONS as readonly string[]).includes(key) ? t.ceo.tabs[key as (typeof CEO_SECTIONS)[number]] : x.tabs[key as "summary" | "products" | "employees" | "series"];
+          return <a key={key} href={href} className={(CEO_SECTIONS as readonly string[]).includes(key) ? "is-ceo" : undefined} aria-current={key === section ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate(intelligencePath(key)); window.history.replaceState(window.history.state, "", href); }}>{label}</a>;
         })}
       </nav>
       <Card>
@@ -98,15 +154,18 @@ export function ProductionIntelligencePage({ section }: { section: IntelligenceS
             <Field label={x.filters.to}>{(id) => <input id={id} type="date" required min={draft.from || "2026-10-04"} value={draft.to} onChange={(event) => setDraft({ ...draft, to: event.target.value })} />}</Field>
           </>}
           <Field label={x.filters.source}>{(id) => <select id={id} value={draft.source} onChange={(event) => setDraft({ ...draft, source: event.target.value })}><option value="">{x.filters.allSources}</option>{INTELLIGENCE_SOURCES.map((key) => <option key={key} value={key}>{x.sources[key]}</option>)}</select>}</Field>
-          {section === "series" && <Field label={x.filters.bucket}>{(id) => <select id={id} value={draft.bucket} onChange={(event) => setDraft({ ...draft, bucket: event.target.value as SeriesBucket })}>{(["day", "week", "month"] as const).map((key) => <option key={key} value={key}>{x.buckets[key]}</option>)}</select>}</Field>}
+          {(section === "series" || section === "completions") && <Field label={x.filters.bucket}>{(id) => <select id={id} value={draft.bucket} onChange={(event) => setDraft({ ...draft, bucket: event.target.value as SeriesBucket })}>{(["day", "week", "month"] as const).map((key) => <option key={key} value={key}>{x.buckets[key]}</option>)}</select>}</Field>}
           <button type="submit" className="button button-primary">{x.filters.apply}</button>
         </form>
         {invalid && <p className="form-error" role="alert">{x.filters.invalidRange}</p>}
       </Card>
       {range && <p className="muted small intelligence-range">{range}</p>}
-      {error !== null && (error instanceof ApiError && error.status === 404 ? <Notice tone="warning">{x.unavailable}</Notice> : <ErrorBanner error={error} onRetry={() => setRevision((value) => value + 1)} />)}
+      {error !== null && (error instanceof ApiError && error.status === 404 ? <Notice tone="warning">{ceo ? t.ceo.unavailable : x.unavailable}</Notice> : <ErrorBanner error={error} onRetry={() => setRevision((value) => value + 1)} />)}
       {data === null && error === null && <Loading />}
-      {stale && <Notice tone="warning">{x.unavailable}</Notice>}
+      {stale && <Notice tone="warning">{ceo ? t.ceo.unavailable : x.unavailable}</Notice>}
+      {data && !stale && section === "overview" && <CeoOverviewView data={data as CeoOverview} />}
+      {data && section === "completions" && <CeoCompletionsView data={data as CeoCompletions} />}
+      {data && section === "skus" && <CeoSkusView data={data as CeoSkus} filters={{ category: filters.category, code: filters.code, variant: filters.variant, status: filters.status }} onFilters={applySku} query={query} />}
       {data && !stale && section === "summary" && <SummaryView data={data as IntelligenceSummary} />}
       {data && section === "products" && <ProductsView data={data as IntelligenceProducts} />}
       {data && section === "employees" && <EmployeesView data={data as IntelligenceEmployees} />}
