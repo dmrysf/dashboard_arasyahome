@@ -42,6 +42,8 @@ export type Capabilities = {
   revokeDocuments?: boolean;
   /** API 2.72.0: Production Intelligence (Root and the canonical CEO only). Absent on older APIs. */
   viewProductionIntelligence?: boolean;
+  /** API 2.75.0: the order resolver (root, or the `orders.intervene` permission). Absent on older APIs. */
+  resolveOrders?: boolean;
 };
 
 export type DocumentChange = { field: string; line: number | null; before: string | null; after: string | null };

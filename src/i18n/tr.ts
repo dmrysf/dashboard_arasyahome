@@ -4,6 +4,7 @@ import type { Messages } from "./ro";
 import { analyticsTr } from "./analytics";
 import { documentsTr } from "./documents";
 import { interventionsTr } from "./interventions";
+import { resolverTr } from "./resolver";
 import { ceoTr } from "./ceo";
 import { intelligenceTr } from "./intelligence";
 import { timelineTr } from "./timeline";
@@ -11,6 +12,7 @@ export const tr: Messages = {
   analytics: analyticsTr,
   documents: documentsTr,
   interventions: interventionsTr,
+  resolver: resolverTr,
   ceo: ceoTr,
   intelligence: intelligenceTr,
   timeline: timelineTr,
@@ -117,6 +119,7 @@ export const tr: Messages = {
     organization: "Organizasyon",
     productionSettings: "Üretim Ayarları",
     interventions: "Müdahale",
+    resolver: "Takılan siparişler",
     intelligence: "Metraj",
     displayDevices: "Ekran Cihazları",
     documentRevisions: "Belge revizyonları",

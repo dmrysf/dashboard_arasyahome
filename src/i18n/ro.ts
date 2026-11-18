@@ -6,6 +6,7 @@
 import { analyticsRo } from "./analytics";
 import { documentsRo } from "./documents";
 import { interventionsRo } from "./interventions";
+import { resolverRo } from "./resolver";
 import { ceoRo } from "./ceo";
 import { intelligenceRo } from "./intelligence";
 import { timelineRo } from "./timeline";
@@ -13,6 +14,7 @@ export const ro = {
   analytics: analyticsRo,
   documents: documentsRo,
   interventions: interventionsRo,
+  resolver: resolverRo,
   ceo: ceoRo,
   intelligence: intelligenceRo,
   timeline: timelineRo,
@@ -119,6 +121,7 @@ export const ro = {
     organization: "Organizație",
     productionSettings: "Setări producție",
     interventions: "Intervenții",
+    resolver: "Comenzi blocate",
     intelligence: "Metraj",
     displayDevices: "Dispozitive de afișare",
     documentRevisions: "Revizii documente",

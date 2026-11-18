@@ -31,6 +31,7 @@ export const NAVIGATION: NavItem[] = [
   { path: "/aplicatii", label: "applications", visible: (_, can) => can("applications.view"), match: (path) => path.startsWith("/aplicatii") },
   { path: "/organizatie", label: "organization", visible: (me) => Boolean(me.capabilities?.manageOrganization), match: (path) => path.startsWith("/organizatie") },
   { path: "/setari-productie", label: "productionSettings", visible: (me) => Boolean(me.capabilities?.manageProductionSettings), match: (path) => path.startsWith("/setari-productie") },
+  { path: "/rezolvare", label: "resolver", visible: (me) => me.isRoot || Boolean(me.capabilities?.resolveOrders), match: (path) => path.startsWith("/rezolvare") },
   { path: "/interventii", label: "interventions", visible: (me) => me.isRoot, match: (path) => path.startsWith("/interventii") },
   { path: "/dispozitive-afisare", label: "displayDevices", visible: (me) => me.isRoot, match: path => path === "/dispozitive-afisare" },
   { path: "/audit", label: "audit", visible: (_, can) => can("iam.audit.view"), match: (path) => path.startsWith("/audit") },
