@@ -30,6 +30,7 @@ export type Route =
   | { name: "interventions" }
   | { name: "intelligence"; section: "overview" | "completions" | "skus" | "summary" | "products" | "employees" | "series" }
   | { name: "intervention"; id: string }
+  | { name: "resolver"; number?: string }
   | { name: "not-found" };
 
 export function parseRoute(pathname: string): Route {
@@ -86,6 +87,11 @@ export function parseRoute(pathname: string): Route {
   if (intelligence) {
     const sections = { sumar: "summary", finalizate: "completions", "produse-analiza": "skus", produse: "products", angajati: "employees", evolutie: "series" } as const;
     return { name: "intelligence", section: intelligence[1] ? sections[intelligence[1] as keyof typeof sections] : "overview" };
+  }
+  if (path === "/rezolvare") return { name: "resolver" };
+  const resolver = /^\/rezolvare\/([^/]{1,80})$/.exec(path);
+  if (resolver) {
+    try { return { name: "resolver", number: decodeURIComponent(resolver[1]) }; } catch { return { name: "not-found" }; }
   }
   if (path === "/interventii") return { name: "interventions" };
   const intervention = /^\/interventii\/([^/]{1,600})$/.exec(path);

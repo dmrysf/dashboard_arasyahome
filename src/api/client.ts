@@ -4,6 +4,7 @@ import type { DocumentLookupItem, OrderDocuments, RevisionRequest, Application, 
 import type { CuttingTransfer, DisplayDevice, DisplayPairing, DisplaySettings } from "./cutting";
 import type { AnalyticsPolicy } from "./analytics";
 import type { InterventionAction, InterventionOrder, InterventionOverview } from "./interventions";
+import type { ResolverFixAction, ResolverLookup, ResolverResult, ResolverStuck } from "./resolver";
 import type { IntelligenceSection } from "./intelligence";
 
 /**
@@ -126,6 +127,11 @@ export function createApi(baseUrl: string, fetchImpl: Fetch = (...args) => fetch
     interventions: (view: "stuck" | "all", number: string | undefined, signal?: AbortSignal) => request<InterventionOverview>("/management/interventions", { query: { view, number }, signal }),
     intervention: (globalOrderId: string, signal?: AbortSignal) => request<InterventionOrder>(`/management/interventions/orders/${encodeURIComponent(globalOrderId)}`, { signal }),
     intervene: (globalOrderId: string, action: InterventionAction, body: Record<string, unknown>, key: string) => request<Record<string, unknown>>(`/management/interventions/orders/${encodeURIComponent(globalOrderId)}/${action}`, { method: "POST", body, idempotencyKey: key }),
+    /** The order resolver (API 2.75.0): the blocked orders, one number's diagnosis, and the one step pressed. */
+    resolverStuck: (signal?: AbortSignal) => request<ResolverStuck>("/management/interventions/resolver", { signal }),
+    resolverFind: (number: string, signal?: AbortSignal) => request<ResolverLookup>("/management/interventions/resolver", { query: { number }, signal }),
+    resolve: (globalOrderId: string, body: { action: ResolverFixAction; fingerprint: string; fields?: Record<string, unknown> }, key: string) =>
+      request<ResolverResult>(`/management/interventions/resolver/orders/${encodeURIComponent(globalOrderId)}`, { method: "POST", body, idempotencyKey: key }),
     displayDevices: (signal?: AbortSignal) => request<{ items: DisplayDevice[]; settings: DisplaySettings }>("/management/cutting/devices", { signal }),
     createDisplay: (name: string, key: string) => request<DisplayPairing>("/management/cutting/devices", { method: "POST", body: { name }, idempotencyKey: key }),
     repairDisplay: (id: string, key: string) => request<DisplayPairing>(`/management/cutting/devices/${encodeURIComponent(id)}/re-pair`, { method: "POST", body: { confirmed: true }, idempotencyKey: key }),
