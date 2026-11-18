@@ -6,6 +6,7 @@ import { documentsTr } from "./documents";
 import { interventionsTr } from "./interventions";
 import { resolverTr } from "./resolver";
 import { ceoTr } from "./ceo";
+import { metersTr } from "./meters";
 import { intelligenceTr } from "./intelligence";
 import { timelineTr } from "./timeline";
 export const tr: Messages = {
@@ -14,6 +15,7 @@ export const tr: Messages = {
   interventions: interventionsTr,
   resolver: resolverTr,
   ceo: ceoTr,
+  meters: metersTr,
   intelligence: intelligenceTr,
   timeline: timelineTr,
   locale: { short: "TR", name: "Türkçe", switcher: "Arayüz dili" },

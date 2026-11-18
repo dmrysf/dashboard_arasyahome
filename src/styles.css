@@ -544,3 +544,7 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
   .resolver-search-row { flex-direction: column; }
   .resolver-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ---- CEO sales meters and data coverage (Dashboard 0.22.0) ------------------------------------------------------ */
+.ceo-section-title { font-size: 1.15rem; margin: 8px 0 0; }
+.ceo-subtitle { font-size: 0.95rem; margin: 16px 0 6px; }

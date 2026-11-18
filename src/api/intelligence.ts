@@ -6,18 +6,20 @@
 
 export const INTELLIGENCE_SOURCES = ["trendhome", "outletperdele", "trendyol", "b2b"] as const;
 export type IntelligenceSource = (typeof INTELLIGENCE_SOURCES)[number];
-export const INTELLIGENCE_SECTIONS = ["overview", "completions", "skus", "summary", "products", "employees", "series"] as const;
-/** The CEO reports of API 2.73.0 (Dashboard 0.20.0). */
-export const CEO_SECTIONS = ["overview", "completions", "skus"] as const;
+export const INTELLIGENCE_SECTIONS = ["overview", "completions", "skus", "coverage", "summary", "products", "employees", "series"] as const;
+/** The CEO reports of API 2.73.0 (Dashboard 0.20.0); `coverage` since API 2.76.0 (Dashboard 0.22.0). */
+export const CEO_SECTIONS = ["overview", "completions", "skus", "coverage"] as const;
 export type IntelligenceSection = (typeof INTELLIGENCE_SECTIONS)[number];
 export const PAYMENT_CLASSES = ["paid", "advance_verified", "partial", "no_charge", "unverified", "reversed", "unknown"] as const;
 export type PaymentClass = (typeof PAYMENT_CLASSES)[number];
 /** Line contract statuses (MeterContract). Only `measured_source` carries meters; the others are named, never zero. */
 export const COVERAGE_STATUSES = ["measured_source", "not_metered", "unknown_basis", "unknown", "unknown_marketplace", "conflict", "excluded"] as const;
-/** The first day of the main analysis (owner decision K3), Europe/Bucharest. */
+/** The first day of Arasya production data (owner decision K3), Europe/Bucharest. Production figures start here. */
 export const ANALYSIS_START = "2026-10-04";
-/** The API accepts at most 366 days per report. */
-export const MAX_RANGE_DAYS = 366;
+/** API 2.76.0: sold meters reach back to the oldest verifiable shop order; no range may start before this day. */
+export const HISTORY_FLOOR = "2024-01-01";
+/** API 2.76.0 accepts multi-year history ranges (Production Intelligence only). */
+export const MAX_RANGE_DAYS = 4000;
 
 export type Meters = { fabricMeters: string; railMeters: string };
 export type IntelligenceMeta = { range: { fromUtc: string; toUtcExclusive: string; timezone: string; analysisStart?: string }; source: IntelligenceSource | null; contractVersion: number | string };
@@ -97,31 +99,20 @@ export function isCurrentSummary(value: unknown): value is IntelligenceSummary {
 export const PERIODS = ["today", "yesterday", "week", "month", "previous_month", "total", "custom"] as const;
 export type Period = (typeof PERIODS)[number];
 
-function bucharestToday(now: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Bucharest", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
-}
-
-function addDays(day: string, days: number): string {
-  const date = new Date(`${day}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
 /**
- * Query of one period. `total` is everything since the analysis start, capped by the API's 366-day window (the most
- * recent 366 days once the analysis is older than that).
+ * Query of one period. `total` is all time (API 2.76.0 `period=all`): from the oldest day any source holds data to
+ * today, with no 366-day cap. The server decides the first day; days without data are never shown as zero sales.
  */
 export function periodQuery(period: Period, custom: { from: string; to: string }, now = new Date()): Record<string, string> {
+  void now;
   if (period === "custom") return { from: custom.from, to: custom.to };
   if (period !== "total") return { period };
-  const today = bucharestToday(now);
-  const earliest = addDays(today, -(MAX_RANGE_DAYS - 1));
-  return { from: earliest > ANALYSIS_START ? earliest : ANALYSIS_START, to: today };
+  return { period: "all" };
 }
 
-/** A custom range the API will accept: both dates, in order, not before the analysis start, at most 366 days. */
+/** A custom range the API will accept: both dates, in order, not before the history floor, at most MAX_RANGE_DAYS. */
 export function validCustomRange(from: string, to: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to || from < ANALYSIS_START) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to || from < HISTORY_FLOOR) return false;
   const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1;
   return days >= 1 && days <= MAX_RANGE_DAYS;
 }

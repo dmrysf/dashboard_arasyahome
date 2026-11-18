@@ -10,6 +10,8 @@ import { intelligencePath, parseRoute } from "../src/app/router";
 import { I18nProvider } from "../src/i18n/context";
 import { ceoRo, ceoTr } from "../src/i18n/ceo";
 import { CeoCompletionsView, CeoOverviewView, CeoSkusView } from "../src/pages/CeoViews";
+import { CeoCoverageView, SalesSection } from "../src/pages/CeoMeters";
+import type { CeoCoverage, Sales, SalesFigure } from "../src/api/ceo";
 import { bucharestRange, initialFilters, sectionQuery } from "../src/pages/ProductionIntelligencePage";
 import { API, fakeFetch, me, sessionPayload } from "./support";
 
@@ -184,4 +186,75 @@ test("the client reads the CEO reports read-only from the management routes", as
 test("Romanian and Turkish CEO texts have the same shape", () => {
   const shape = (value: unknown): unknown => typeof value === "function" ? `fn${(value as (...a: unknown[]) => unknown).length}` : value && typeof value === "object" ? Object.fromEntries(Object.keys(value as object).sort().map((k) => [k, shape((value as Record<string, unknown>)[k])])) : typeof value;
   assert.deepEqual(shape(ceoTr), shape(ceoRo));
+});
+
+// ---- Dashboard 0.22.0 (API 2.76.0): sales meters and data coverage --------------------------------------------------------
+
+const fig = (ordered: string, cancelled: string, net: string, verified: string): SalesFigure => ({ ordered, cancelled, adjusted: "0.000", net, verified });
+const pay = (paid: string, unverified: string) => ({ paid: { fabricMeters: paid, railMeters: "0.000", orders: 1 }, unverified: { fabricMeters: unverified, railMeters: "0.000", orders: 2 }, unknown: { fabricMeters: "0.000", railMeters: "0.000", orders: 0 } });
+function sales(over: Partial<Sales> = {}): Sales {
+  return {
+    bySource: {
+      trendhome: { fabric: fig("5.000", "0.000", "5.000", "5.000"), rail: fig("3.000", "0.000", "3.000", "0.000"), arasya: { fabricMeters: "5.000", railMeters: "3.000" }, outsideArasya: { fabricMeters: "0.000", railMeters: "0.000", verifiedFabricMeters: "0.000", openFabricMeters: "0.000" }, orders: 1, byPayment: pay("5.000", "0.000") },
+      outletperdele: { fabric: fig("4.000", "0.000", "4.000", "0.000"), rail: fig("0.000", "0.000", "0.000", "0.000"), arasya: { fabricMeters: "4.000", railMeters: "0.000" }, outsideArasya: null, orders: 1, byPayment: pay("0.000", "4.000") },
+      b2b: { fabric: fig("24.700", "8.000", "16.700", "0.000"), rail: fig("0.000", "0.000", "0.000", "0.000"), arasya: { fabricMeters: "16.700", railMeters: "0.000" }, outsideArasya: null, orders: 3, byPayment: pay("0.000", "16.700") },
+    },
+    total: { fabric: fig("33.700", "8.000", "25.700", "5.000"), rail: fig("3.000", "0.000", "3.000", "0.000"), orders: 5, byPayment: pay("5.000", "20.700"), sources: ["trendhome", "outletperdele", "b2b"] },
+    rules: {}, state: "automatic", syncedThrough: "2026-11-19T08:05:00.000Z", lastRun: { at: "2026-11-19T08:05:02.000Z", orders: 4, entries: 2 },
+    trendyolPanel: { widthMeters: "2.800", verifiedLines: 1, unknownLines: 3, orders: 1, rule: "x" },
+    unknown: { linesBySource: { trendhome: 1, outletperdele: 0, b2b: 2 }, lines: 3, orders: 2, outsideArasyaLines: 0, rule: "x" },
+    ...over,
+  };
+}
+
+test("0.22 routes: the data coverage section round-trips", () => {
+  assert.deepEqual(parseRoute("/metraj/acoperire"), { name: "intelligence", section: "coverage" });
+  assert.deepEqual(parseRoute("/metraj/kapsam"), { name: "intelligence", section: "coverage" });
+  assert.equal(intelligencePath("coverage"), "/metraj/acoperire");
+});
+
+test("0.22 sales: twelve figures, fabric total TH + OP + B2B, rail and Trendyol panel apart, unknown counted", () => {
+  const current = { ...overview().current, meters: { inProduction: bag({ orders: 5, fabricMeters: "40.500", unknownLines: 1 }), waiting: bag({ orders: 2, fabricMeters: "9.500" }) } };
+  const { html } = render(<SalesSection data={overview({ sales: sales(), current })} />);
+  for (const text of ["Metraj vândut", "Total metri țesătură comandați (net)", "25,7 m", "16,7 m", "Vânzare cu plata dovedită integral", "Anulate · metri scăzuți din net", "8,0 m",
+    "Șină / accesorii · metri (separat)", "3,0 m", "Trendyol · lățime panouri dovedită (separat)", "2,8 m", "Linii fără metri cunoscuți", "7 comenzi · 50,0 m", "Plată nedovedită", "Total TH + OP + B2B"]) {
+    assert.ok(has(html, text), text);
+  }
+  assert.doesNotMatch(html, /NaN|undefined/);
+  const tr = render(<SalesSection data={overview({ sales: sales(), current })} />, "tr").html;
+  for (const text of ["Satılan metraj", "Toplam sipariş edilen kumaş metresi (net)", "B2B · gerçek satış metresi", "Ray / aksesuar · metre (ayrı)", "Son otomatik senkronizasyon"]) assert.ok(has(tr, text), text);
+});
+
+test("0.22 sales: an empty ledger shows dashes, never zero; an older API shows a notice", () => {
+  const empty = render(<SalesSection data={overview({ sales: sales({ state: "empty", syncedThrough: null, lastRun: null }) })} />).html;
+  assert.ok(has(empty, "Registrul de metraj este gol"));
+  assert.ok(!has(empty, "25,7 m"), "no sold value while the ledger is empty");
+  assert.ok(has(empty, "Nu rulează încă"));
+  const old = render(<SalesSection data={overview()} />).html;
+  assert.ok(has(old, "necesită API 2.76.0"));
+});
+
+test("0.22 coverage: sources, gap months, the B2B test cohort and the production start", () => {
+  const shop = (orders: number, gaps: string[]) => ({ firstOrderAt: "2024-05-17T13:40:07.000Z", lastOrderAt: "2026-11-18T21:08:46.000Z", orders, meteredLines: 100, notMeteredLines: 20, unknownLines: 3, coveragePercent: "97.1",
+    arasya: { orders: 10, firstOrderAt: null, lastOrderAt: null, cancelled: 2, excluded: 1, enteredProduction: 4, notInProduction: 6, completed: 3, linesByStatus: {} },
+    outsideArasya: { orders: orders - 10, lines: 50, firstOrderAt: "2024-05-17T13:40:07.000Z", lastOrderAt: "2026-11-15T04:55:10.000Z", lastImportAt: "2026-11-19T07:00:00.000Z", verifiedSaleOrders: 30, noSaleOrders: 5, refundedLines: 0, meteredLines: 40, notMeteredLines: 8, unknownLines: 2 },
+    months: [], gapMonths: gaps });
+  const data: CeoCoverage = { ...range, coverage: {
+    generatedAt: "2026-11-19T08:00:00.000Z", productionStart: "2026-10-04", historyFloor: "2024-01-01",
+    sources: { trendhome: shop(16496, ["2024-08"]), outletperdele: shop(9343, []),
+      trendyol: { firstOrderAt: "2026-10-11T15:07:49.000Z", lastOrderAt: "2026-11-18T10:43:46.000Z", orders: 2063, cancelled: 37, excluded: 0, enteredProduction: 2062, notInProduction: 1, completed: 1572, fabricMeters: null, fabricRule: "x", panelLinesByStatus: { verified: 900 }, panelVerifiedLines: 900, panelCoveragePercent: "36.0", months: [], gapMonths: [] },
+      b2b: { firstOrderAt: "2026-10-05T11:39:00.000Z", lastOrderAt: "2026-10-06T01:26:00.000Z", orders: 17, testOrders: 17, realOrders: 0, realFinalized: 0, realCancelled: 0, realDraft: 0, handedOff: 5, realLinesByStatus: { measured_source: 0, not_metered: 0, unknown: 0 }, coveragePercent: null, saleRule: "x", months: [], gapMonths: [] } },
+    b2bTestCohort: { available: true, orders: 17, enteredMeters: "180.375", canonicalOrders: 5, canonicalExcluded: 5, items: [
+      { cohort: "b2b-test-2026-11-19", orderCode: "B2B-ORD-000010", statusAtDecision: "finalized", statusNow: "finalized", enteredMeters: "10.750", canonicalOrder: "b2b:x", canonicalExcluded: true, soldMetersBooked: "0.000", decidedBy: "Owner", decidedAt: null },
+      { cohort: "b2b-test-2026-11-19", orderCode: "B2B-ORD-000001", statusAtDecision: "finalized", statusNow: "finalized", enteredMeters: "21.000", canonicalOrder: null, canonicalExcluded: false, soldMetersBooked: "0.000", decidedBy: "Owner", decidedAt: null }] },
+    ledger: { canonicalEntries: 120, b2bEntries: 0, exclusions: 7, automatic: true, syncedThrough: "2026-11-19T08:05:00.000Z", lastRunAt: null, lastRunOrders: null, lastRunEntries: null },
+    categories: [{ source_key: "trendhome", products: 1485, last_change: null }],
+  } };
+  const { html } = render(<CeoCoverageView data={data} />);
+  for (const text of ["Acoperirea datelor pe canale (toate datele)", "2026-10-04", "2024-08", "97.1%", "36.0%", "Trendyol nu declară metri de țesătură", "B2B-ORD-000010", "B2B-ORD-000001", "10,8", "180,4 m introduși", "5 excluse din producție", "0 comenzi reale · 17 comenzi de test excluse", "1485 produse"]) {
+    assert.ok(has(html, text), text);
+  }
+  assert.doesNotMatch(html, /NaN|undefined/);
+  const tr = render(<CeoCoverageView data={data} />, "tr").html;
+  assert.ok(has(tr, "Hariç tutulan B2B test siparişleri (owner kararı)") && has(tr, "Siparişsiz aylar"));
 });

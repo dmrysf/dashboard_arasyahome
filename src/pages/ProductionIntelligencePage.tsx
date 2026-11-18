@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { SKU_STATUSES, isCeoOverview, refreshSeconds, type CeoCompletions, type CeoOverview, type CeoSkus, type SkuFilters, type SkuStatus } from "../api/ceo";
+import { SKU_STATUSES, isCeoCoverage, isCeoOverview, refreshSeconds, type CeoCompletions, type CeoCoverage, type CeoOverview, type CeoSkus, type SkuFilters, type SkuStatus } from "../api/ceo";
 import { ApiError } from "../api/client";
 import {
-  CEO_SECTIONS, COVERAGE_STATUSES, INTELLIGENCE_SOURCES, PAYMENT_CLASSES, PERIODS, isCurrentSummary, ledgerState, meterUnits, periodQuery, share, validCustomRange,
+  CEO_SECTIONS, COVERAGE_STATUSES, HISTORY_FLOOR, INTELLIGENCE_SOURCES, PAYMENT_CLASSES, PERIODS, isCurrentSummary, ledgerState, meterUnits, periodQuery, share, validCustomRange,
   type EmployeeRow, type IntelligenceEmployees, type IntelligenceProducts, type IntelligenceSection, type IntelligenceSeries, type IntelligenceSummary,
   type PaymentClass, type Period, type ProductRow, type SeriesBucket, type SeriesPoint,
 } from "../api/intelligence";
@@ -10,10 +10,11 @@ import { useDashboard } from "../app/context";
 import { intelligencePath } from "../app/router";
 import { Badge, Card, EmptyState, ErrorBanner, Field, Loading, Notice, PageHeader } from "../components/ui";
 import { useI18n } from "../i18n/context";
+import { CeoCoverageView, SalesSection } from "./CeoMeters";
 import { CeoCompletionsView, CeoOverviewView, CeoSkusView } from "./CeoViews";
 
 type Filters = { period: Period; from: string; to: string; source: string; bucket: SeriesBucket } & SkuFilters;
-type Result = IntelligenceSummary | IntelligenceProducts | IntelligenceEmployees | IntelligenceSeries | CeoOverview | CeoCompletions | CeoSkus;
+type Result = IntelligenceSummary | IntelligenceProducts | IntelligenceEmployees | IntelligenceSeries | CeoOverview | CeoCompletions | CeoSkus | CeoCoverage;
 
 /** The page's filters from the address bar. The CEO overview opens on today, every other report on this month. */
 export function initialFilters(section: IntelligenceSection = "summary", locationSearch?: string): Filters {
@@ -125,9 +126,10 @@ export function ProductionIntelligencePage({ section }: { section: IntelligenceS
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${search(draft)}`);
     setFilters(draft);
   };
-  const tabs: IntelligenceSection[] = ["overview", "completions", "skus", "summary", "products", "employees", "series"];
+  const tabs: IntelligenceSection[] = ["overview", "completions", "skus", "coverage", "summary", "products", "employees", "series"];
   const range = data && "range" in data ? x.range(...bucharestRange(data.range.fromUtc, data.range.toUtcExclusive)) : null;
-  const stale = (section === "summary" && data !== null && !isCurrentSummary(data)) || (section === "overview" && data !== null && !isCeoOverview(data));
+  const stale = (section === "summary" && data !== null && !isCurrentSummary(data)) || (section === "overview" && data !== null && !isCeoOverview(data))
+    || (section === "coverage" && data !== null && !isCeoCoverage(data));
   const applySku = (next: SkuFilters) => {
     const merged = { ...filters, ...next };
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${search(merged)}`);
@@ -150,8 +152,8 @@ export function ProductionIntelligencePage({ section }: { section: IntelligenceS
         <form className="intelligence-filters" onSubmit={apply}>
           <Field label={x.filters.period}>{(id) => <select id={id} value={draft.period} onChange={(event) => setDraft({ ...draft, period: event.target.value as Period })}>{PERIODS.map((key) => <option key={key} value={key}>{x.periods[key]}</option>)}</select>}</Field>
           {draft.period === "custom" && <>
-            <Field label={x.filters.from}>{(id) => <input id={id} type="date" required min="2026-10-04" value={draft.from} onChange={(event) => setDraft({ ...draft, from: event.target.value })} />}</Field>
-            <Field label={x.filters.to}>{(id) => <input id={id} type="date" required min={draft.from || "2026-10-04"} value={draft.to} onChange={(event) => setDraft({ ...draft, to: event.target.value })} />}</Field>
+            <Field label={x.filters.from}>{(id) => <input id={id} type="date" required min={HISTORY_FLOOR} value={draft.from} onChange={(event) => setDraft({ ...draft, from: event.target.value })} />}</Field>
+            <Field label={x.filters.to}>{(id) => <input id={id} type="date" required min={draft.from || HISTORY_FLOOR} value={draft.to} onChange={(event) => setDraft({ ...draft, to: event.target.value })} />}</Field>
           </>}
           <Field label={x.filters.source}>{(id) => <select id={id} value={draft.source} onChange={(event) => setDraft({ ...draft, source: event.target.value })}><option value="">{x.filters.allSources}</option>{INTELLIGENCE_SOURCES.map((key) => <option key={key} value={key}>{x.sources[key]}</option>)}</select>}</Field>
           {(section === "series" || section === "completions") && <Field label={x.filters.bucket}>{(id) => <select id={id} value={draft.bucket} onChange={(event) => setDraft({ ...draft, bucket: event.target.value as SeriesBucket })}>{(["day", "week", "month"] as const).map((key) => <option key={key} value={key}>{x.buckets[key]}</option>)}</select>}</Field>}
@@ -163,7 +165,8 @@ export function ProductionIntelligencePage({ section }: { section: IntelligenceS
       {error !== null && (error instanceof ApiError && error.status === 404 ? <Notice tone="warning">{ceo ? t.ceo.unavailable : x.unavailable}</Notice> : <ErrorBanner error={error} onRetry={() => setRevision((value) => value + 1)} />)}
       {data === null && error === null && <Loading />}
       {stale && <Notice tone="warning">{ceo ? t.ceo.unavailable : x.unavailable}</Notice>}
-      {data && !stale && section === "overview" && <CeoOverviewView data={data as CeoOverview} />}
+      {data && !stale && section === "overview" && <><SalesSection data={data as CeoOverview} /><CeoOverviewView data={data as CeoOverview} /></>}
+      {data && !stale && section === "coverage" && <CeoCoverageView data={data as CeoCoverage} />}
       {data && section === "completions" && <CeoCompletionsView data={data as CeoCompletions} />}
       {data && section === "skus" && <CeoSkusView data={data as CeoSkus} filters={{ category: filters.category, code: filters.code, variant: filters.variant, status: filters.status }} onFilters={applySku} query={query} />}
       {data && !stale && section === "summary" && <SummaryView data={data as IntelligenceSummary} />}

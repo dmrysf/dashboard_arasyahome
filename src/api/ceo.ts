@@ -25,6 +25,24 @@ export type CurrentState = {
   inProduction: number; waiting: number; delayed: number; delayedWaiting: number; delayedInProduction: number; stopped: number; legacyActive: number;
   bySource: Record<string, { inProduction: number; waiting: number; delayed: number }> | [];
   byStage: Record<string, number> | []; delayedByStage: Record<string, number> | []; asOf: string; delayHours: number;
+  /** API 2.76.0: meters of the active Arasya-flow orders (absent before). */
+  meters?: { inProduction: Bag; waiting: Bag };
+};
+/** One metric of the sales block (API 2.76.0): every value a decimal string of meters. */
+export type SalesFigure = { ordered: string; cancelled: string; adjusted: string; net: string; verified: string };
+export type PaymentBreakdown = Record<string, { fabricMeters: string; railMeters: string; orders: number }>;
+export type SalesSource = {
+  fabric: SalesFigure; rail: SalesFigure; arasya: { fabricMeters: string; railMeters: string };
+  outsideArasya: { fabricMeters: string; railMeters: string; verifiedFabricMeters: string; openFabricMeters: string } | null;
+  orders: number; byPayment: PaymentBreakdown;
+};
+export type Sales = {
+  bySource: Record<string, SalesSource>;
+  total: { fabric: SalesFigure; rail: SalesFigure; orders: number; byPayment: PaymentBreakdown; sources: string[] };
+  rules: Record<string, string>;
+  state: "empty" | "manual" | "automatic"; syncedThrough: string | null; lastRun: { at: string; orders: number; entries: number } | null;
+  trendyolPanel: { widthMeters: string; verifiedLines: number; unknownLines: number; orders: number; rule: string } | null;
+  unknown: { linesBySource: Record<string, number>; lines: number; orders: number; outsideArasyaLines: number; rule: string };
 };
 export type SourceCount = { orders: number; units: number; cancelled: number };
 export type CeoOverview = ReportRange & {
@@ -33,8 +51,39 @@ export type CeoOverview = ReportRange & {
   worked: { orders: number; bySource: Record<string, number>; byArea: Record<string, number> };
   completed: Bag & { recompletions: { orders: number; events: number }; cancelledAfterCompletion: number; afterCompletion: { cancelled: Bag; returned: Bag }; bySource: Record<string, Bag> | [] };
   current: CurrentState; quality: Quality; ledger: LedgerFigures;
+  /** API 2.76.0; absent from an older API. */
+  sales?: Sales;
   definitions: { delayHours: number; categoryCatalog: boolean; panelRule: string };
 };
+export type CoverageMonth = { month: string; orders: number };
+export type ShopCoverage = {
+  firstOrderAt: string | null; lastOrderAt: string | null; orders: number; meteredLines: number; notMeteredLines: number; unknownLines: number; coveragePercent: string | null;
+  arasya: { orders: number; firstOrderAt: string | null; lastOrderAt: string | null; cancelled: number; excluded: number; enteredProduction: number; notInProduction: number; completed: number; linesByStatus: Record<string, number> };
+  outsideArasya: { orders: number; lines: number; firstOrderAt: string | null; lastOrderAt: string | null; lastImportAt: string | null; verifiedSaleOrders: number; noSaleOrders: number;
+    refundedLines: number; meteredLines: number; notMeteredLines: number; unknownLines: number };
+  months: CoverageMonth[]; gapMonths: string[];
+};
+export type TrendyolCoverage = {
+  firstOrderAt: string | null; lastOrderAt: string | null; orders: number; cancelled: number; excluded: number; enteredProduction: number; notInProduction: number; completed: number;
+  fabricMeters: null; fabricRule: string; panelLinesByStatus: Record<string, number> | []; panelVerifiedLines: number; panelCoveragePercent: string | null; months: CoverageMonth[]; gapMonths: string[];
+};
+export type B2bCoverage = {
+  firstOrderAt: string | null; lastOrderAt: string | null; orders: number; testOrders: number; realOrders: number; realFinalized: number; realCancelled: number; realDraft: number; handedOff: number;
+  realLinesByStatus: Record<string, number>; coveragePercent: string | null; saleRule: string; months: CoverageMonth[]; gapMonths: string[];
+};
+export type CohortItem = { cohort: string; orderCode: string; statusAtDecision: string; statusNow: string; enteredMeters: string; canonicalOrder: string | null; canonicalExcluded: boolean; soldMetersBooked: string; decidedBy: string; decidedAt: string | null };
+export type CeoCoverage = ReportRange & { coverage: {
+  generatedAt: string; productionStart: string; historyFloor: string;
+  sources: { trendhome: ShopCoverage; outletperdele: ShopCoverage; trendyol: TrendyolCoverage; b2b: B2bCoverage };
+  b2bTestCohort: { available: boolean; orders: number; enteredMeters?: string; canonicalOrders?: number; canonicalExcluded?: number; items: CohortItem[]; rule?: string };
+  ledger: { canonicalEntries: number; b2bEntries: number | null; exclusions: number; automatic: boolean; syncedThrough: string | null; lastRunAt: string | null; lastRunOrders: number | null; lastRunEntries: number | null };
+  categories: { source_key: string; products: number | string; last_change: string | null }[];
+} };
+
+export function isCeoCoverage(raw: unknown): raw is CeoCoverage {
+  const value = raw as Partial<CeoCoverage> | null;
+  return Boolean(value && value.coverage && value.coverage.sources && value.coverage.b2bTestCohort);
+}
 export type SeriesBag = Bag & { period: string; bySource: Record<string, Bag> | [] };
 export type CategoryRow = Bag & { category: string; source: string; categorySources: string[] };
 export type SkuCompletionRow = Bag & { source: string; productCode: string | null; name: string; category: string; categorySource: string; evidence: Record<string, number> | [] };
