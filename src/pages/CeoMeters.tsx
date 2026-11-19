@@ -60,13 +60,13 @@ export function SalesSection({ data }: { data: CeoOverview }) {
             <thead><tr><th scope="col">{x.table.source}</th><th scope="col">{x.table.ordered}</th><th scope="col">{x.table.cancelled}</th><th scope="col">{x.table.net}</th><th scope="col">{x.table.verified}</th><th scope="col">{x.table.rail}</th><th scope="col">{x.table.orders}</th><th scope="col">{x.kpi.unknown}</th></tr></thead>
             <tbody>
               {SHOP_ORDER.filter((key) => src(key)).map((key) => (
-                <tr key={key}><th scope="row">{s[key] ?? key}</th><td className="num">{value(src(key).fabric.ordered)}</td><td className="num">{value(src(key).fabric.cancelled)}</td>
-                  <td className="num">{value(src(key).fabric.net)}</td><td className="num">{value(src(key).fabric.verified)}</td><td className="num">{value(src(key).rail.net)}</td>
-                  <td className="num">{number(src(key).orders)}</td><td className="num">{number(unknownBySource[key] ?? 0)}</td></tr>
+                <tr key={key}><th scope="row">{s[key] ?? key}</th><td className="num" data-label={x.table.ordered}>{value(src(key).fabric.ordered)}</td><td className="num" data-label={x.table.cancelled}>{value(src(key).fabric.cancelled)}</td>
+                  <td className="num" data-label={x.table.net}>{value(src(key).fabric.net)}</td><td className="num" data-label={x.table.verified}>{value(src(key).fabric.verified)}</td><td className="num" data-label={x.table.rail}>{value(src(key).rail.net)}</td>
+                  <td className="num" data-label={x.table.orders}>{number(src(key).orders)}</td><td className="num" data-label={x.kpi.unknown}>{number(unknownBySource[key] ?? 0)}</td></tr>
               ))}
-              <tr className="ceo-total"><th scope="row">{x.table.total}</th><td className="num">{value(sales.total.fabric.ordered)}</td><td className="num">{value(sales.total.fabric.cancelled)}</td>
-                <td className="num">{value(sales.total.fabric.net)}</td><td className="num">{value(sales.total.fabric.verified)}</td><td className="num">{value(sales.total.rail.net)}</td>
-                <td className="num">{number(sales.total.orders)}</td><td className="num">{number(sales.unknown.lines)}</td></tr>
+              <tr className="ceo-total"><th scope="row">{x.table.total}</th><td className="num" data-label={x.table.ordered}>{value(sales.total.fabric.ordered)}</td><td className="num" data-label={x.table.cancelled}>{value(sales.total.fabric.cancelled)}</td>
+                <td className="num" data-label={x.table.net}>{value(sales.total.fabric.net)}</td><td className="num" data-label={x.table.verified}>{value(sales.total.fabric.verified)}</td><td className="num" data-label={x.table.rail}>{value(sales.total.rail.net)}</td>
+                <td className="num" data-label={x.table.orders}>{number(sales.total.orders)}</td><td className="num" data-label={x.kpi.unknown}>{number(sales.unknown.lines)}</td></tr>
             </tbody>
           </table>
         </div>
@@ -105,17 +105,17 @@ export function CeoCoverageView({ data }: { data: CeoCoverage }) {
             <thead><tr><th scope="col">{x.source}</th><th scope="col">{x.first}</th><th scope="col">{x.last}</th><th scope="col">{x.orders}</th><th scope="col">{x.metered}</th><th scope="col">{x.unknown}</th><th scope="col">{x.coverage}</th><th scope="col">{x.cancelled}</th><th scope="col">{x.production}</th><th scope="col">{x.gaps}</th></tr></thead>
             <tbody>
               {shops.map(([key, row]) => (
-                <tr key={key}><th scope="row">{s[key]}</th><td>{day(row.firstOrderAt)}</td><td>{day(row.lastOrderAt)}</td><td className="num">{number(row.orders)}</td>
-                  <td className="num">{number(row.meteredLines)}</td><td className="num">{number(row.unknownLines)}</td><td className="num">{pct(row.coveragePercent)}</td>
-                  <td className="num">{number(row.arasya.cancelled + row.outsideArasya.noSaleOrders)}</td><td className="num">{number(row.arasya.enteredProduction)}</td>
-                  <td>{row.gapMonths.length === 0 ? x.none : row.gapMonths.join(", ")}</td></tr>
+                <tr key={key}><th scope="row">{s[key]}</th><td data-label={x.first}>{day(row.firstOrderAt)}</td><td data-label={x.last}>{day(row.lastOrderAt)}</td><td className="num" data-label={x.orders}>{number(row.orders)}</td>
+                  <td className="num" data-label={x.metered}>{number(row.meteredLines)}</td><td className="num" data-label={x.unknown}>{number(row.unknownLines)}</td><td className="num" data-label={x.coverage}>{pct(row.coveragePercent)}</td>
+                  <td className="num" data-label={x.cancelled}>{number(row.arasya.cancelled + row.outsideArasya.noSaleOrders)}</td><td className="num" data-label={x.production}>{number(row.arasya.enteredProduction)}</td>
+                  <td data-label={x.gaps}>{row.gapMonths.length === 0 ? x.none : row.gapMonths.join(", ")}</td></tr>
               ))}
-              <tr><th scope="row">{s.trendyol}</th><td>{day(ty.firstOrderAt)}</td><td>{day(ty.lastOrderAt)}</td><td className="num">{number(ty.orders)}</td>
-                <td className="num">{x.none}</td><td className="num">{x.none}</td><td className="num">{pct(ty.panelCoveragePercent)}</td><td className="num">{number(ty.cancelled)}</td>
-                <td className="num">{number(ty.enteredProduction)}</td><td>{ty.gapMonths.length === 0 ? x.none : ty.gapMonths.join(", ")}</td></tr>
-              <tr><th scope="row">{s.b2b}</th><td>{day(b2b.firstOrderAt)}</td><td>{day(b2b.lastOrderAt)}</td><td className="num">{number(b2b.realOrders)}</td>
-                <td className="num">{number(b2b.realLinesByStatus.measured_source ?? 0)}</td><td className="num">{number(b2b.realLinesByStatus.unknown ?? 0)}</td><td className="num">{pct(b2b.coveragePercent)}</td>
-                <td className="num">{number(b2b.realCancelled)}</td><td className="num">{number(b2b.handedOff)}</td><td>{b2b.gapMonths.length === 0 ? x.none : b2b.gapMonths.join(", ")}</td></tr>
+              <tr><th scope="row">{s.trendyol}</th><td data-label={x.first}>{day(ty.firstOrderAt)}</td><td data-label={x.last}>{day(ty.lastOrderAt)}</td><td className="num" data-label={x.orders}>{number(ty.orders)}</td>
+                <td className="num" data-label={x.metered}>{x.none}</td><td className="num" data-label={x.unknown}>{x.none}</td><td className="num" data-label={x.coverage}>{pct(ty.panelCoveragePercent)}</td><td className="num" data-label={x.cancelled}>{number(ty.cancelled)}</td>
+                <td className="num" data-label={x.production}>{number(ty.enteredProduction)}</td><td data-label={x.gaps}>{ty.gapMonths.length === 0 ? x.none : ty.gapMonths.join(", ")}</td></tr>
+              <tr><th scope="row">{s.b2b}</th><td data-label={x.first}>{day(b2b.firstOrderAt)}</td><td data-label={x.last}>{day(b2b.lastOrderAt)}</td><td className="num" data-label={x.orders}>{number(b2b.realOrders)}</td>
+                <td className="num" data-label={x.metered}>{number(b2b.realLinesByStatus.measured_source ?? 0)}</td><td className="num" data-label={x.unknown}>{number(b2b.realLinesByStatus.unknown ?? 0)}</td><td className="num" data-label={x.coverage}>{pct(b2b.coveragePercent)}</td>
+                <td className="num" data-label={x.cancelled}>{number(b2b.realCancelled)}</td><td className="num" data-label={x.production}>{number(b2b.handedOff)}</td><td data-label={x.gaps}>{b2b.gapMonths.length === 0 ? x.none : b2b.gapMonths.join(", ")}</td></tr>
             </tbody>
           </table>
         </div>
@@ -134,10 +134,10 @@ export function CeoCoverageView({ data }: { data: CeoCoverage }) {
             <table className="data-table intelligence-table">
               <thead><tr><th scope="col">{x.cohortCode}</th><th scope="col">{x.cohortStatus}</th><th scope="col">{x.cohortMeters}</th><th scope="col">{x.cohortCanonical}</th><th scope="col">{x.cohortExcluded}</th><th scope="col">{x.cohortBooked}</th></tr></thead>
               <tbody>{cohort.items.map((item) => (
-                <tr key={item.orderCode}><td className="mono">{item.orderCode}</td><td>{item.statusNow}</td><td className="num">{m(item.enteredMeters)}</td>
-                  <td>{item.canonicalOrder ? <Badge tone="neutral">{x.yes}</Badge> : x.none}</td>
-                  <td>{item.canonicalOrder ? (item.canonicalExcluded ? <Badge tone="success">{x.yes}</Badge> : <Badge tone="danger">{x.no}</Badge>) : x.none}</td>
-                  <td className="num">{m(item.soldMetersBooked)}</td></tr>
+                <tr key={item.orderCode}><td className="mono">{item.orderCode}</td><td data-label={x.cohortStatus}>{item.statusNow}</td><td className="num" data-label={x.cohortMeters}>{m(item.enteredMeters)}</td>
+                  <td data-label={x.cohortCanonical}>{item.canonicalOrder ? <Badge tone="neutral">{x.yes}</Badge> : x.none}</td>
+                  <td data-label={x.cohortExcluded}>{item.canonicalOrder ? (item.canonicalExcluded ? <Badge tone="success">{x.yes}</Badge> : <Badge tone="danger">{x.no}</Badge>) : x.none}</td>
+                  <td className="num" data-label={x.cohortBooked}>{m(item.soldMetersBooked)}</td></tr>
               ))}</tbody>
             </table>
           </div>
