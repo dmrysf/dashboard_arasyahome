@@ -73,15 +73,16 @@ test("meters are read as integer millimetres; malformed values are never zero", 
   assert.equal(share(1, 0), null);
 });
 
-test("periods: total starts at the analysis start and respects the 366-day window", () => {
+test("periods: total is all time (API 2.76.0 period=all); custom ranges reach back to the history floor", () => {
   assert.deepEqual(periodQuery("month", { from: "", to: "" }), { period: "month" });
-  assert.deepEqual(periodQuery("total", { from: "", to: "" }, new Date("2026-11-14T21:00:00Z")), { from: "2026-10-04", to: "2026-11-14" });
-  assert.deepEqual(periodQuery("total", { from: "", to: "" }, new Date("2027-12-01T10:00:00Z")), { from: "2026-12-01", to: "2027-12-01" });
+  assert.deepEqual(periodQuery("total", { from: "", to: "" }, new Date("2026-11-14T21:00:00Z")), { period: "all" });
+  assert.deepEqual(periodQuery("total", { from: "", to: "" }, new Date("2029-12-01T10:00:00Z")), { period: "all" }, "no 366-day cap");
   assert.deepEqual(periodQuery("custom", { from: "2026-10-04", to: "2026-10-31" }), { from: "2026-10-04", to: "2026-10-31" });
   assert.equal(validCustomRange("2026-10-04", "2026-10-31"), true);
-  assert.equal(validCustomRange("2026-10-01", "2026-10-31"), false, "before the analysis start");
+  assert.equal(validCustomRange("2024-05-01", "2026-11-18"), true, "multi-year history range");
+  assert.equal(validCustomRange("2023-12-31", "2024-01-31"), false, "before the history floor");
   assert.equal(validCustomRange("2026-11-02", "2026-11-01"), false);
-  assert.equal(validCustomRange("2026-10-04", "2027-10-06"), false, "more than 366 days");
+  assert.equal(validCustomRange("2024-01-01", "2035-01-01"), false, "more than MAX_RANGE_DAYS");
 });
 
 test("an empty ledger is never shown as zero ordered or sold meters", () => {

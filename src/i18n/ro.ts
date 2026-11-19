@@ -8,6 +8,7 @@ import { documentsRo } from "./documents";
 import { interventionsRo } from "./interventions";
 import { resolverRo } from "./resolver";
 import { ceoRo } from "./ceo";
+import { metersRo } from "./meters";
 import { intelligenceRo } from "./intelligence";
 import { timelineRo } from "./timeline";
 export const ro = {
@@ -16,6 +17,7 @@ export const ro = {
   interventions: interventionsRo,
   resolver: resolverRo,
   ceo: ceoRo,
+  meters: metersRo,
   intelligence: intelligenceRo,
   timeline: timelineRo,
   locale: { short: "RO", name: "Română", switcher: "Limba interfeței" },

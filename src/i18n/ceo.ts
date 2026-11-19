@@ -1,6 +1,6 @@
 /** CEO production reports (Dashboard 0.20.0, API 2.73.0): Romanian (reference) and Turkish texts. */
 export const ceoRo = {
-  tabs: { overview: "Panou CEO", completions: "Producție finalizată", skus: "Analiză produse" },
+  tabs: { overview: "Panou CEO", completions: "Producție finalizată", skus: "Analiză produse", coverage: "Acoperire date" },
   unavailable: "Serverul nu oferă încă acest raport (necesită API 2.73.0).",
   autoRefresh: (minutes: number) => `Reîmprospătare automată (${minutes} min)`,
   generatedAt: (at: string) => `Date citite la ${at}`,
@@ -105,7 +105,7 @@ export const ceoRo = {
 };
 
 export const ceoTr: typeof ceoRo = {
-  tabs: { overview: "CEO Paneli", completions: "Tamamlanan üretim", skus: "Ürün analizi" },
+  tabs: { overview: "CEO Paneli", completions: "Tamamlanan üretim", skus: "Ürün analizi", coverage: "Veri kapsamı" },
   unavailable: "Sunucu bu raporu henüz sunmuyor (API 2.73.0 gerekir).",
   autoRefresh: (minutes: number) => `Otomatik yenile (${minutes} dk)`,
   generatedAt: (at: string) => `Veriler ${at} itibarıyla okundu`,
